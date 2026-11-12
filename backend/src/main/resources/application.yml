@@ -1,0 +1,64 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: metromind
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/metromind}
+    username: ${DB_USER:metromind}
+    password: ${DB_PASSWORD:metromind}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+metromind:
+  sim:
+    speed: 10            # simulated seconds per real second
+    tick-millis: 500
+    start-clock: "07:30"
+    strategy: NO_CONTROL
+  kafka:
+    enabled: true
+  redis:
+    enabled: true
+  persistence:
+    enabled: true
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+---
+# Run without any infrastructure: mvn spring-boot:run -Dspring-boot.run.profiles=standalone
+spring:
+  config:
+    activate:
+      on-profile: standalone
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+metromind:
+  kafka:
+    enabled: false
+  redis:
+    enabled: false
+  persistence:
+    enabled: false
+management:
+  health:
+    redis:
+      enabled: false

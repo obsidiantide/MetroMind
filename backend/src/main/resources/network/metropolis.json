@@ -1,0 +1,187 @@
+{
+  "city": "Metropolis",
+  "stations": [
+    {
+      "id": "R1",
+      "name": "Harbor Gate",
+      "lat": 40.37,
+      "lon": 49.78,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "R2",
+      "name": "Old Market",
+      "lat": 40.372,
+      "lon": 49.8,
+      "baseArrivalsPerMinute": 6
+    },
+    {
+      "id": "R3",
+      "name": "Central",
+      "lat": 40.375,
+      "lon": 49.82,
+      "baseArrivalsPerMinute": 12
+    },
+    {
+      "id": "R4",
+      "name": "University",
+      "lat": 40.378,
+      "lon": 49.84,
+      "baseArrivalsPerMinute": 9
+    },
+    {
+      "id": "R5",
+      "name": "Riverside",
+      "lat": 40.381,
+      "lon": 49.86,
+      "baseArrivalsPerMinute": 5
+    },
+    {
+      "id": "R6",
+      "name": "Tech Park",
+      "lat": 40.384,
+      "lon": 49.88,
+      "baseArrivalsPerMinute": 7
+    },
+    {
+      "id": "R7",
+      "name": "Eastfield",
+      "lat": 40.387,
+      "lon": 49.9,
+      "baseArrivalsPerMinute": 3
+    },
+    {
+      "id": "B1",
+      "name": "Southport",
+      "lat": 40.33,
+      "lon": 49.825,
+      "baseArrivalsPerMinute": 3
+    },
+    {
+      "id": "B2",
+      "name": "Stadium",
+      "lat": 40.345,
+      "lon": 49.823,
+      "baseArrivalsPerMinute": 5
+    },
+    {
+      "id": "B4",
+      "name": "City Hall",
+      "lat": 40.395,
+      "lon": 49.818,
+      "baseArrivalsPerMinute": 8
+    },
+    {
+      "id": "B5",
+      "name": "Green Hills",
+      "lat": 40.41,
+      "lon": 49.816,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "B6",
+      "name": "Northgate",
+      "lat": 40.425,
+      "lon": 49.815,
+      "baseArrivalsPerMinute": 3
+    },
+    {
+      "id": "G1",
+      "name": "Airport Link",
+      "lat": 40.35,
+      "lon": 49.87,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "G2",
+      "name": "Exhibition",
+      "lat": 40.362,
+      "lon": 49.855,
+      "baseArrivalsPerMinute": 5
+    },
+    {
+      "id": "G5",
+      "name": "Lakeside",
+      "lat": 40.405,
+      "lon": 49.795,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "G6",
+      "name": "Westwood",
+      "lat": 40.415,
+      "lon": 49.775,
+      "baseArrivalsPerMinute": 3
+    }
+  ],
+  "lines": [
+    {
+      "id": "RED",
+      "name": "Red Line",
+      "color": "#e53935",
+      "stationIds": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ],
+      "runSeconds": [
+        191,
+        193,
+        193,
+        193,
+        193,
+        193
+      ],
+      "trainCount": 6,
+      "trainCapacity": 900
+    },
+    {
+      "id": "BLUE",
+      "name": "Blue Line",
+      "color": "#1e88e5",
+      "stationIds": [
+        "B1",
+        "B2",
+        "R3",
+        "B4",
+        "B5",
+        "B6"
+      ],
+      "runSeconds": [
+        187,
+        354,
+        243,
+        187,
+        187
+      ],
+      "trainCount": 5,
+      "trainCapacity": 900
+    },
+    {
+      "id": "GREEN",
+      "name": "Green Line",
+      "color": "#43a047",
+      "stationIds": [
+        "G1",
+        "G2",
+        "R4",
+        "B4",
+        "G5",
+        "G6"
+      ],
+      "runSeconds": [
+        204,
+        239,
+        286,
+        245,
+        223
+      ],
+      "trainCount": 4,
+      "trainCapacity": 900
+    }
+  ]
+}
