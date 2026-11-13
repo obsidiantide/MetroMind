@@ -10,7 +10,13 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
                             int capacity, boolean failed) {
     }
 
-    public record StationView(String id, double waiting, double predictedWaiting15m, String overloadRisk) {
+    /** @param queues waiting passengers broken down by line and direction of travel */
+    public record StationView(String id, double waiting, double predictedWaiting15m, String overloadRisk,
+                              List<QueueView> queues) {
+    }
+
+    /** @param towardsStationId terminal the queued passengers are travelling towards */
+    public record QueueView(String lineId, String towardsStationId, double waiting) {
     }
 
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class SimulationEngineTest {
 
@@ -92,5 +93,70 @@ class SimulationEngineTest {
         assertThat(DemandProfile.multiplier(8.25 * 3600)).isGreaterThan(DemandProfile.multiplier(12 * 3600));
         assertThat(DemandProfile.multiplier(18 * 3600)).isGreaterThan(DemandProfile.multiplier(14 * 3600));
         assertThat(DemandProfile.multiplier(3 * 3600)).isLessThan(0.5);
+    }
+
+    @Test
+    void demandSplitsByStationsAheadInEachDirection() {
+        Line line = TestNetworks.singleLine().line("L1");
+        assertThat(SimulationEngine.outboundShare(line, 0)).isEqualTo(1.0);
+        assertThat(SimulationEngine.outboundShare(line, 1)).isEqualTo(0.8);
+        assertThat(SimulationEngine.outboundShare(line, 5)).isZero();
+
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        engine.step(1);
+        double outbound = engine.stationWaiting("B", "L1", 1);
+        double inbound = engine.stationWaiting("B", "L1", -1);
+        assertThat(outbound).isPositive();
+        assertThat(outbound / inbound).isCloseTo(4.0, within(1e-9));
+        assertThat(outbound + inbound).isCloseTo(engine.stationWaiting("B"), within(1e-9));
+    }
+
+    @Test
+    void terminalsOnlyQueueTowardsTheOtherEnd() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        engine.step(1);
+        assertThat(engine.stationWaiting("A", "L1", -1)).isZero();
+        assertThat(engine.stationWaiting("A", "L1", 1)).isEqualTo(engine.stationWaiting("A"));
+        assertThat(engine.stationWaiting("F", "L1", 1)).isZero();
+        assertThat(engine.stationWaiting("F", "L1", -1)).isEqualTo(engine.stationWaiting("F"));
+
+        SimulationSnapshot.StationView a = engine.snapshot().stations().stream()
+                .filter(s -> s.id().equals("A")).findFirst().orElseThrow();
+        assertThat(a.queues()).singleElement().satisfies(q -> {
+            assertThat(q.lineId()).isEqualTo("L1");
+            assertThat(q.towardsStationId()).isEqualTo("F");
+        });
+    }
+
+    @Test
+    void trainBoardsOnlyPassengersTravellingInItsDirection() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleTrain(), START, HeadwayStrategy.NO_CONTROL);
+        TrainState train = engine.train("L1-1");
+        // The only train starts at A heading outbound; wait until it has called at C on the way out.
+        while (!(train.stop() == 2 && train.phase() == TrainPhase.DWELLING)) {
+            engine.step(1);
+        }
+        assertThat(engine.stationWaiting("C", "L1", 1)).isCloseTo(0.0, within(1e-9));
+        assertThat(engine.stationWaiting("C", "L1", -1)).isPositive();
+
+        // On the way back it serves the inbound queue and leaves the (refilled) outbound one alone.
+        while (!(train.stop() == 8 && train.phase() == TrainPhase.DWELLING)) {
+            engine.step(1);
+        }
+        assertThat(engine.stationWaiting("C", "L1", -1)).isCloseTo(0.0, within(1e-9));
+        assertThat(engine.stationWaiting("C", "L1", 1)).isPositive();
+    }
+
+    @Test
+    void predictionDoesNotLetOneDirectionOffsetTheOther() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleTrain(), START, HeadwayStrategy.NO_CONTROL);
+        TrainState train = engine.train("L1-1");
+        while (!(train.stop() == 2 && train.phase() == TrainPhase.DWELLING)) {
+            engine.step(1);
+        }
+        // The train is about to leave C outbound and will not return inbound within 60 s, so the inbound
+        // queue can only grow while the outbound queue is about to be served.
+        double inbound = engine.stationWaiting("C", "L1", -1);
+        assertThat(engine.predictWaiting("C", 60)).isGreaterThanOrEqualTo(inbound);
     }
 }

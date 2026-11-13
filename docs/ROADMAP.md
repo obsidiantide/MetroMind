@@ -16,11 +16,11 @@ Mark items `[x]` when merged.
 - [x] Kafka telemetry, Redis state cache, PostGIS topology, STOMP WebSocket feed
 - [x] Next.js live dashboard with map, incident panel and what-if table
 - [x] Docker Compose, CI
+- [x] Per-direction passenger queues (one queue per station, line and direction of travel)
 
 ## Next
 
 ### Simulation fidelity
-- [ ] Per-direction passenger queues (today one queue per station per line serves both directions)
 - [ ] Origin–destination matrix instead of a fixed alighting fraction; transfers between lines at interchanges
 - [ ] Investigate why a delay can *reduce* total waiting under NO_CONTROL in some runs; fix or document
 - [ ] Platform capacity limits and "passengers left behind" metric
