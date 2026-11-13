@@ -96,19 +96,16 @@ class SimulationEngineTest {
     }
 
     @Test
-    void demandSplitsByStationsAheadInEachDirection() {
-        Line line = TestNetworks.singleLine().line("L1");
-        assertThat(SimulationEngine.outboundShare(line, 0)).isEqualTo(1.0);
-        assertThat(SimulationEngine.outboundShare(line, 1)).isEqualTo(0.8);
-        assertThat(SimulationEngine.outboundShare(line, 5)).isZero();
-
+    void demandSplitsByDestinationsAheadInEachDirection() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.step(1);
         double outbound = engine.stationWaiting("B", "L1", 1);
         double inbound = engine.stationWaiting("B", "L1", -1);
         assertThat(outbound).isPositive();
-        assertThat(outbound / inbound).isCloseTo(4.0, within(1e-9));
+        // Gravity model: from B, destinations C..F (12 + 8 + 6 + 4) versus A (5).
+        assertThat(outbound / inbound).isCloseTo(30.0 / 5.0, within(1e-9));
         assertThat(outbound + inbound).isCloseTo(engine.stationWaiting("B"), within(1e-9));
+        assertThat(engine.stationWaiting("B", "L1", 1, "C") / outbound).isCloseTo(12.0 / 30.0, within(1e-9));
     }
 
     @Test

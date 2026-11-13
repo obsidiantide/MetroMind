@@ -19,7 +19,13 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
     public record QueueView(String lineId, String towardsStationId, double waiting) {
     }
 
+    /**
+     * @param passengersServed    boardings so far, counting each line of a journey with transfers
+     * @param passengersDelivered passengers who reached their destination
+     * @param transfers           line changes made at interchanges
+     */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
-                          double passengersServed, double headwayCoefficientOfVariation) {
+                          double passengersServed, double passengersDelivered, double transfers,
+                          double headwayCoefficientOfVariation) {
     }
 }

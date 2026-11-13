@@ -5,6 +5,7 @@ import com.metromind.network.MetroNetwork;
 import com.metromind.network.Station;
 
 import java.util.List;
+import java.util.Map;
 
 public final class TestNetworks {
     private TestNetworks() {
@@ -27,5 +28,21 @@ public final class TestNetworks {
         Line line = new Line("L1", "Line 1", "#f00", List.of("A", "B", "C", "D", "E", "F"),
                 List.of(120, 120, 120, 120, 120), 1, 900);
         return new MetroNetwork("Test", base.stations(), List.of(line));
+    }
+
+    /**
+     * {@link #singleLine()} crossed at C by a second line X–C–Y (2 trains), so trips such as A→Y need a transfer.
+     */
+    public static MetroNetwork twoLines() {
+        return twoLines(Map.of());
+    }
+
+    public static MetroNetwork twoLines(Map<String, Map<String, Double>> odWeights) {
+        MetroNetwork base = singleLine();
+        List<Station> stations = new java.util.ArrayList<>(base.stations());
+        stations.add(new Station("X", "X", 0.01, 0.02, 6));
+        stations.add(new Station("Y", "Y", -0.01, 0.02, 10));
+        Line cross = new Line("L2", "Line 2", "#00f", List.of("X", "C", "Y"), List.of(150, 150), 2, 600);
+        return new MetroNetwork("Test", stations, List.of(base.line("L1"), cross), odWeights);
     }
 }

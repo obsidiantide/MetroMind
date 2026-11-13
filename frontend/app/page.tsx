@@ -29,6 +29,11 @@ export default function Home() {
           <section className="panel kpis">
             <div className="kpi"><b>{Math.round(m.averageDelaySeconds)} s</b><span>avg delay</span></div>
             <div className="kpi"><b>{Math.round(m.totalWaiting)}</b><span>waiting now</span></div>
+            <div className="kpi"><b>{Math.round(m.passengersDelivered)}</b><span>journeys completed</span></div>
+            <div className="kpi">
+              <b>{(m.passengersDelivered > 0 ? m.transfers / m.passengersDelivered : 0).toFixed(2)}</b>
+              <span>transfers per journey</span>
+            </div>
             <div className="kpi"><b>{m.headwayCoefficientOfVariation.toFixed(2)}</b><span>headway CV (bunching)</span></div>
           </section>
         )}

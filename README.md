@@ -14,9 +14,9 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 |---|---|
 | Virtual trains, stations, lines | Network loaded from JSON, persisted to PostGIS (`GEOGRAPHY(POINT)`, `GEOMETRY(LINESTRING)`) |
 | Train movement | Discrete-time engine, 1 s step, fixed-block signalling (segment + next platform) |
-| Passenger flow | Fluid demand model with morning/evening peaks; one queue per station, line and direction (split by stations ahead); boarding, alighting, crowding-dependent dwell times |
+| Passenger flow | Fluid demand model with morning/evening peaks; origin–destination matrix (gravity model or explicit weights); fastest-route assignment with transfers at interchanges; one queue per station, line and direction, tracked by destination; crowding-dependent dwell times |
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
-| Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow − share of capacity of trains calling in that direction |
+| Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
@@ -89,6 +89,21 @@ WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/
 Each station in a snapshot carries `queues`: waiting passengers per line and direction, e.g.
 `{ "lineId": "RED", "towardsStationId": "R7", "waiting": 42.0 }`. A train only boards the queue for the
 direction it is about to travel in; terminals have a single queue towards the other end of the line.
+
+### Passenger demand and routing
+
+Every passenger has an origin and a destination. By default destinations follow a gravity model: from any
+station, a destination attracts trips in proportion to its own ridership (`baseArrivalsPerMinute`). A network
+file may override this per origin with relative weights (destinations not listed get none):
+
+```json
+"odWeights": { "R1": { "R3": 3, "B6": 1 } }
+```
+
+Passengers take the fastest route: each segment costs its nominal run time plus a dwell, boarding a line costs
+half its headway and a change of line adds a 120 s walk. They leave the train at their destination, or at an
+interchange where they join the queue for their next line. Snapshot `metrics` report `passengersServed`
+(boardings, one per line ridden), `passengersDelivered` (completed journeys) and `transfers` (line changes).
 
 ## Project layout
 
