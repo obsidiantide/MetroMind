@@ -14,9 +14,9 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 |---|---|
 | Virtual trains, stations, lines | Network loaded from JSON, persisted to PostGIS (`GEOGRAPHY(POINT)`, `GEOMETRY(LINESTRING)`) |
 | Train movement | Discrete-time engine, 1 s step, fixed-block signalling (segment + next platform) |
-| Passenger flow | Fluid demand model with morning/evening peaks; boarding, alighting, crowding-dependent dwell times |
+| Passenger flow | Fluid demand model with morning/evening peaks; one queue per station, line and direction (split by stations ahead); boarding, alighting, crowding-dependent dwell times |
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
-| Overload prediction | 15-minute forecast per station: queue + inflow − share of capacity of approaching trains |
+| Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow − share of capacity of trains calling in that direction |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
@@ -85,6 +85,10 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
 WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/state`.
+
+Each station in a snapshot carries `queues`: waiting passengers per line and direction, e.g.
+`{ "lineId": "RED", "towardsStationId": "R7", "waiting": 42.0 }`. A train only boards the queue for the
+direction it is about to travel in; terminals have a single queue towards the other end of the line.
 
 ## Project layout
 

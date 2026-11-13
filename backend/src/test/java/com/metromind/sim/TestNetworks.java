@@ -20,4 +20,12 @@ public final class TestNetworks {
                 List.of(120, 120, 120, 120, 120), 4, 900);
         return new MetroNetwork("Test", stations, List.of(line));
     }
+
+    /** Same six stations as {@link #singleLine()} with a single train, so queues are easy to follow. */
+    public static MetroNetwork singleTrain() {
+        MetroNetwork base = singleLine();
+        Line line = new Line("L1", "Line 1", "#f00", List.of("A", "B", "C", "D", "E", "F"),
+                List.of(120, 120, 120, 120, 120), 1, 900);
+        return new MetroNetwork("Test", base.stations(), List.of(line));
+    }
 }

@@ -10,7 +10,10 @@ export interface TrainView {
   id: string; lineId: string; fromStationId: string; toStationId: string; progress: number;
   lat: number; lon: number; phase: TrainPhase; delaySeconds: number; load: number; capacity: number; failed: boolean;
 }
-export interface StationView { id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH" }
+export interface QueueView { lineId: string; towardsStationId: string; waiting: number }
+export interface StationView {
+  id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH"; queues: QueueView[];
+}
 export interface SimEvent { simTime: number; type: string; subjectId: string; message: string }
 export interface Snapshot {
   simTime: number; clock: string; strategy: string; trains: TrainView[]; stations: StationView[];
