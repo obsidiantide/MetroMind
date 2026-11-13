@@ -3,7 +3,9 @@ export interface Line {
   id: string; name: string; color: string; stationIds: string[]; runSeconds: number[];
   trainCount: number; trainCapacity: number;
 }
-export interface MetroNetwork { city: string; stations: Station[]; lines: Line[] }
+export interface MetroNetwork {
+  city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
+}
 
 export type TrainPhase = "DWELLING" | "HELD" | "WAITING_SIGNAL" | "RUNNING";
 export interface TrainView {
@@ -18,7 +20,10 @@ export interface SimEvent { simTime: number; type: string; subjectId: string; me
 export interface Snapshot {
   simTime: number; clock: string; strategy: string; trains: TrainView[]; stations: StationView[];
   recentEvents: SimEvent[];
-  metrics: { averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number; headwayCoefficientOfVariation: number };
+  metrics: {
+    averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
+    passengersDelivered: number; transfers: number; headwayCoefficientOfVariation: number;
+  };
 }
 export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;

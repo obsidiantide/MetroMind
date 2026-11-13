@@ -14,7 +14,10 @@ public final class TrainState {
     double phaseRemaining;
     double segmentElapsed;
     double segmentDuration;
+    /** Passengers on board, total; always equal to the sum of {@link #onboard}. */
     double passengers;
+    /** Passengers on board by destination station index. */
+    final double[] onboard;
     /** Time the train was scheduled to arrive at {@link #stop}. */
     double scheduledArrival;
     double delaySeconds;
@@ -25,14 +28,16 @@ public final class TrainState {
     boolean delayAlertActive;
     final List<Double> arrivals = new ArrayList<>();
 
-    TrainState(String id, String lineId, int capacity) {
+    TrainState(String id, String lineId, int capacity, int stationCount) {
         this.id = id;
         this.lineId = lineId;
         this.capacity = capacity;
+        this.onboard = new double[stationCount];
     }
 
     TrainState copy() {
-        TrainState t = new TrainState(id, lineId, capacity);
+        TrainState t = new TrainState(id, lineId, capacity, onboard.length);
+        System.arraycopy(onboard, 0, t.onboard, 0, onboard.length);
         t.stop = stop;
         t.phase = phase;
         t.phaseRemaining = phaseRemaining;

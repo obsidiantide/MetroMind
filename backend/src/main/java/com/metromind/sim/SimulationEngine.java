@@ -19,10 +19,11 @@ import java.util.Map;
  * produce identical results. This is what makes counterfactual analysis ("what if train R-3 is delayed by
  * 4 minutes?") possible: copy the engine, inject the incident into one copy and compare.
  *
- * <p>Each station keeps one passenger queue per line and direction of travel. Arriving passengers are split
- * evenly between the lines serving the station, then between the two directions in proportion to the number
- * of stations ahead in each direction (so a terminal only has a queue towards the other end of the line).
- * A train boards only the queue for the direction it is about to travel in.
+ * <p>Passengers travel between an origin and a destination drawn from an {@link OdMatrix} and follow the
+ * cheapest route computed by {@link RoutePlanner}, changing lines at interchanges where that is faster. Each
+ * station keeps one passenger queue per line and direction of travel, broken down by destination. A train boards
+ * only the queue for the direction it is about to travel in; passengers leave the train at their destination,
+ * or at an interchange where they join the queue for their next line.
  *
  * <p>Signalling uses fixed blocks: a train may only leave a platform when the next segment and the next
  * platform are both free. Delays therefore propagate to followers naturally.
@@ -35,7 +36,8 @@ public final class SimulationEngine {
     static final double MIN_DWELL = 15;
     static final double MAX_DWELL = 90;
     static final double SECONDS_PER_PASSENGER = 0.04;
-    static final double ALIGHT_FRACTION = 1.0 / 6.0;
+    /** Time constant of the moving average used to estimate transfer inflow for predictions. */
+    static final double TRANSFER_RATE_WINDOW_SECONDS = 600;
     static final double DELAY_ALERT_SECONDS = 120;
     static final double DELAY_RECOVERED_SECONDS = 60;
     static final double OVERLOAD_HIGH = 400;
@@ -46,6 +48,8 @@ public final class SimulationEngine {
     private final Map<String, Line> lines = new LinkedHashMap<>();
     private final Map<String, double[]> cumulativeStopSeconds = new LinkedHashMap<>();
     private final Map<String, List<String>> linesByStation = new LinkedHashMap<>();
+    private final RoutePlanner routes;
+    private final OdMatrix od;
 
     private final List<TrainState> trains = new ArrayList<>();
     private final Map<String, StationState> stations = new LinkedHashMap<>();
@@ -70,38 +74,32 @@ public final class SimulationEngine {
                 linesByStation.computeIfAbsent(sid, k -> new ArrayList<>()).add(line.id());
             }
         }
-        for (Station s : network.stations()) {
+        this.routes = new RoutePlanner(network, NOMINAL_DWELL);
+        this.od = new OdMatrix(network, routes);
+        int n = network.stations().size();
+        for (int o = 0; o < n; o++) {
+            Station s = network.stations().get(o);
             StationState st = new StationState(s.id());
-            List<String> stationLines = linesByStation.getOrDefault(s.id(), List.of());
-            for (String lid : stationLines) {
+            // A platform queue for every direction a train can leave in (a terminal only has one per line).
+            for (String lid : linesByStation.getOrDefault(s.id(), List.of())) {
                 Line line = lines.get(lid);
-                double outbound = outboundShare(line, line.stationIds().indexOf(s.id()));
-                addQueue(st, new StationState.QueueKey(lid, 1), outbound / stationLines.size());
-                addQueue(st, new StationState.QueueKey(lid, -1), (1 - outbound) / stationLines.size());
+                int pos = line.stationIds().indexOf(s.id());
+                if (pos < line.stationIds().size() - 1) {
+                    st.waiting.put(new StationState.QueueKey(lid, 1), new double[n]);
+                }
+                if (pos > 0) {
+                    st.waiting.put(new StationState.QueueKey(lid, -1), new double[n]);
+                }
+            }
+            for (int d = 0; d < n; d++) {
+                double share = od.share(o, d);
+                if (share > 0) {
+                    st.arrivalShare.computeIfAbsent(routes.entryQueue(o, d), k -> new double[n])[d] += share;
+                }
             }
             stations.put(s.id(), st);
         }
         placeTrains();
-    }
-
-    private static void addQueue(StationState st, StationState.QueueKey key, double share) {
-        if (share > 0) {
-            st.waiting.put(key, 0.0);
-            st.arrivalShare.put(key, share);
-        }
-    }
-
-    /**
-     * Fraction of passengers at the station with index {@code index} on {@code line} who travel outbound
-     * (towards the last station). Destinations are assumed to be spread evenly over the other stations of the
-     * line, so the split follows the number of stations ahead in each direction.
-     */
-    static double outboundShare(Line line, int index) {
-        int last = line.stationIds().size() - 1;
-        if (index < 0 || index > last) {
-            throw new IllegalArgumentException("Station index " + index + " is not on line " + line.id());
-        }
-        return (double) (last - index) / last;
     }
 
     private SimulationEngine(SimulationEngine other) {
@@ -109,6 +107,8 @@ public final class SimulationEngine {
         this.lines.putAll(other.lines);
         this.cumulativeStopSeconds.putAll(other.cumulativeStopSeconds);
         this.linesByStation.putAll(other.linesByStation);
+        this.routes = other.routes;
+        this.od = other.od;
         other.trains.forEach(t -> this.trains.add(t.copy()));
         other.stations.forEach((k, v) -> this.stations.put(k, v.copy()));
         this.events.addAll(other.events);
@@ -141,7 +141,8 @@ public final class SimulationEngine {
                     throw new IllegalStateException("Too many trains for line " + line.id());
                 }
                 used = stop;
-                TrainState t = new TrainState(line.id() + "-" + (i + 1), line.id(), line.trainCapacity());
+                TrainState t = new TrainState(line.id() + "-" + (i + 1), line.id(), line.trainCapacity(),
+                        network.stations().size());
                 t.stop = stop;
                 t.phase = TrainPhase.DWELLING;
                 t.phaseRemaining = NOMINAL_DWELL;
@@ -170,13 +171,20 @@ public final class SimulationEngine {
 
     private void accumulateDemand(double dt) {
         double mult = DemandProfile.multiplier(simTime);
+        double decay = Math.exp(-dt / TRANSFER_RATE_WINDOW_SECONDS);
         for (Station s : network.stations()) {
             StationState st = stations.get(s.id());
             if (st.waiting.isEmpty()) {
                 continue;
             }
             double arrivals = s.baseArrivalsPerMinute() * mult * dt / 60.0;
-            st.waiting.replaceAll((key, w) -> w + arrivals * st.arrivalShare.get(key));
+            st.arrivalShare.forEach((key, share) -> {
+                double[] queue = st.waiting.get(key);
+                for (int d = 0; d < queue.length; d++) {
+                    queue[d] += arrivals * share[d];
+                }
+            });
+            st.recentTransfers.replaceAll((key, v) -> v * decay);
             double total = st.totalWaiting();
             st.waitSeconds += total * dt;
             st.peakWaiting = Math.max(st.peakWaiting, total);
@@ -261,20 +269,66 @@ public final class SimulationEngine {
 
         String stationId = line.stationAtStop(t.stop);
         StationState st = stations.get(stationId);
-        boolean terminal = t.stop == 0 || t.stop == line.stationIds().size() - 1;
-        double alight = terminal ? t.passengers : t.passengers * ALIGHT_FRACTION;
-        t.passengers -= alight;
-        StationState.QueueKey queue = new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop));
-        double waiting = st.waiting.getOrDefault(queue, 0.0);
-        double board = Math.min(waiting, t.capacity - t.passengers);
-        st.waiting.put(queue, waiting - board);
-        st.served += board;
-        t.passengers += board;
+        double alight = alight(t, line, st);
+        double board = board(t, line, st);
 
         t.phase = TrainPhase.DWELLING;
         t.holdDecided = false;
         t.phaseRemaining = Math.max(MIN_DWELL,
                 Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
+    }
+
+    /**
+     * Passengers whose destination is this station leave the network; passengers whose route changes lines
+     * here join the queue for their next line. Everyone else stays aboard.
+     */
+    private double alight(TrainState t, Line line, StationState st) {
+        int lineIdx = routes.lineIndex(line.id());
+        int here = routes.index(st.id);
+        boolean[] stays = routes.staysAboard(lineIdx, t.stop);
+        double alight = 0;
+        for (int d = 0; d < t.onboard.length; d++) {
+            double amount = t.onboard[d];
+            if (amount <= 0 || stays[d]) {
+                continue;
+            }
+            t.onboard[d] = 0;
+            alight += amount;
+            StationState.QueueKey next = d == here ? null : routes.transferQueue(lineIdx, t.stop, d);
+            if (next == null) {
+                st.delivered += amount;
+            } else {
+                st.waiting.get(next)[d] += amount;
+                st.transfers += amount;
+                st.recentTransfers.merge(next, amount, Double::sum);
+            }
+        }
+        t.passengers = StationState.sum(t.onboard);
+        return alight;
+    }
+
+    /** Boards the queue for the train's direction; if it does not fit, every destination boards pro rata. */
+    private double board(TrainState t, Line line, StationState st) {
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        if (queue == null) {
+            return 0;
+        }
+        double waiting = StationState.sum(queue);
+        double room = Math.max(0, t.capacity - t.passengers);
+        if (waiting <= 0 || room <= 0) {
+            return 0;
+        }
+        double fraction = Math.min(1, room / waiting);
+        double board = 0;
+        for (int d = 0; d < queue.length; d++) {
+            double b = queue[d] * fraction;
+            queue[d] -= b;
+            t.onboard[d] += b;
+            board += b;
+        }
+        st.served += board;
+        t.passengers = StationState.sum(t.onboard);
+        return board;
     }
 
     private void detectDelay(TrainState t) {
@@ -356,34 +410,34 @@ public final class SimulationEngine {
 
     /**
      * Predicts how many passengers will be waiting at a station after {@code horizon} seconds. Each platform
-     * queue (line + direction) is forecast separately: current queue + expected arrivals − residual capacity of
-     * the trains that will call at the station in that direction within the horizon. A train travelling the
-     * other way cannot relieve a queue, so a surplus in one direction never offsets a backlog in the other.
+     * queue (line + direction) is forecast separately: current queue + expected arrivals (new trips routed to
+     * this queue plus recent transfers into it) − the share of free space of the trains that will call at the
+     * station in that direction within the horizon. A train travelling the other way cannot relieve a queue, so
+     * a surplus in one direction never offsets a backlog in the other.
      */
     public double predictWaiting(String stationId, double horizon) {
         StationState st = stations.get(stationId);
-        Station station = network.station(stationId);
-        double inflow = station.baseArrivalsPerMinute() * DemandProfile.multiplier(simTime + horizon / 2) * horizon / 60.0;
+        double mult = DemandProfile.multiplier(simTime + horizon / 2);
         double predicted = 0;
-        for (Map.Entry<StationState.QueueKey, Double> queue : st.waiting.entrySet()) {
-            StationState.QueueKey key = queue.getKey();
+        for (StationState.QueueKey key : st.waiting.keySet()) {
             Line line = lines.get(key.lineId());
-            // Fraction of this station's demand on this line that travels in this direction.
-            double directionShare = key.direction() > 0
-                    ? outboundShare(line, line.stationIds().indexOf(stationId))
-                    : 1 - outboundShare(line, line.stationIds().indexOf(stationId));
-            double stationShare = demandShare(line, station) * directionShare;
-            double expected = queue.getValue() + inflow * st.arrivalShare.get(key);
+            double rate = boardingRate(st, key, mult);
+            double lineRate = 0;
+            for (String sid : line.stationIds()) {
+                lineRate += boardingRate(stations.get(sid), key, mult);
+            }
+            // A train's spare room is shared by every station it serves in this direction, roughly in proportion
+            // to demand, so this queue can only count on its share of it.
+            double share = lineRate > 0 ? rate / lineRate : 0;
+            double expected = st.waiting(key) + rate * horizon;
             for (TrainState t : trains) {
                 if (!t.lineId.equals(key.lineId())) {
                     continue;
                 }
-                double eta = secondsUntilStop(t, line, stationId, key.direction());
-                if (eta <= horizon) {
-                    // A train's spare room is shared by every station it still serves, roughly in proportion
-                    // to demand, so this queue can only count on its share of it.
-                    double residual = Math.max(0, t.capacity - t.passengers * (1 - ALIGHT_FRACTION));
-                    expected -= Math.min(residual, residual * 2 * stationShare);
+                int stop = nextCallStop(t, line, stationId, key.direction());
+                if (stop >= 0 && secondsUntilStop(t, line, stop) <= horizon) {
+                    double residual = Math.max(0, t.capacity - passengersAboardAfter(t, line, stop));
+                    expected -= residual * share;
                 }
             }
             predicted += Math.max(0, expected);
@@ -391,28 +445,72 @@ public final class SimulationEngine {
         return predicted;
     }
 
-    private double demandShare(Line line, Station station) {
-        double total = line.stationIds().stream().map(network::station)
-                .mapToDouble(Station::baseArrivalsPerMinute).sum();
-        return total == 0 ? 0 : station.baseArrivalsPerMinute() / total;
+    /** Expected passengers per second joining queue {@code key} at a station (0 if it has no such queue). */
+    private double boardingRate(StationState st, StationState.QueueKey key, double demandMultiplier) {
+        if (!st.waiting.containsKey(key)) {
+            return 0;
+        }
+        double newTrips = network.station(st.id).baseArrivalsPerMinute() * demandMultiplier / 60.0
+                * st.arrivalShare(key);
+        double transfers = st.recentTransfers.getOrDefault(key, 0.0) / TRANSFER_RATE_WINDOW_SECONDS;
+        return newTrips + transfers;
     }
 
-    /** Seconds until {@code t} calls at {@code stationId} ready to depart in {@code direction}. */
-    private double secondsUntilStop(TrainState t, Line line, String stationId, int direction) {
+    /** Loop stop at which {@code t} next calls at {@code stationId} ready to leave in {@code direction}. */
+    private int nextCallStop(TrainState t, Line line, String stationId, int direction) {
         double[] cum = cumulativeStopSeconds.get(line.id());
         double total = cum[line.loopLength()];
         double pos = loopPosition(t);
         double best = Double.MAX_VALUE;
+        int bestStop = -1;
         for (int k = 0; k < line.loopLength(); k++) {
             if (line.stationAtStop(k).equals(stationId) && line.directionAtStop(k) == direction) {
                 double d = cum[k] - pos;
                 if (d <= 0) {
                     d += total;
                 }
-                best = Math.min(best, d);
+                if (d < best) {
+                    best = d;
+                    bestStop = k;
+                }
             }
         }
-        return best + Math.max(0, t.blockedRemaining);
+        return bestStop;
+    }
+
+    /** Nominal seconds until {@code t} reaches loop stop {@code stop}, plus any time it is blocked. */
+    private double secondsUntilStop(TrainState t, Line line, int stop) {
+        double[] cum = cumulativeStopSeconds.get(line.id());
+        double d = cum[stop] - loopPosition(t);
+        if (d <= 0) {
+            d += cum[line.loopLength()];
+        }
+        return d + Math.max(0, t.blockedRemaining);
+    }
+
+    /**
+     * Passengers currently on {@code t} who will still be aboard after it has called at loop stop {@code stop}
+     * (everyone alighting at or before that stop frees their place).
+     */
+    double passengersAboardAfter(TrainState t, Line line, int stop) {
+        int lineIdx = routes.lineIndex(line.id());
+        boolean[] aboard = new boolean[t.onboard.length];
+        java.util.Arrays.fill(aboard, true);
+        int k = t.stop;
+        do {
+            k = (k + 1) % line.loopLength();
+            boolean[] stays = routes.staysAboard(lineIdx, k);
+            for (int d = 0; d < aboard.length; d++) {
+                aboard[d] &= stays[d];
+            }
+        } while (k != stop);
+        double remaining = 0;
+        for (int d = 0; d < aboard.length; d++) {
+            if (aboard[d]) {
+                remaining += t.onboard[d];
+            }
+        }
+        return remaining;
     }
 
     private void updateOverloadAlerts() {
@@ -455,7 +553,7 @@ public final class SimulationEngine {
             st.waiting.forEach((key, waiting) -> {
                 List<String> ids = lines.get(key.lineId()).stationIds();
                 String towards = key.direction() > 0 ? ids.get(ids.size() - 1) : ids.get(0);
-                queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, waiting));
+                queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,
                     riskLevel(predicted), queues));
@@ -469,7 +567,9 @@ public final class SimulationEngine {
         double max = trains.stream().mapToDouble(t -> t.delaySeconds).max().orElse(0);
         double waiting = stations.values().stream().mapToDouble(StationState::totalWaiting).sum();
         double served = stations.values().stream().mapToDouble(s -> s.served).sum();
-        return new SimulationSnapshot.Metrics(avg, max, waiting, served, headwayCv());
+        double delivered = stations.values().stream().mapToDouble(s -> s.delivered).sum();
+        double transfers = stations.values().stream().mapToDouble(s -> s.transfers).sum();
+        return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, headwayCv());
     }
 
     /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
@@ -524,6 +624,30 @@ public final class SimulationEngine {
      * -1 towards its first). Returns 0 for a queue that does not exist, e.g. outbound at the last station.
      */
     public double stationWaiting(String stationId, String lineId, int direction) {
-        return stations.get(stationId).waiting.getOrDefault(new StationState.QueueKey(lineId, direction), 0.0);
+        return stations.get(stationId).waiting(new StationState.QueueKey(lineId, direction));
     }
+
+    /** Passengers waiting at a station for one line and direction who are heading to {@code destinationId}. */
+    public double stationWaiting(String stationId, String lineId, int direction, String destinationId) {
+        double[] queue = stations.get(stationId).waiting.get(new StationState.QueueKey(lineId, direction));
+        return queue == null ? 0 : queue[routes.index(destinationId)];
+    }
+
+    /** Passengers on board {@code trainId} heading to {@code destinationId}. */
+    public double trainPassengersTo(String trainId, String destinationId) {
+        return train(trainId).onboard[routes.index(destinationId)];
+    }
+
+    /** Fraction of trips entering at {@code originId} that travel to {@code destinationId}. */
+    public double odShare(String originId, String destinationId) {
+        return od.share(routes.index(originId), routes.index(destinationId));
+    }
+
+    /** Lines a passenger from {@code originId} to {@code destinationId} rides, in order. */
+    public List<String> route(String originId, String destinationId) {
+        return routes.linesRidden(routes.index(originId), routes.index(destinationId));
+    }
+
+    public double stationDelivered(String stationId) { return stations.get(stationId).delivered; }
+    public double stationTransfers(String stationId) { return stations.get(stationId).transfers; }
 }

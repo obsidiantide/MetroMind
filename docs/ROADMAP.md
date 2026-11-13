@@ -21,7 +21,7 @@ Mark items `[x]` when merged.
 ## Next
 
 ### Simulation fidelity
-- [ ] Origin–destination matrix instead of a fixed alighting fraction; transfers between lines at interchanges
+- [x] Origin–destination matrix instead of a fixed alighting fraction; transfers between lines at interchanges
 - [ ] Investigate why a delay can *reduce* total waiting under NO_CONTROL in some runs; fix or document
 - [ ] Platform capacity limits and "passengers left behind" metric
 - [ ] Scheduled timetable (planned departures) and lateness vs timetable instead of vs nominal run times

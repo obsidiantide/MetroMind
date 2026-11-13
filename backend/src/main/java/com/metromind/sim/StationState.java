@@ -5,13 +5,26 @@ import java.util.Map;
 
 final class StationState {
     final String id;
-    /** Passengers waiting per platform queue (line + direction of travel). */
-    final Map<QueueKey, Double> waiting = new LinkedHashMap<>();
-    /** Share of the station's passenger arrivals that joins each queue; values sum to 1. */
-    final Map<QueueKey, Double> arrivalShare = new LinkedHashMap<>();
+    /** Passengers waiting per platform queue (line + direction of travel), broken down by destination index. */
+    final Map<QueueKey, double[]> waiting = new LinkedHashMap<>();
+    /**
+     * For each queue, the fraction of the station's new passenger arrivals that joins it, per destination.
+     * Summed over queues and destinations this is 1 (or 0 if the station generates no trips).
+     */
+    final Map<QueueKey, double[]> arrivalShare = new LinkedHashMap<>();
+    /**
+     * Exponentially decayed count of passengers who joined each queue by changing lines here; divided by the
+     * decay time constant it estimates the current transfer inflow rate.
+     */
+    final Map<QueueKey, Double> recentTransfers = new LinkedHashMap<>();
     /** Integral of waiting passengers over time (passenger-seconds). */
     double waitSeconds;
+    /** Boardings, including passengers boarding their second or later line. */
     double served;
+    /** Passengers who completed their journey here. */
+    double delivered;
+    /** Passengers who changed lines here. */
+    double transfers;
     double peakWaiting;
 
     StationState(String id) {
@@ -19,15 +32,41 @@ final class StationState {
     }
 
     double totalWaiting() {
-        return waiting.values().stream().mapToDouble(Double::doubleValue).sum();
+        double total = 0;
+        for (double[] q : waiting.values()) {
+            total += sum(q);
+        }
+        return total;
+    }
+
+    double waiting(QueueKey key) {
+        double[] q = waiting.get(key);
+        return q == null ? 0 : sum(q);
+    }
+
+    /** Fraction of the station's new arrivals that joins {@code key}, over all destinations. */
+    double arrivalShare(QueueKey key) {
+        double[] a = arrivalShare.get(key);
+        return a == null ? 0 : sum(a);
+    }
+
+    static double sum(double[] values) {
+        double total = 0;
+        for (double v : values) {
+            total += v;
+        }
+        return total;
     }
 
     StationState copy() {
         StationState s = new StationState(id);
-        s.waiting.putAll(waiting);
-        s.arrivalShare.putAll(arrivalShare);
+        waiting.forEach((k, v) -> s.waiting.put(k, v.clone()));
+        s.arrivalShare.putAll(arrivalShare); // immutable after construction
+        s.recentTransfers.putAll(recentTransfers);
         s.waitSeconds = waitSeconds;
         s.served = served;
+        s.delivered = delivered;
+        s.transfers = transfers;
         s.peakWaiting = peakWaiting;
         return s;
     }

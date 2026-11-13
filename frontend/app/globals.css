@@ -16,7 +16,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 syst
 .stack { display: flex; flex-direction: column; gap: 12px; }
 h1 { font-size: 20px; margin: 0; }
 h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
-.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .kpi b { display: block; font-size: 18px; }
 .kpi span { color: var(--muted); font-size: 12px; }
 select, input, button { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font: inherit; }
