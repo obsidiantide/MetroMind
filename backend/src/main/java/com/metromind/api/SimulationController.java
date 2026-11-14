@@ -1,6 +1,7 @@
 package com.metromind.api;
 
 import com.metromind.incident.DelayImpactReport;
+import com.metromind.incident.IncidentRecord;
 import com.metromind.network.MetroNetwork;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.Departure;
@@ -61,6 +62,12 @@ public class SimulationController {
     public ResponseEntity<Void> pause(@PathVariable String action) {
         simulation.setPaused("pause".equals(action));
         return ResponseEntity.noContent().build();
+    }
+
+    /** Incidents injected into the live simulation, most recent first. */
+    @GetMapping("/incidents")
+    public List<IncidentRecord> incidents(@RequestParam(defaultValue = "50") @Min(1) @Max(500) int limit) {
+        return simulation.incidentHistory(limit);
     }
 
     public record IncidentRequest(@NotBlank String trainId, @Min(1) @Max(3600) double seconds) {
