@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class AdaptiveDispatchTest {
 
@@ -89,5 +90,44 @@ class AdaptiveDispatchTest {
 
         assertThat(fork.snapshot()).isEqualTo(a.snapshot());
         assertThat(b.snapshot()).isEqualTo(a.snapshot());
+    }
+
+    @Test
+    void extraTrainsReturnToTheDepotWhenDemandEases() {
+        SimulationEngine engine = new SimulationEngine(crowdedLine(2, 2), START, HeadwayStrategy.ADAPTIVE_DISPATCH);
+        engine.run(1800, 1);
+        assertThat(engine.trains()).hasSize(4);
+
+        engine.run(4 * 3600, 1); // into the midday lull
+        assertThat(engine.trains()).hasSize(2);
+        assertThat(engine.depotTrains("L1")).isEqualTo(2);
+        assertThat(engine.snapshot().recentEvents()).anyMatch(e -> e.type() == SimEvent.Type.TRAIN_WITHDRAWN);
+    }
+
+    @Test
+    void neverWithdrawsBelowTheBaseFleet() {
+        SimulationEngine engine = new SimulationEngine(crowdedLine(2, 2), 12 * 3600, HeadwayStrategy.ADAPTIVE_DISPATCH);
+        engine.run(3600, 1);
+        assertThat(engine.trains()).hasSize(2);
+        assertThat(engine.depotTrains("L1")).isEqualTo(2);
+    }
+
+    @Test
+    void nobodyLeavesTheNetworkWithAWithdrawnTrain() {
+        SimulationEngine engine = new SimulationEngine(crowdedLine(2, 2), START, HeadwayStrategy.ADAPTIVE_DISPATCH);
+        SimulationEngine control = new SimulationEngine(crowdedLine(2, 0), START, HeadwayStrategy.BALANCED);
+        engine.run(1800 + 4 * 3600, 1);
+        control.run(1800 + 4 * 3600, 1);
+        assertThat(engine.snapshot().recentEvents()).anyMatch(e -> e.type() == SimEvent.Type.TRAIN_WITHDRAWN);
+
+        // Demand does not depend on the fleet, so both runs admitted the same passengers; every one of them is
+        // still waiting, aboard a train or delivered.
+        assertThat(passengersInSystem(engine)).isCloseTo(passengersInSystem(control), within(1e-6));
+    }
+
+    private static double passengersInSystem(SimulationEngine engine) {
+        SimulationSnapshot.Metrics m = engine.snapshot().metrics();
+        return m.passengersDelivered() + m.totalWaiting() + m.passengersHeldAtEntrance()
+                + engine.trains().stream().mapToDouble(TrainState::passengers).sum();
     }
 }
