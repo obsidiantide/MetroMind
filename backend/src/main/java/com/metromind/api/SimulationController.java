@@ -2,6 +2,7 @@ package com.metromind.api;
 
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.network.MetroNetwork;
+import com.metromind.sim.Departure;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationService;
 import com.metromind.sim.SimulationSnapshot;
@@ -35,6 +36,13 @@ public class SimulationController {
     @GetMapping("/state")
     public SimulationSnapshot state() {
         return simulation.snapshot();
+    }
+
+    /** Live departure board: trains leaving the station in the next {@code horizonSeconds}, soonest first. */
+    @GetMapping("/stations/{stationId}/departures")
+    public List<Departure> departures(@PathVariable String stationId,
+                                      @RequestParam(defaultValue = "1800") @Min(60) @Max(7200) double horizonSeconds) {
+        return simulation.departures(stationId, horizonSeconds);
     }
 
     @GetMapping("/strategies")
