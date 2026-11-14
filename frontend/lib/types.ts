@@ -1,4 +1,6 @@
-export interface Station { id: string; name: string; lat: number; lon: number; baseArrivalsPerMinute: number }
+export interface Station {
+  id: string; name: string; lat: number; lon: number; baseArrivalsPerMinute: number; platformCapacity?: number | null;
+}
 export interface Line {
   id: string; name: string; color: string; stationIds: string[]; runSeconds: number[];
   trainCount: number; trainCapacity: number;
@@ -14,7 +16,8 @@ export interface TrainView {
 }
 export interface QueueView { lineId: string; towardsStationId: string; waiting: number }
 export interface StationView {
-  id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH"; queues: QueueView[];
+  id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH";
+  heldAtEntrance: number; leftBehind: number; queues: QueueView[];
 }
 export interface SimEvent { simTime: number; type: string; subjectId: string; message: string }
 export interface Snapshot {
@@ -22,7 +25,8 @@ export interface Snapshot {
   recentEvents: SimEvent[];
   metrics: {
     averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
-    passengersDelivered: number; transfers: number; headwayCoefficientOfVariation: number;
+    passengersDelivered: number; transfers: number; passengersLeftBehind: number; passengersHeldAtEntrance: number;
+    headwayCoefficientOfVariation: number;
   };
 }
 export interface StrategyOutcome {
