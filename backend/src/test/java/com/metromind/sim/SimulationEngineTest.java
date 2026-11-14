@@ -77,6 +77,34 @@ class SimulationEngineTest {
     }
 
     @Test
+    void earlyTrainsWaitAtTerminalsForTheirTimetabledDeparture() {
+        // Night-time demand: dwells are at the 15 s minimum, so trains gain 10 s per stop on the 25 s timetable.
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), 3 * 3600,
+                HeadwayStrategy.NO_CONTROL);
+        Line line = engine.network().line("L1");
+        boolean heldAtTerminal = false;
+        boolean leftIntermediateEarly = false;
+        for (int i = 0; i < 4 * 3600; i++) {
+            List<TrainState> before = engine.trains().stream().map(TrainState::copy).toList();
+            engine.step(1);
+            for (TrainState was : before) {
+                TrainState now = engine.train(was.id());
+                heldAtTerminal |= now.phase() == TrainPhase.HELD && (now.stop() == 0 || now.stop() == 5);
+                if (was.phase() != TrainPhase.RUNNING && now.phase() == TrainPhase.RUNNING) {
+                    double planned = engine.plannedDeparture(now);
+                    if (now.stop() == 0 || now.stop() == line.stationIds().size() - 1) {
+                        assertThat(engine.simTime()).isGreaterThanOrEqualTo(planned - 1e-9);
+                    } else if (engine.simTime() < planned - 5) {
+                        leftIntermediateEarly = true;
+                    }
+                }
+            }
+        }
+        assertThat(heldAtTerminal).isTrue();
+        assertThat(leftIntermediateEarly).isTrue();
+    }
+
+    @Test
     void neverTwoTrainsInTheSameBlock() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.injectBreakdown("L1-1", 900);
