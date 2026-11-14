@@ -56,6 +56,8 @@ public final class SimulationEngine {
     private final Deque<SimEvent> events = new ArrayDeque<>();
     private final Map<String, String> overloadState = new LinkedHashMap<>();
     private final List<SectionClosure> closures = new ArrayList<>();
+    /** Closed stations and the seconds until each reopens. */
+    private final Map<String, Double> closedStations = new LinkedHashMap<>();
     private HeadwayStrategy strategy;
     private double simTime;
     private boolean recordArrivals;
@@ -117,6 +119,7 @@ public final class SimulationEngine {
         this.events.addAll(other.events);
         this.overloadState.putAll(other.overloadState);
         other.closures.forEach(c -> this.closures.add(c.copy()));
+        this.closedStations.putAll(other.closedStations);
         this.strategy = other.strategy;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
@@ -255,9 +258,12 @@ public final class SimulationEngine {
      * planned departure (the layover gives recovery time), so earliness never carries over into the next trip.
      */
     private void decideHoldOrDepart(TrainState t) {
+        Line line = lines.get(t.lineId);
+        if (!isTerminalStop(line, t.stop) && closedStations.containsKey(line.stationAtStop(t.stop))) {
+            t.holdDecided = true; // never hold a train at a closed station it is running through
+        }
         if (!t.holdDecided) {
             t.holdDecided = true;
-            Line line = lines.get(t.lineId);
             double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / line.trainCount();
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t), target);
             if (isTerminalStop(line, t.stop)) {
@@ -318,19 +324,25 @@ public final class SimulationEngine {
         detectDelay(t);
 
         String stationId = line.stationAtStop(t.stop);
+        t.phase = TrainPhase.DWELLING;
+        t.holdDecided = false;
+        if (closedStations.containsKey(stationId)) {
+            // Doors stay shut: the train runs through without stopping.
+            t.phaseRemaining = 0;
+            return;
+        }
         StationState st = stations.get(stationId);
         double alight = alight(t, line, st);
         double board = board(t, line, st);
 
-        t.phase = TrainPhase.DWELLING;
-        t.holdDecided = false;
         t.phaseRemaining = Math.max(MIN_DWELL,
                 Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
     }
 
     /**
      * Passengers whose destination is this station leave the network; passengers whose route changes lines
-     * here join the queue for their next line. Everyone else stays aboard.
+     * here join the queue for their next line. Everyone else stays aboard. Passengers for a closed station that
+     * the train has run through get off at the first open station after it and finish their trip on foot.
      */
     private double alight(TrainState t, Line line, StationState st) {
         int lineIdx = routes.lineIndex(line.id());
@@ -344,7 +356,9 @@ public final class SimulationEngine {
             }
             t.onboard[d] = 0;
             alight += amount;
-            StationState.QueueKey next = d == here ? null : routes.transferQueue(lineIdx, t.stop, d);
+            boolean arrived = d == here || (!closedStations.isEmpty()
+                    && closedStations.containsKey(network.stations().get(d).id()));
+            StationState.QueueKey next = arrived ? null : routes.transferQueue(lineIdx, t.stop, d);
             if (next == null) {
                 st.delivered += amount;
             } else {
@@ -590,6 +604,33 @@ public final class SimulationEngine {
                         sectionName(line, c.lowerPosition), sectionName(line, c.lowerPosition + 1), c.lineId));
             }
         }
+        for (var it = closedStations.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            e.setValue(e.getValue() - dt);
+            if (e.getValue() <= 1e-9) {
+                it.remove();
+                emit(SimEvent.Type.INCIDENT_CLEARED, e.getKey(),
+                        "Station " + network.station(e.getKey()).name() + " reopened");
+            }
+        }
+    }
+
+    /**
+     * Closes a station for {@code seconds}: trains run through it without stopping (they still reverse at a
+     * closed terminal) and nobody can enter or leave it there. Closing a closed station extends the closure.
+     */
+    public void closeStation(String stationId, double seconds) {
+        Station station = network.station(stationId);
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Closure duration must be positive");
+        }
+        closedStations.merge(stationId, seconds, Math::max);
+        emit(SimEvent.Type.INCIDENT, stationId,
+                "Station %s closed for %.0f s".formatted(station.name(), seconds));
+    }
+
+    public boolean stationClosed(String stationId) {
+        return closedStations.containsKey(stationId);
     }
 
     // ------------------------------------------------------------------ prediction
@@ -705,11 +746,14 @@ public final class SimulationEngine {
     /**
      * Departure board for a station: every train due to leave it within {@code horizon} seconds, in either
      * direction, with its timetabled and expected departure, soonest expected first. A train counts once per
-     * call, at the first time it leaves the station.
+     * call, at the first time it leaves the station. A closed station's board is empty: trains run through.
      */
     public List<Departure> departures(String stationId, double horizon) {
         network.station(stationId); // validate
         List<Departure> board = new ArrayList<>();
+        if (closedStations.containsKey(stationId)) {
+            return board; // trains run through without stopping
+        }
         for (TrainState t : trains) {
             Line line = lines.get(t.lineId);
             double[] cum = cumulativeStopSeconds.get(line.id());
