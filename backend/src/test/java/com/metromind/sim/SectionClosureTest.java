@@ -107,6 +107,23 @@ class SectionClosureTest {
     }
 
     @Test
+    void turningBackInboundDoesNotMakeTheTrainLate() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleTrain(), START, HeadwayStrategy.NO_CONTROL);
+        // Close C–D once the train is out at F: it comes back to D inbound (stop 7) and reverses onto D outbound.
+        for (int i = 0; i < 1800 && engine.train("L1-1").stop() != 5; i++) {
+            engine.step(1);
+        }
+        engine.closeSection("L1", "C", "D", 3600, ClosureResponse.TURN_BACK);
+        for (int i = 0; i < 1800 && engine.train("L1-1").stop() != 3; i++) {
+            engine.step(1);
+        }
+        TrainState t = engine.train("L1-1");
+        assertThat(t.stop()).as("D, outbound again").isEqualTo(3);
+        assertThat(t.delaySeconds()).isLessThan(SimulationEngine.DELAY_ALERT_SECONDS);
+        assertThat(engine.snapshot().recentEvents()).noneMatch(e -> e.type() == SimEvent.Type.DELAY_DETECTED);
+    }
+
+    @Test
     void turnBackKeepsServiceRunningWhereWaitingDoesNot() {
         SimulationEngine base = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         SimulationEngine wait = base.copy();

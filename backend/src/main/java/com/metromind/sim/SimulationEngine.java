@@ -572,8 +572,13 @@ public final class SimulationEngine {
         }
         t.passengers = 0;
         double[] cum = cumulativeStopSeconds.get(line.id());
-        // Take over the timetable slot of the mirror stop; the train is now early, never later than before.
-        t.scheduledArrival += cum[mirror] - cum[t.stop];
+        // Take over the timetable slot of the mirror stop; the train is now early, never later than before. Turning
+        // back from the inbound half the mirror stop belongs to the next trip round the loop, not the last one.
+        double ahead = cum[mirror] - cum[t.stop];
+        if (ahead < 0) {
+            ahead += cum[line.loopLength()];
+        }
+        t.scheduledArrival += ahead;
         t.stop = mirror;
         t.delaySeconds = Math.max(0, simTime - t.scheduledArrival);
         double board = board(t, line, st);
