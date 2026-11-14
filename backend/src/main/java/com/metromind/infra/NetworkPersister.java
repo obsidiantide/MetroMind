@@ -28,11 +28,12 @@ public class NetworkPersister {
     public void persist() {
         for (Station s : network.stations()) {
             jdbc.update("""
-                    INSERT INTO station (id, name, location, base_arrivals_per_minute)
-                    VALUES (?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
+                    INSERT INTO station (id, name, location, base_arrivals_per_minute, platform_capacity)
+                    VALUES (?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?, ?)
                     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, location = EXCLUDED.location,
-                        base_arrivals_per_minute = EXCLUDED.base_arrivals_per_minute
-                    """, s.id(), s.name(), s.lon(), s.lat(), s.baseArrivalsPerMinute());
+                        base_arrivals_per_minute = EXCLUDED.base_arrivals_per_minute,
+                        platform_capacity = EXCLUDED.platform_capacity
+                    """, s.id(), s.name(), s.lon(), s.lat(), s.baseArrivalsPerMinute(), s.platformCapacity());
         }
         for (Line l : network.lines()) {
             String wkt = l.stationIds().stream().map(network::station)
