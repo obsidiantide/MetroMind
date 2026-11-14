@@ -247,12 +247,19 @@ public final class SimulationEngine {
         }
     }
 
+    /**
+     * Applies the headway strategy and, at terminals, the timetable: a train that turns round early waits for its
+     * planned departure (the layover gives recovery time), so earliness never carries over into the next trip.
+     */
     private void decideHoldOrDepart(TrainState t) {
         if (!t.holdDecided) {
             t.holdDecided = true;
             Line line = lines.get(t.lineId);
             double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / line.trainCount();
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t), target);
+            if (isTerminalStop(line, t.stop)) {
+                hold = Math.max(hold, plannedDeparture(t) - simTime);
+            }
             if (hold > 0.5) {
                 t.phase = TrainPhase.HELD;
                 t.phaseRemaining = hold;
@@ -260,6 +267,15 @@ public final class SimulationEngine {
             }
         }
         tryDepart(t);
+    }
+
+    private static boolean isTerminalStop(Line line, int stop) {
+        return stop == 0 || stop == line.stationIds().size() - 1;
+    }
+
+    /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell. */
+    double plannedDeparture(TrainState t) {
+        return t.scheduledArrival + NOMINAL_DWELL;
     }
 
     private void tryDepart(TrainState t) {
