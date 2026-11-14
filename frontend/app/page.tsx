@@ -44,7 +44,7 @@ export default function Home() {
           {network && <MetroMap network={network} snapshot={snapshot} />}
         </section>
       </div>
-      <ControlPanel snapshot={snapshot} />
+      <ControlPanel snapshot={snapshot} network={network} />
     </main>
   );
 }

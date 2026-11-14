@@ -1,13 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { DelayImpactReport, Snapshot } from "@/lib/types";
+import type { ClosureResponse, DelayImpactReport, MetroNetwork, Snapshot } from "@/lib/types";
 
-export function ControlPanel({ snapshot }: { snapshot: Snapshot | null }) {
+export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
   const [seconds, setSeconds] = useState(240);
   const [report, setReport] = useState<DelayImpactReport | null>(null);
+  const [section, setSection] = useState("");
+  const [closureMinutes, setClosureMinutes] = useState(10);
+  const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,6 +20,19 @@ export function ControlPanel({ snapshot }: { snapshot: Snapshot | null }) {
   useEffect(() => {
     if (!trainId && snapshot?.trains.length) setTrainId(snapshot.trains[0].id);
   }, [snapshot, trainId]);
+
+  const stationName = new Map(network?.stations.map((s) => [s.id, s.name]) ?? []);
+  // Every pair of adjacent stations, encoded as "line|from|to".
+  const sections = (network?.lines ?? []).flatMap((l) =>
+    l.stationIds.slice(1).map((to, i) => ({
+      key: `${l.id}|${l.stationIds[i]}|${to}`,
+      label: `${l.name}: ${stationName.get(l.stationIds[i])} – ${stationName.get(to)}`,
+    })),
+  );
+  const closeSection = () => {
+    const [lineId, from, to] = (section || sections[0]?.key || "").split("|");
+    return api.closeSection(lineId, from, to, closureMinutes * 60, closureResponse);
+  };
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -57,6 +73,25 @@ export function ControlPanel({ snapshot }: { snapshot: Snapshot | null }) {
         </div>
         {error && <p style={{ color: "var(--bad)" }}>{error}</p>}
       </section>
+
+      {sections.length > 0 && (
+        <section className="panel">
+          <h2>Track closure</h2>
+          <select value={section || sections[0].key} onChange={(e) => setSection(e.target.value)} aria-label="Section">
+            {sections.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <div className="row" style={{ marginTop: 8 }}>
+            <input type="number" min={1} max={120} value={closureMinutes} onChange={(e) => setClosureMinutes(+e.target.value)}
+                   aria-label="Minutes" style={{ width: 70 }} /> min
+            <select value={closureResponse} onChange={(e) => setClosureResponse(e.target.value as ClosureResponse)}
+                    aria-label="Trains">
+              <option value="TURN_BACK">Trains turn back</option>
+              <option value="WAIT">Trains wait</option>
+            </select>
+            <button disabled={busy} onClick={() => run(closeSection)}>Close</button>
+          </div>
+        </section>
+      )}
 
       {report && (
         <section className="panel">
