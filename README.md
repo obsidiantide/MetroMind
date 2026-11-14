@@ -28,8 +28,18 @@ network, makes two copies per strategy, injects the delay into one, simulates bo
 
 - extra delay per train (how much later it reaches each stop than in the baseline);
 - extra passenger-minutes of waiting per station, and peak queue growth;
+- extra passenger-minutes spent on board, and the total (wait + on board);
 - headway regularity (coefficient of variation) at the end of the horizon;
-- the strategy with the lowest total passenger wait.
+- the strategy with the lowest total passenger travel time (platform wait + time on board).
+
+**Can a delay reduce waiting?** Platform waiting alone, yes, and that is why it is not the yardstick. When a
+train is late its followers catch up and pick passengers up sooner, so people move from the platform onto
+crowded trains, and passengers on the late train wait aboard instead of on a platform. On the seed network a
+one-minute delay could show ~375 passenger-minutes *less* platform waiting while adding ~390 minutes on board.
+Trains also used to start snapped to platforms, with uneven gaps, so a delay could accidentally even out the
+headways; they now start evenly spaced. What remains under `NO_CONTROL` are small net gains (well under 1 % of
+total travel time) when a delay happens to rebalance load between neighbouring trains or shifts transfers at
+interchanges: real effects of an uncontrolled line, not measurement errors.
 
 ```http
 POST /api/analysis/delay-impact?horizonSeconds=1800
