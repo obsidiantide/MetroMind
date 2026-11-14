@@ -38,6 +38,9 @@ Mark items `[x]` when merged.
 - [x] Strategy benchmark endpoint: run N random incident scenarios and rank strategies (mean, p95 passenger wait)
 - [ ] Recovery-time metric: how long until headways return to normal after an incident
 - [ ] Dynamic headway target that tracks predicted demand
+- [ ] Strategy: skip-stop (a late train runs through low-demand stations; their passengers ride on to the next stop)
+- [ ] Benchmark scenarios with track-section and station closures, not only train delays and breakdowns
+- [ ] Short-turn report: count and location of short turns in what-if and benchmark results
 
 ### Platform
 - [ ] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
@@ -46,6 +49,7 @@ Mark items `[x]` when merged.
 - [ ] OpenAPI (springdoc) documentation
 - [ ] Integration tests with Testcontainers (PostGIS, Kafka, Redis)
 - [ ] Micrometer metrics for simulation tick time and analysis duration
+- [ ] Run benchmarks as background jobs (`202 Accepted` + job id, poll for progress) so large runs do not hold a request
 
 ### Frontend
 - [ ] Charts: delay and waiting over time
