@@ -18,7 +18,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
-| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
+| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
@@ -183,6 +183,24 @@ still turns trains round). Its departure board is empty and its station view has
   count as delivered there.
 - Passengers who planned to change lines at a closed interchange stay aboard to the next open station and are
   re-routed from there using the normal route table, which may still take them through the closed station.
+
+### Adaptive dispatching
+
+A line may keep spare trains in a depot next to its first terminal:
+
+```json
+{ "id": "RED", "trainCount": 6, "spareTrains": 2, "trainCapacity": 900 }
+```
+
+Under the `ADAPTIVE_DISPATCH` strategy the engine reviews every line once a simulated minute. It forecasts the
+line's own platform queues 15 minutes ahead (closed stations left out); when the worst station reaches the high
+overload level (400 passengers), one spare train enters service at the first terminal as soon as its platform
+and the track into it are clear. It gets its own timetable from that moment, and the strategy's two-way
+balancing holds spread it out among the others. When the forecast drops below the medium level (200) and the
+line runs more trains than its base `trainCount`, a train standing at the first terminal returns to the depot;
+anyone who already boarded it waits for the next one. Target headways follow the number of trains in service.
+Dispatches and withdrawals appear as `TRAIN_DISPATCHED` and `TRAIN_WITHDRAWN` events, and snapshot `metrics`
+report `trainsInService` and `trainsInDepot`. Other strategies leave the spares in the depot.
 
 ### Incident clearing timeline
 

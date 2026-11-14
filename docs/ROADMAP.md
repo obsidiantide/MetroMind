@@ -33,7 +33,7 @@ Mark items `[x]` when merged.
 - [x] Automatic incident clearing timeline in the UI
 
 ### Optimisation and comparison
-- [ ] Strategy: adaptive dispatching that adds / withdraws trains from depot when overload is predicted
+- [x] Strategy: adaptive dispatching that adds / withdraws trains from depot when overload is predicted
 - [ ] Strategy: skip-stop / short-turning for recovery
 - [ ] Strategy benchmark endpoint: run N random incident scenarios and rank strategies (mean, p95 passenger wait)
 - [ ] Recovery-time metric: how long until headways return to normal after an incident
