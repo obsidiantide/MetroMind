@@ -18,7 +18,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
-| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted) |
+| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
@@ -201,6 +201,17 @@ line runs more trains than its base `trainCount`, a train standing at the first 
 anyone who already boarded it waits for the next one. Target headways follow the number of trains in service.
 Dispatches and withdrawals appear as `TRAIN_DISPATCHED` and `TRAIN_WITHDRAWN` events, and snapshot `metrics`
 report `trainsInService` and `trainsInDepot`. Other strategies leave the spares in the depot.
+
+### Short-turning for recovery
+
+Under the `SHORT_TURN` strategy a train that is at least 4 minutes behind its timetable reverses at the
+intermediate platform where it is ready to leave, instead of carrying its lateness out to the terminal and back,
+provided the train behind it is closer than half the target headway (so the stations it gives up are served
+again soon), the station is open and the opposite platform and the track into it are free. Everyone aboard
+steps off to wait for that follower, and the train takes over the timetable slot of the opposite platform, so it
+starts its return on time. Each reversal appears as a `TRAIN_SHORT_TURNED` event. On the test line, a train held
+for 7 minutes is short-turned once, and 30 minutes later the line's worst lateness is about half of what
+balanced holding alone leaves.
 
 ### Incident clearing timeline
 
