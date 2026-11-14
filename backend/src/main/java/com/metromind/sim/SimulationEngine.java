@@ -48,6 +48,8 @@ public final class SimulationEngine {
     private final Map<String, Line> lines = new LinkedHashMap<>();
     private final Map<String, double[]> cumulativeStopSeconds = new LinkedHashMap<>();
     private final Map<String, List<String>> linesByStation = new LinkedHashMap<>();
+    /** Stations next to each station on any line, in network order; where a closed station's passengers go. */
+    private final Map<String, List<String>> neighbours = new LinkedHashMap<>();
     private final RoutePlanner routes;
     private final OdMatrix od;
 
@@ -78,6 +80,20 @@ public final class SimulationEngine {
             for (String sid : line.stationIds()) {
                 linesByStation.computeIfAbsent(sid, k -> new ArrayList<>()).add(line.id());
             }
+        }
+        for (Station s : network.stations()) {
+            List<String> adjacent = new ArrayList<>();
+            for (Station other : network.stations()) {
+                boolean next = network.lines().stream().anyMatch(l -> {
+                    int a = l.stationIds().indexOf(s.id());
+                    int b = l.stationIds().indexOf(other.id());
+                    return a >= 0 && b >= 0 && Math.abs(a - b) == 1;
+                });
+                if (next) {
+                    adjacent.add(other.id());
+                }
+            }
+            neighbours.put(s.id(), List.copyOf(adjacent));
         }
         this.routes = new RoutePlanner(network, NOMINAL_DWELL);
         this.od = new OdMatrix(network, routes);
@@ -112,6 +128,7 @@ public final class SimulationEngine {
         this.lines.putAll(other.lines);
         this.cumulativeStopSeconds.putAll(other.cumulativeStopSeconds);
         this.linesByStation.putAll(other.linesByStation);
+        this.neighbours.putAll(other.neighbours);
         this.routes = other.routes;
         this.od = other.od;
         other.trains.forEach(t -> this.trains.add(t.copy()));
@@ -198,12 +215,17 @@ public final class SimulationEngine {
     private void accumulateDemand(double dt) {
         double mult = DemandProfile.multiplier(simTime);
         double decay = Math.exp(-dt / TRANSFER_RATE_WINDOW_SECONDS);
+        Map<String, Double> diverted = new LinkedHashMap<>();
+        for (String closed : closedStations.keySet()) {
+            divertToNeighbours(closed, network.station(closed).baseArrivalsPerMinute() * mult * dt / 60.0, diverted);
+        }
         for (Station s : network.stations()) {
             StationState st = stations.get(s.id());
-            if (st.waiting.isEmpty()) {
+            if (st.waiting.isEmpty() || closedStations.containsKey(s.id())) {
                 continue;
             }
-            double entering = st.heldAtEntrance + s.baseArrivalsPerMinute() * mult * dt / 60.0;
+            double entering = st.heldAtEntrance + s.baseArrivalsPerMinute() * mult * dt / 60.0
+                    + diverted.getOrDefault(s.id(), 0.0);
             double admitted = s.hasPlatformLimit()
                     ? Math.min(entering, Math.max(0, s.platformCapacity() - st.totalWaiting()))
                     : entering;
@@ -617,16 +639,47 @@ public final class SimulationEngine {
 
     /**
      * Closes a station for {@code seconds}: trains run through it without stopping (they still reverse at a
-     * closed terminal) and nobody can enter or leave it there. Closing a closed station extends the closure.
+     * closed terminal) and nobody can enter or leave it there. Passengers already inside, and new ones arriving
+     * while it is closed, go to the neighbouring stations instead. Closing a closed station extends the closure.
      */
     public void closeStation(String stationId, double seconds) {
         Station station = network.station(stationId);
         if (seconds <= 0) {
             throw new IllegalArgumentException("Closure duration must be positive");
         }
+        if (!closedStations.containsKey(stationId)) {
+            evacuate(stations.get(stationId));
+        }
         closedStations.merge(stationId, seconds, Math::max);
         emit(SimEvent.Type.INCIDENT, stationId,
                 "Station %s closed for %.0f s".formatted(station.name(), seconds));
+    }
+
+    /**
+     * Clears a closing station: everyone on its platforms or at its entrance walks to a neighbouring open station
+     * and queues at its entrance. In the fluid model they then travel like that station's own passengers.
+     */
+    private void evacuate(StationState st) {
+        double people = st.totalWaiting() + st.heldAtEntrance;
+        for (double[] q : st.waiting.values()) {
+            java.util.Arrays.fill(q, 0);
+        }
+        st.heldAtEntrance = 0;
+        Map<String, Double> moved = new LinkedHashMap<>();
+        divertToNeighbours(st.id, people, moved);
+        moved.forEach((sid, amount) -> stations.get(sid).heldAtEntrance += amount);
+    }
+
+    /**
+     * Splits {@code passengers} evenly between the open neighbours of a closed station. If every neighbour is
+     * closed too, they give up on the metro.
+     */
+    private void divertToNeighbours(String stationId, double passengers, Map<String, Double> into) {
+        List<String> open = neighbours.get(stationId).stream()
+                .filter(n -> !closedStations.containsKey(n)).toList();
+        for (String n : open) {
+            into.merge(n, passengers / open.size(), Double::sum);
+        }
     }
 
     public boolean stationClosed(String stationId) {
