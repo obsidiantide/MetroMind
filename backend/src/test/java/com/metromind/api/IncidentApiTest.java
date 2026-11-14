@@ -127,4 +127,23 @@ class IncidentApiTest {
     void historyLimitIsValidated() throws Exception {
         mvc.perform(get("/api/incidents").param("limit", "0")).andExpect(status().isBadRequest());
     }
+
+    @Test
+    void keepsTheResultOfEachWhatIfAnalysis() throws Exception {
+        mvc.perform(post("/api/analysis/delay-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "GREEN-1", "seconds": 90}"""))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/incidents/analyses").param("limit", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].simTime").isNumber())
+                .andExpect(jsonPath("$[0].report.trainId").value("GREEN-1"))
+                .andExpect(jsonPath("$[0].report.injectedDelaySeconds").value(90.0))
+                .andExpect(jsonPath("$[0].report.horizonSeconds").value(300.0))
+                .andExpect(jsonPath("$[0].report.bestStrategy").isString())
+                .andExpect(jsonPath("$[0].report.outcomes.length()").value(3));
+    }
 }

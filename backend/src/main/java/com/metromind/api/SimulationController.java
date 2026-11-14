@@ -1,5 +1,6 @@
 package com.metromind.api;
 
+import com.metromind.incident.AnalysisRecord;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.network.MetroNetwork;
@@ -68,6 +69,12 @@ public class SimulationController {
     @GetMapping("/incidents")
     public List<IncidentRecord> incidents(@RequestParam(defaultValue = "50") @Min(1) @Max(500) int limit) {
         return simulation.incidentHistory(limit);
+    }
+
+    /** Delay-impact analyses run so far, with their full reports, most recent first. */
+    @GetMapping("/incidents/analyses")
+    public List<AnalysisRecord> analyses(@RequestParam(defaultValue = "10") @Min(1) @Max(50) int limit) {
+        return simulation.analysisHistory(limit);
     }
 
     public record IncidentRequest(@NotBlank String trainId, @Min(1) @Max(3600) double seconds) {
