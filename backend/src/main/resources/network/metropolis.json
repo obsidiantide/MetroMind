@@ -20,14 +20,16 @@
       "name": "Central",
       "lat": 40.375,
       "lon": 49.82,
-      "baseArrivalsPerMinute": 12
+      "baseArrivalsPerMinute": 12,
+      "platformCapacity": 450
     },
     {
       "id": "R4",
       "name": "University",
       "lat": 40.378,
       "lon": 49.84,
-      "baseArrivalsPerMinute": 9
+      "baseArrivalsPerMinute": 9,
+      "platformCapacity": 450
     },
     {
       "id": "R5",
@@ -69,7 +71,8 @@
       "name": "City Hall",
       "lat": 40.395,
       "lon": 49.818,
-      "baseArrivalsPerMinute": 8
+      "baseArrivalsPerMinute": 8,
+      "platformCapacity": 350
     },
     {
       "id": "B5",
