@@ -1,5 +1,6 @@
 package com.metromind.sim;
 
+import com.metromind.incident.AnalysisRecord;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.DelayPropagationAnalyzer;
 import com.metromind.incident.IncidentHistory;
@@ -114,6 +115,13 @@ public class SimulationService {
         synchronized (engine) {
             fork = engine.copy();
         }
-        return analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all());
+        DelayImpactReport report = analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all());
+        history.recordAnalysis(fork.simTime(), report);
+        return report;
+    }
+
+    /** What-if analyses run so far, most recent first. */
+    public List<AnalysisRecord> analysisHistory(int limit) {
+        return history.recentAnalyses(limit);
     }
 }

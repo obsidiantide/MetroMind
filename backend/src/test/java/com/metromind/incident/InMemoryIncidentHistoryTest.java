@@ -2,6 +2,8 @@ package com.metromind.incident;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class InMemoryIncidentHistoryTest {
@@ -27,5 +29,18 @@ class InMemoryIncidentHistoryTest {
         var all = history.recent(Integer.MAX_VALUE);
         assertThat(all).hasSize(InMemoryIncidentHistory.CAPACITY);
         assertThat(all.get(all.size() - 1).id()).isEqualTo(6);
+    }
+
+    @Test
+    void keepsAnalysesSeparatelyFromIncidents() {
+        InMemoryIncidentHistory history = new InMemoryIncidentHistory();
+        for (int i = 0; i < InMemoryIncidentHistory.ANALYSIS_CAPACITY + 1; i++) {
+            history.recordAnalysis(1000 + i, new DelayImpactReport("RED-" + i, 60, 1800, List.of(), "BALANCED"));
+        }
+        assertThat(history.recent(10)).isEmpty();
+        List<AnalysisRecord> analyses = history.recentAnalyses(Integer.MAX_VALUE);
+        assertThat(analyses).hasSize(InMemoryIncidentHistory.ANALYSIS_CAPACITY);
+        assertThat(analyses.get(0).report().trainId()).isEqualTo("RED-" + InMemoryIncidentHistory.ANALYSIS_CAPACITY);
+        assertThat(analyses.get(0).simTime()).isEqualTo(1000 + InMemoryIncidentHistory.ANALYSIS_CAPACITY);
     }
 }
