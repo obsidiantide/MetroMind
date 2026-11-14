@@ -3,7 +3,7 @@ export interface Station {
 }
 export interface Line {
   id: string; name: string; color: string; stationIds: string[]; runSeconds: number[];
-  trainCount: number; trainCapacity: number;
+  trainCount: number; trainCapacity: number; spareTrains: number;
 }
 export interface MetroNetwork {
   city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
@@ -37,7 +37,7 @@ export interface Snapshot {
   metrics: {
     averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
     passengersDelivered: number; transfers: number; passengersLeftBehind: number; passengersHeldAtEntrance: number;
-    headwayCoefficientOfVariation: number;
+    headwayCoefficientOfVariation: number; trainsInService: number; trainsInDepot: number;
   };
 }
 export interface StrategyOutcome {
