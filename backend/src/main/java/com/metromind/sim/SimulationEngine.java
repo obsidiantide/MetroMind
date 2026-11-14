@@ -1110,8 +1110,9 @@ public final class SimulationEngine {
         double transfers = stations.values().stream().mapToDouble(s -> s.transfers).sum();
         double leftBehind = stations.values().stream().mapToDouble(s -> s.leftBehind).sum();
         double held = stations.values().stream().mapToDouble(s -> s.heldAtEntrance).sum();
+        int inDepot = depot.values().stream().mapToInt(Integer::intValue).sum();
         return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind, held,
-                headwayCv());
+                headwayCv(), trains.size(), inDepot);
     }
 
     /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
