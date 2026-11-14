@@ -55,6 +55,7 @@ public final class SimulationEngine {
     private final Map<String, StationState> stations = new LinkedHashMap<>();
     private final Deque<SimEvent> events = new ArrayDeque<>();
     private final Map<String, String> overloadState = new LinkedHashMap<>();
+    private final List<SectionClosure> closures = new ArrayList<>();
     private HeadwayStrategy strategy;
     private double simTime;
     private boolean recordArrivals;
@@ -115,6 +116,7 @@ public final class SimulationEngine {
         other.stations.forEach((k, v) -> this.stations.put(k, v.copy()));
         this.events.addAll(other.events);
         this.overloadState.putAll(other.overloadState);
+        other.closures.forEach(c -> this.closures.add(c.copy()));
         this.strategy = other.strategy;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
@@ -182,6 +184,7 @@ public final class SimulationEngine {
 
     public void step(double dt) {
         simTime += dt;
+        expireClosures(dt);
         accumulateDemand(dt);
         for (TrainState t : trains) {
             rideSeconds += t.passengers * dt;
@@ -280,6 +283,10 @@ public final class SimulationEngine {
 
     private void tryDepart(TrainState t) {
         Line line = lines.get(t.lineId);
+        if (sectionClosed(line, t.stop)) {
+            t.phase = TrainPhase.WAITING_SIGNAL;
+            return;
+        }
         int next = (t.stop + 1) % line.loopLength();
         for (TrainState o : trains) {
             if (o == t || !o.lineId.equals(t.lineId)) {
@@ -451,6 +458,70 @@ public final class SimulationEngine {
         t.blockedRemaining += repairSeconds;
         t.failed = true;
         emit(SimEvent.Type.INCIDENT, trainId, "Train %s broke down, repair ETA %.0f s".formatted(trainId, repairSeconds));
+    }
+
+    /**
+     * Closes the track between two adjacent stations of a line, in both directions, for {@code seconds}. Trains
+     * due to enter the section wait at the platform before it (their signal stays red) until it reopens; a train
+     * already inside the section completes its run.
+     */
+    public void closeSection(String lineId, String fromStationId, String toStationId, double seconds) {
+        Line line = lines.get(lineId);
+        if (line == null) {
+            throw new IllegalArgumentException("Unknown line " + lineId);
+        }
+        int a = line.stationIds().indexOf(fromStationId);
+        int b = line.stationIds().indexOf(toStationId);
+        if (a < 0 || b < 0 || Math.abs(a - b) != 1) {
+            throw new IllegalArgumentException(
+                    "Stations %s and %s are not adjacent on line %s".formatted(fromStationId, toStationId, lineId));
+        }
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Closure duration must be positive");
+        }
+        int lower = Math.min(a, b);
+        SectionClosure existing = closures.stream()
+                .filter(c -> c.lineId.equals(lineId) && c.lowerPosition == lower).findFirst().orElse(null);
+        if (existing != null) {
+            existing.remainingSeconds = Math.max(existing.remainingSeconds, seconds);
+        } else {
+            closures.add(new SectionClosure(lineId, lower, seconds));
+        }
+        emit(SimEvent.Type.INCIDENT, lineId, "Track %s–%s on line %s closed for %.0f s".formatted(
+                sectionName(line, lower), sectionName(line, lower + 1), lineId, seconds));
+    }
+
+    private String sectionName(Line line, int position) {
+        return network.station(line.stationIds().get(position)).name();
+    }
+
+    /** Whether the segment a train takes when leaving loop stop {@code stop} is closed. */
+    boolean sectionClosed(Line line, int stop) {
+        if (closures.isEmpty()) {
+            return false;
+        }
+        int n = line.stationIds().size();
+        int pos = stop < n ? stop : line.loopLength() - stop;
+        int lower = line.directionAtStop(stop) > 0 ? pos : pos - 1;
+        for (SectionClosure c : closures) {
+            if (c.lineId.equals(line.id()) && c.lowerPosition == lower) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void expireClosures(double dt) {
+        for (var it = closures.iterator(); it.hasNext(); ) {
+            SectionClosure c = it.next();
+            c.remainingSeconds -= dt;
+            if (c.remainingSeconds <= 1e-9) {
+                it.remove();
+                Line line = lines.get(c.lineId);
+                emit(SimEvent.Type.INCIDENT_CLEARED, c.lineId, "Track %s–%s on line %s reopened".formatted(
+                        sectionName(line, c.lowerPosition), sectionName(line, c.lowerPosition + 1), c.lineId));
+            }
+        }
     }
 
     // ------------------------------------------------------------------ prediction
