@@ -61,4 +61,32 @@ class IncidentApiTest {
                                  "response": "TELEPORT"}"""))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void closesAStation() throws Exception {
+        mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stationId": "G5", "seconds": 120}"""))
+                .andExpect(status().isAccepted());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.stations[?(@.id == 'G5')].closed", hasItem(true)))
+                .andExpect(jsonPath("$.stations[?(@.id == 'G5')].waiting", hasItem(0.0)));
+        mvc.perform(get("/api/stations/G5/departures"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void closingAnUnknownStationIsABadRequest() throws Exception {
+        mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stationId": "NOPE", "seconds": 60}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Unknown station NOPE"));
+        mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stationId": "G5", "seconds": 0}"""))
+                .andExpect(status().isBadRequest());
+    }
 }
