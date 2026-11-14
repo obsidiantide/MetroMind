@@ -803,7 +803,17 @@ public final class SimulationEngine {
                     riskLevel(predicted), st.heldAtEntrance, st.leftBehind, queues));
         }
         return new SimulationSnapshot(simTime, clock(simTime), strategy.name(), trainViews, stationViews,
-                List.copyOf(events), metrics());
+                List.copyOf(events), metrics(), closedSections());
+    }
+
+    private List<SimulationSnapshot.ClosedSectionView> closedSections() {
+        List<SimulationSnapshot.ClosedSectionView> views = new ArrayList<>();
+        for (SectionClosure c : closures) {
+            List<String> ids = lines.get(c.lineId).stationIds();
+            views.add(new SimulationSnapshot.ClosedSectionView(c.lineId, ids.get(c.lowerPosition),
+                    ids.get(c.lowerPosition + 1), c.response, c.remainingSeconds));
+        }
+        return views;
     }
 
     private SimulationSnapshot.Metrics metrics() {

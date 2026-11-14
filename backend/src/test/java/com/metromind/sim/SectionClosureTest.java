@@ -130,4 +130,21 @@ class SectionClosureTest {
         assertThat(engine.train("L1-1").stop()).isZero();
         assertThat(engine.train("L1-1").phase()).isEqualTo(TrainPhase.WAITING_SIGNAL);
     }
+
+    @Test
+    void snapshotListsClosedSectionsUntilTheyReopen() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        engine.closeSection("L1", "E", "D", 120, ClosureResponse.TURN_BACK);
+        engine.run(20, 1);
+
+        assertThat(engine.snapshot().closedSections()).singleElement().satisfies(c -> {
+            assertThat(c.lineId()).isEqualTo("L1");
+            assertThat(c.fromStationId()).isEqualTo("D");
+            assertThat(c.toStationId()).isEqualTo("E");
+            assertThat(c.response()).isEqualTo(ClosureResponse.TURN_BACK);
+            assertThat(c.remainingSeconds()).isEqualTo(100.0);
+        });
+        engine.run(100, 1);
+        assertThat(engine.snapshot().closedSections()).isEmpty();
+    }
 }
