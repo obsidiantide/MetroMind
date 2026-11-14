@@ -729,12 +729,38 @@ public final class SimulationEngine {
     /**
      * Brings a spare train into service on every line whose overload forecast is high, one train per line and
      * review. Trains enter at the first terminal, next to the depot, once its platform and the track into it
-     * are clear.
+     * are clear. When a line running more than its base fleet is forecast below the medium level, a train that
+     * is standing at the first terminal goes back to the depot instead.
      */
     private void reviewFleets() {
         for (Line line : lines.values()) {
-            if (depot.get(line.id()) > 0 && lineForecast(line) >= OVERLOAD_HIGH && depotExitClear(line)) {
+            double forecast = lineForecast(line);
+            if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && depotExitClear(line)) {
                 dispatch(line);
+            } else if (forecast < OVERLOAD_MEDIUM && trainsInService(line.id()) > line.trainCount()) {
+                withdrawAtDepot(line);
+            }
+        }
+    }
+
+    /**
+     * Sends back to the depot a train standing at the first terminal, if there is one and it is free to move.
+     * Anyone already aboard for the outbound trip steps off and waits for the next train.
+     */
+    private void withdrawAtDepot(Line line) {
+        for (TrainState t : trains) {
+            if (t.lineId.equals(line.id()) && t.stop == 0 && t.phase != TrainPhase.RUNNING
+                    && t.blockedRemaining <= 0) {
+                StationState st = stations.get(line.stationIds().get(0));
+                double[] queue = st.waiting.get(new StationState.QueueKey(line.id(), line.directionAtStop(0)));
+                for (int d = 0; d < t.onboard.length; d++) {
+                    queue[d] += t.onboard[d];
+                }
+                trains.remove(t);
+                depot.merge(line.id(), 1, Integer::sum);
+                emit(SimEvent.Type.TRAIN_WITHDRAWN, t.id, "Train %s returned to the depot of line %s".formatted(
+                        t.id, line.id()));
+                return;
             }
         }
     }
