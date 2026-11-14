@@ -283,8 +283,11 @@ public final class SimulationEngine {
 
     private void tryDepart(TrainState t) {
         Line line = lines.get(t.lineId);
-        if (sectionClosed(line, t.stop)) {
-            t.phase = TrainPhase.WAITING_SIGNAL;
+        SectionClosure closure = closureAhead(line, t.stop);
+        if (closure != null) {
+            if (closure.response != ClosureResponse.TURN_BACK || !tryTurnBack(t, line)) {
+                t.phase = TrainPhase.WAITING_SIGNAL;
+            }
             return;
         }
         int next = (t.stop + 1) % line.loopLength();
@@ -354,8 +357,15 @@ public final class SimulationEngine {
         return alight;
     }
 
-    /** Boards the queue for the train's direction; if it does not fit, every destination boards pro rata. */
+    /**
+     * Boards the queue for the train's direction; if it does not fit, every destination boards pro rata. Nobody
+     * boards a train that is about to turn back short of a closed section.
+     */
     private double board(TrainState t, Line line, StationState st) {
+        SectionClosure closure = closureAhead(line, t.stop);
+        if (closure != null && closure.response == ClosureResponse.TURN_BACK) {
+            return 0; // the train will reverse here; passengers keep waiting for the line to reopen
+        }
         double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
         if (queue == null) {
             return 0;
@@ -461,11 +471,63 @@ public final class SimulationEngine {
     }
 
     /**
+     * Turns a train round at its current platform: it moves to the stop serving the same station in the opposite
+     * direction, everyone on board gets off to wait for the original direction, and passengers for the new
+     * direction board. Not possible at a terminal or while the opposite platform (or the track into it) is taken.
+     */
+    private boolean tryTurnBack(TrainState t, Line line) {
+        if (isTerminalStop(line, t.stop)) {
+            return false;
+        }
+        int mirror = line.loopLength() - t.stop;
+        if (sectionClosed(line, mirror)) {
+            return false; // closed on both sides: nowhere to go
+        }
+        int before = (mirror - 1 + line.loopLength()) % line.loopLength();
+        for (TrainState o : trains) {
+            if (o != t && o.lineId.equals(t.lineId)
+                    && ((o.stop == mirror && o.phase != TrainPhase.RUNNING)
+                    || (o.stop == before && o.phase == TrainPhase.RUNNING))) {
+                return false;
+            }
+        }
+        StationState st = stations.get(line.stationAtStop(t.stop));
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        double alight = t.passengers;
+        for (int d = 0; d < t.onboard.length; d++) {
+            queue[d] += t.onboard[d];
+            t.onboard[d] = 0;
+        }
+        t.passengers = 0;
+        double[] cum = cumulativeStopSeconds.get(line.id());
+        // Take over the timetable slot of the mirror stop; the train is now early, never later than before.
+        t.scheduledArrival += cum[mirror] - cum[t.stop];
+        t.stop = mirror;
+        t.delaySeconds = Math.max(0, simTime - t.scheduledArrival);
+        double board = board(t, line, st);
+        t.phase = TrainPhase.DWELLING;
+        t.holdDecided = false;
+        t.phaseRemaining = Math.max(MIN_DWELL,
+                Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
+        return true;
+    }
+
+    /**
      * Closes the track between two adjacent stations of a line, in both directions, for {@code seconds}. Trains
      * due to enter the section wait at the platform before it (their signal stays red) until it reopens; a train
      * already inside the section completes its run.
      */
     public void closeSection(String lineId, String fromStationId, String toStationId, double seconds) {
+        closeSection(lineId, fromStationId, toStationId, seconds, ClosureResponse.WAIT);
+    }
+
+    /**
+     * Closes a track section as {@link #closeSection(String, String, String, double)} does, with trains reacting
+     * as {@code response} says. Closing a section that is already closed extends the closure and updates the
+     * response.
+     */
+    public void closeSection(String lineId, String fromStationId, String toStationId, double seconds,
+                             ClosureResponse response) {
         Line line = lines.get(lineId);
         if (line == null) {
             throw new IllegalArgumentException("Unknown line " + lineId);
@@ -484,8 +546,9 @@ public final class SimulationEngine {
                 .filter(c -> c.lineId.equals(lineId) && c.lowerPosition == lower).findFirst().orElse(null);
         if (existing != null) {
             existing.remainingSeconds = Math.max(existing.remainingSeconds, seconds);
+            existing.response = response;
         } else {
-            closures.add(new SectionClosure(lineId, lower, seconds));
+            closures.add(new SectionClosure(lineId, lower, response, seconds));
         }
         emit(SimEvent.Type.INCIDENT, lineId, "Track %s–%s on line %s closed for %.0f s".formatted(
                 sectionName(line, lower), sectionName(line, lower + 1), lineId, seconds));
@@ -497,18 +560,23 @@ public final class SimulationEngine {
 
     /** Whether the segment a train takes when leaving loop stop {@code stop} is closed. */
     boolean sectionClosed(Line line, int stop) {
+        return closureAhead(line, stop) != null;
+    }
+
+    /** Closure of the segment a train takes when leaving loop stop {@code stop}, or null if it is open. */
+    private SectionClosure closureAhead(Line line, int stop) {
         if (closures.isEmpty()) {
-            return false;
+            return null;
         }
         int n = line.stationIds().size();
         int pos = stop < n ? stop : line.loopLength() - stop;
         int lower = line.directionAtStop(stop) > 0 ? pos : pos - 1;
         for (SectionClosure c : closures) {
             if (c.lineId.equals(line.id()) && c.lowerPosition == lower) {
-                return true;
+                return c;
             }
         }
-        return false;
+        return null;
     }
 
     private void expireClosures(double dt) {
