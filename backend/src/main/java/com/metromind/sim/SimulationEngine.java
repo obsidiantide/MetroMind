@@ -60,6 +60,8 @@ public final class SimulationEngine {
     private final List<SectionClosure> closures = new ArrayList<>();
     /** Closed stations and the seconds until each reopens. */
     private final Map<String, Double> closedStations = new LinkedHashMap<>();
+    /** Simulated time at which each currently closed station was closed. */
+    private final Map<String, Double> stationClosedSince = new LinkedHashMap<>();
     private HeadwayStrategy strategy;
     private double simTime;
     private boolean recordArrivals;
@@ -137,6 +139,7 @@ public final class SimulationEngine {
         this.overloadState.putAll(other.overloadState);
         other.closures.forEach(c -> this.closures.add(c.copy()));
         this.closedStations.putAll(other.closedStations);
+        this.stationClosedSince.putAll(other.stationClosedSince);
         this.strategy = other.strategy;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
@@ -494,6 +497,7 @@ public final class SimulationEngine {
     /** Holds a train in place for {@code seconds} (e.g. door fault, passenger incident). */
     public void injectDelay(String trainId, double seconds) {
         TrainState t = train(trainId);
+        startBlock(t);
         t.blockedRemaining += seconds;
         emit(SimEvent.Type.INCIDENT, trainId, "Train %s delayed by %.0f s".formatted(trainId, seconds));
     }
@@ -501,9 +505,18 @@ public final class SimulationEngine {
     /** Technical failure: the train stops where it is and blocks the track until repaired. */
     public void injectBreakdown(String trainId, double repairSeconds) {
         TrainState t = train(trainId);
+        startBlock(t);
         t.blockedRemaining += repairSeconds;
         t.failed = true;
         emit(SimEvent.Type.INCIDENT, trainId, "Train %s broke down, repair ETA %.0f s".formatted(trainId, repairSeconds));
+    }
+
+    /** Records when a train's current stoppage began, unless it is already stopped by an earlier incident. */
+    private void startBlock(TrainState t) {
+        if (t.blockedRemaining <= 0) {
+            t.blockedRemaining = 0;
+            t.blockedSince = simTime;
+        }
     }
 
     /**
@@ -584,7 +597,7 @@ public final class SimulationEngine {
             existing.remainingSeconds = Math.max(existing.remainingSeconds, seconds);
             existing.response = response;
         } else {
-            closures.add(new SectionClosure(lineId, lower, response, seconds));
+            closures.add(new SectionClosure(lineId, lower, response, seconds, simTime));
         }
         emit(SimEvent.Type.INCIDENT, lineId, "Track %s–%s on line %s closed for %.0f s".formatted(
                 sectionName(line, lower), sectionName(line, lower + 1), lineId, seconds));
@@ -631,6 +644,7 @@ public final class SimulationEngine {
             e.setValue(e.getValue() - dt);
             if (e.getValue() <= 1e-9) {
                 it.remove();
+                stationClosedSince.remove(e.getKey());
                 emit(SimEvent.Type.INCIDENT_CLEARED, e.getKey(),
                         "Station " + network.station(e.getKey()).name() + " reopened");
             }
@@ -649,6 +663,7 @@ public final class SimulationEngine {
         }
         if (!closedStations.containsKey(stationId)) {
             evacuate(stations.get(stationId));
+            stationClosedSince.put(stationId, simTime);
         }
         closedStations.merge(stationId, seconds, Math::max);
         emit(SimEvent.Type.INCIDENT, stationId,
@@ -901,7 +916,42 @@ public final class SimulationEngine {
                     closedStations.containsKey(st.id)));
         }
         return new SimulationSnapshot(simTime, clock(simTime), strategy.name(), trainViews, stationViews,
-                List.copyOf(events), metrics(), closedSections());
+                List.copyOf(events), metrics(), closedSections(), activeIncidents());
+    }
+
+    /**
+     * Every incident still in force, soonest to clear first: stopped trains (delays and breakdowns), closed track
+     * sections and closed stations. Ties keep the order above, so the list is deterministic.
+     */
+    List<SimulationSnapshot.ActiveIncidentView> activeIncidents() {
+        List<SimulationSnapshot.ActiveIncidentView> views = new ArrayList<>();
+        for (TrainState t : trains) {
+            if (t.blockedRemaining > 0) {
+                var kind = t.failed ? SimulationSnapshot.IncidentKind.BREAKDOWN
+                        : SimulationSnapshot.IncidentKind.TRAIN_DELAY;
+                String what = t.failed ? "Train %s broken down" : "Train %s held";
+                views.add(incidentView(kind, t.id, what.formatted(t.id), t.blockedSince, t.blockedRemaining));
+            }
+        }
+        for (SectionClosure c : closures) {
+            Line line = lines.get(c.lineId);
+            views.add(incidentView(SimulationSnapshot.IncidentKind.SECTION_CLOSURE, c.lineId,
+                    "Track %s–%s on line %s closed".formatted(sectionName(line, c.lowerPosition),
+                            sectionName(line, c.lowerPosition + 1), c.lineId),
+                    c.startedAt, c.remainingSeconds));
+        }
+        closedStations.forEach((id, remaining) -> views.add(incidentView(
+                SimulationSnapshot.IncidentKind.STATION_CLOSURE, id,
+                "Station " + network.station(id).name() + " closed",
+                stationClosedSince.getOrDefault(id, simTime), remaining)));
+        views.sort(Comparator.comparingDouble(SimulationSnapshot.ActiveIncidentView::remainingSeconds));
+        return views;
+    }
+
+    private SimulationSnapshot.ActiveIncidentView incidentView(SimulationSnapshot.IncidentKind kind, String subject,
+                                                               String description, double since, double remaining) {
+        return new SimulationSnapshot.ActiveIncidentView(kind, subject, description, since, simTime + remaining,
+                remaining);
     }
 
     private List<SimulationSnapshot.ClosedSectionView> closedSections() {

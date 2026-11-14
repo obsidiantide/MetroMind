@@ -10,15 +10,19 @@ final class SectionClosure {
     final int lowerPosition;
     ClosureResponse response;
     double remainingSeconds;
+    /** Simulated time at which the section was closed. */
+    final double startedAt;
 
-    SectionClosure(String lineId, int lowerPosition, ClosureResponse response, double remainingSeconds) {
+    SectionClosure(String lineId, int lowerPosition, ClosureResponse response, double remainingSeconds,
+                   double startedAt) {
         this.lineId = lineId;
         this.lowerPosition = lowerPosition;
         this.response = response;
         this.remainingSeconds = remainingSeconds;
+        this.startedAt = startedAt;
     }
 
     SectionClosure copy() {
-        return new SectionClosure(lineId, lowerPosition, response, remainingSeconds);
+        return new SectionClosure(lineId, lowerPosition, response, remainingSeconds, startedAt);
     }
 }
