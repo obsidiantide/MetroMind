@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ControlPanel } from "@/components/ControlPanel";
+import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { MetroMap } from "@/components/MetroMap";
 import { api } from "@/lib/api";
 import type { MetroNetwork } from "@/lib/types";
@@ -39,6 +40,7 @@ export default function Home() {
             <div className="kpi"><b>{m.headwayCoefficientOfVariation.toFixed(2)}</b><span>headway CV (bunching)</span></div>
           </section>
         )}
+        {snapshot && <IncidentTimeline snapshot={snapshot} />}
         <section className="panel">
           {error && <p style={{ color: "var(--bad)" }}>Backend unreachable: {error}</p>}
           {network && <MetroMap network={network} snapshot={snapshot} />}
