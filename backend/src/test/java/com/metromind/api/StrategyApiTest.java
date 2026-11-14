@@ -58,6 +58,27 @@ class StrategyApiTest {
                 });
     }
 
+    @Test
+    void offersAndSelectsShortTurning() throws Exception {
+        mvc.perform(get("/api/strategies"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasItem("SHORT_TURN")));
+        selectStrategy("SHORT_TURN");
+        simulation.tick();
+
+        mvc.perform(get("/api/state"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategy").value("SHORT_TURN"));
+    }
+
+    @Test
+    void rejectsAnUnknownStrategy() throws Exception {
+        mvc.perform(put("/api/strategy").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"strategy\": \"SKIP_EVERYTHING\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Unknown strategy SKIP_EVERYTHING"));
+    }
+
     private void selectStrategy(String name) throws Exception {
         mvc.perform(put("/api/strategy").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"strategy\": \"" + name + "\"}"))
