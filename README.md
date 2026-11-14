@@ -184,6 +184,22 @@ still turns trains round). Its departure board is empty and its station view has
 - Passengers who planned to change lines at a closed interchange stay aboard to the next open station and are
   re-routed from there using the normal route table, which may still take them through the closed station.
 
+### Incident clearing timeline
+
+Every incident clears on its own: a delayed or broken-down train moves again when its stoppage runs out, and a
+closed section or station reopens when its time is up. Snapshots list what is still in force under
+`activeIncidents`, soonest to clear first:
+
+```json
+{ "kind": "SECTION_CLOSURE", "subjectId": "RED", "description": "Track University–Riverside on line RED closed",
+  "startedAt": 28800.0, "clearsAt": 29700.0, "remainingSeconds": 412.0 }
+```
+
+`kind` is `TRAIN_DELAY`, `BREAKDOWN`, `SECTION_CLOSURE` or `STATION_CLOSURE`. A second incident on a stopped train
+extends the stoppage and keeps its start; a breakdown on a delayed train turns it into a breakdown. Extending a
+closure keeps its start too. The dashboard draws these as a timeline: elapsed time faded, remaining time solid,
+with a countdown to each clearing.
+
 ### Incident history
 
 Every incident injected through the API (delay, breakdown, track or station closure) is recorded with the
