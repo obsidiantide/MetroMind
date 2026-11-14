@@ -30,3 +30,14 @@ td, th { text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--bord
 .events div { padding: 2px 0; border-bottom: 1px solid var(--border); }
 .muted { color: var(--muted); }
 svg text { fill: var(--muted); font-size: 10px; }
+.timeline { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.timeline-row { display: grid; grid-template-columns: 220px 1fr 64px; gap: 8px; align-items: center; }
+.timeline-track { position: relative; height: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.timeline-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.timeline-elapsed { opacity: .35; }
+.timeline-axis { display: flex; justify-content: space-between; margin-left: 228px; margin-right: 72px; font-size: 11px; }
+@media (max-width: 600px) {
+  .timeline-row { grid-template-columns: 1fr 56px; }
+  .timeline-row .timeline-track { grid-column: 1 / -1; grid-row: 2; }
+  .timeline-axis { margin: 0; }
+}

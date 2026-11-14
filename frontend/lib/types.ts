@@ -23,11 +23,17 @@ export type ClosureResponse = "WAIT" | "TURN_BACK";
 export interface ClosedSectionView {
   lineId: string; fromStationId: string; toStationId: string; response: ClosureResponse; remainingSeconds: number;
 }
+export type IncidentKind = "TRAIN_DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE";
+export interface ActiveIncidentView {
+  kind: IncidentKind; subjectId: string; description: string; startedAt: number; clearsAt: number;
+  remainingSeconds: number;
+}
 export interface SimEvent { simTime: number; type: string; subjectId: string; message: string }
 export interface Snapshot {
   simTime: number; clock: string; strategy: string; trains: TrainView[]; stations: StationView[];
   recentEvents: SimEvent[];
   closedSections: ClosedSectionView[];
+  activeIncidents: ActiveIncidentView[];
   metrics: {
     averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
     passengersDelivered: number; transfers: number; passengersLeftBehind: number; passengersHeldAtEntrance: number;
