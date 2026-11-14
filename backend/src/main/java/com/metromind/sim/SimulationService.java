@@ -1,10 +1,12 @@
 package com.metromind.sim;
 
 import com.metromind.incident.AnalysisRecord;
+import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.DelayPropagationAnalyzer;
 import com.metromind.incident.IncidentHistory;
 import com.metromind.incident.IncidentRecord;
+import com.metromind.incident.StrategyBenchmark;
 import com.metromind.network.MetroNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +26,7 @@ public class SimulationService {
     private final List<SnapshotListener> listeners;
     private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
+    private final StrategyBenchmark benchmark = new StrategyBenchmark();
     private volatile boolean paused;
     private volatile SimulationSnapshot last;
 
@@ -118,6 +121,18 @@ public class SimulationService {
         DelayImpactReport report = analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all());
         history.recordAnalysis(fork.simTime(), report);
         return report;
+    }
+
+    /**
+     * Ranks every headway strategy over {@code scenarios} random incidents drawn from {@code seed}, starting from a
+     * copy of the live state. Like the delay analysis it never touches the live engine.
+     */
+    public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds) {
+        SimulationEngine fork;
+        synchronized (engine) {
+            fork = engine.copy();
+        }
+        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all());
     }
 
     /** What-if analyses run so far, most recent first. */

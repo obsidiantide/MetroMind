@@ -1,6 +1,7 @@
 package com.metromind.api;
 
 import com.metromind.incident.AnalysisRecord;
+import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.network.MetroNetwork;
@@ -121,6 +122,17 @@ public class SimulationController {
     public DelayImpactReport delayImpact(@Valid @RequestBody IncidentRequest req,
                                          @RequestParam(defaultValue = "1800") @Min(60) @Max(7200) double horizonSeconds) {
         return simulation.analyzeDelay(req.trainId(), req.seconds(), horizonSeconds);
+    }
+
+    /**
+     * Strategy benchmark: runs every headway strategy against the same {@code scenarios} random train delays and
+     * breakdowns, drawn from {@code seed}, and ranks them by mean and p95 passenger wait. Does not touch live state.
+     */
+    @PostMapping("/analysis/benchmark")
+    public BenchmarkReport benchmark(@RequestParam(defaultValue = "10") @Min(1) @Max(50) int scenarios,
+                                     @RequestParam(defaultValue = "1") long seed,
+                                     @RequestParam(defaultValue = "1800") @Min(300) @Max(3600) double horizonSeconds) {
+        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
