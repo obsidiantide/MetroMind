@@ -38,6 +38,10 @@ export default function Home() {
             <div className="kpi"><b>{Math.round(m.passengersHeldAtEntrance)}</b><span>held at entrances</span></div>
             <div className="kpi"><b>{Math.round(m.passengersLeftBehind)}</b><span>left behind by full trains</span></div>
             <div className="kpi"><b>{m.headwayCoefficientOfVariation.toFixed(2)}</b><span>headway CV (bunching)</span></div>
+            <div className="kpi">
+              <b>{m.trainsInService}</b>
+              <span>trains in service{m.trainsInDepot > 0 ? ` · ${m.trainsInDepot} in depot` : ""}</span>
+            </div>
           </section>
         )}
         {snapshot && <IncidentTimeline snapshot={snapshot} />}

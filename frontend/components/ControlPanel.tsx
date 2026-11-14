@@ -54,6 +54,12 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
         <select value={snapshot?.strategy ?? ""} onChange={(e) => run(() => api.setStrategy(e.target.value))}>
           {strategies.map((s) => <option key={s}>{s}</option>)}
         </select>
+        {snapshot?.strategy === "ADAPTIVE_DISPATCH" && (
+          <p className="muted">
+            Balanced holding; spare trains leave the depot when a line is forecast to overload and return when
+            demand eases.
+          </p>
+        )}
       </section>
 
       <section className="panel">
