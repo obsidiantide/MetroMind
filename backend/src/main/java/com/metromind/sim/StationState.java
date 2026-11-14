@@ -25,6 +25,11 @@ final class StationState {
     double delivered;
     /** Passengers who changed lines here. */
     double transfers;
+    /**
+     * Passengers who were on the platform when a train left in their direction but could not board because it was
+     * full. Someone left behind by two trains in a row counts twice, as in operators' "denied boardings".
+     */
+    double leftBehind;
     double peakWaiting;
 
     StationState(String id) {
@@ -67,6 +72,7 @@ final class StationState {
         s.served = served;
         s.delivered = delivered;
         s.transfers = transfers;
+        s.leftBehind = leftBehind;
         s.peakWaiting = peakWaiting;
         return s;
     }
