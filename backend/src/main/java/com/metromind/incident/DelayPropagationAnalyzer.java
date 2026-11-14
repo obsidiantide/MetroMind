@@ -7,7 +7,9 @@ import com.metromind.sim.TrainState;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Answers "train X is delayed by N seconds: how does it affect the rest of the network?".
@@ -43,20 +45,27 @@ public final class DelayPropagationAnalyzer {
             e.setStrategy(strategy);
             e.setRecordArrivals(true);
         }
-        int[] startArrivals = live.trains().stream().mapToInt(t -> t.arrivals().size()).toArray();
+        Map<String, Integer> startArrivals = new HashMap<>();
+        live.trains().forEach(t -> startArrivals.put(t.id(), t.arrivals().size()));
         perturbed.injectDelay(trainId, delaySeconds);
         baseline.run(horizon, DT);
         perturbed.run(horizon, DT);
 
         List<DelayImpactReport.TrainImpact> trainImpacts = new ArrayList<>();
-        List<TrainState> baseTrains = baseline.trains();
-        List<TrainState> pertTrains = perturbed.trains();
-        for (int i = 0; i < baseTrains.size(); i++) {
-            List<Double> b = baseTrains.get(i).arrivals();
-            List<Double> p = pertTrains.get(i).arrivals();
-            double extra = extraDelay(b.subList(startArrivals[i], b.size()), p.subList(startArrivals[i], p.size()),
-                    perturbed.simTime());
-            trainImpacts.add(new DelayImpactReport.TrainImpact(baseTrains.get(i).id(), extra));
+        // Pair trains by id: a strategy that dispatches or withdraws trains can leave the two runs with different
+        // fleets. A train that only one run has in service at the horizon cannot be compared and is left out.
+        Map<String, TrainState> pertTrains = new HashMap<>();
+        perturbed.trains().forEach(t -> pertTrains.put(t.id(), t));
+        for (TrainState base : baseline.trains()) {
+            TrainState pert = pertTrains.get(base.id());
+            if (pert == null) {
+                continue;
+            }
+            int start = startArrivals.getOrDefault(base.id(), 0);
+            List<Double> b = base.arrivals();
+            List<Double> p = pert.arrivals();
+            double extra = extraDelay(b.subList(start, b.size()), p.subList(start, p.size()), perturbed.simTime());
+            trainImpacts.add(new DelayImpactReport.TrainImpact(base.id(), extra));
         }
         trainImpacts.sort(Comparator.comparingDouble(DelayImpactReport.TrainImpact::extraDelaySeconds).reversed());
 
