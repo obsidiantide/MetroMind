@@ -27,7 +27,8 @@ export interface Snapshot {
 }
 export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;
-  totalPassengerWaitMinutes: number; headwayCvAtHorizon: number;
+  totalPassengerWaitMinutes: number; totalExtraRideMinutes: number; totalExtraTravelMinutes: number;
+  totalPassengerTravelMinutes: number; headwayCvAtHorizon: number;
   trains: { trainId: string; extraDelaySeconds: number }[];
   stations: { stationId: string; extraWaitMinutes: number; peakWaitingDelta: number }[];
 }
