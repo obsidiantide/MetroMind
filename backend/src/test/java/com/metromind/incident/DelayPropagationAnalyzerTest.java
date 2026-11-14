@@ -3,8 +3,11 @@ package com.metromind.incident;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.TestNetworks;
+import com.metromind.sim.TrainPhase;
+import com.metromind.sim.TrainState;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +28,24 @@ class DelayPropagationAnalyzerTest {
         assertThat(none.trains().get(0).trainId()).isEqualTo("L1-2");
         assertThat(none.maxTrainDelaySeconds()).isGreaterThanOrEqualTo(200);
         assertThat(none.totalExtraPassengerWaitMinutes()).isPositive();
+        assertThat(none.totalExtraTravelMinutes())
+                .isEqualTo(none.totalExtraPassengerWaitMinutes() + none.totalExtraRideMinutes());
         assertThat(report.bestStrategy()).isNotNull();
+    }
+
+    @Test
+    void trainStuckBetweenStationsKeepsItsPassengersWaitingOnBoard() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(900, 1);
+        String loaded = live.trains().stream().filter(t -> t.phase() == TrainPhase.RUNNING)
+                .max(Comparator.comparingDouble(TrainState::passengers))
+                .orElseThrow().id();
+
+        DelayImpactReport.StrategyOutcome outcome = new DelayPropagationAnalyzer()
+                .analyze(live, loaded, 300, 1800, List.of(HeadwayStrategy.NO_CONTROL)).outcomes().get(0);
+
+        assertThat(outcome.totalExtraRideMinutes()).isPositive();
+        assertThat(outcome.totalExtraTravelMinutes()).isGreaterThan(outcome.totalExtraPassengerWaitMinutes());
     }
 
     @Test

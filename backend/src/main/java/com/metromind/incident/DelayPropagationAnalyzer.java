@@ -75,7 +75,9 @@ public final class DelayPropagationAnalyzer {
         int affected = (int) trainImpacts.stream()
                 .filter(t -> t.extraDelaySeconds() >= AFFECTED_THRESHOLD_SECONDS).count();
         double max = trainImpacts.isEmpty() ? 0 : trainImpacts.get(0).extraDelaySeconds();
+        double extraRide = (perturbed.passengerRideSeconds() - baseline.passengerRideSeconds()) / 60.0;
         return new DelayImpactReport.StrategyOutcome(strategy.name(), affected, max, totalExtra, totalAbs,
+                extraRide, totalExtra + extraRide,
                 perturbed.snapshot().metrics().headwayCoefficientOfVariation(), trainImpacts, stationImpacts);
     }
 
