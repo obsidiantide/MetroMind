@@ -335,10 +335,17 @@ public final class SimulationEngine {
         }
         double waiting = StationState.sum(queue);
         double room = Math.max(0, t.capacity - t.passengers);
-        if (waiting <= 0 || room <= 0) {
+        if (waiting <= 0) {
+            return 0;
+        }
+        if (room <= 0) {
+            st.leftBehind += waiting;
             return 0;
         }
         double fraction = Math.min(1, room / waiting);
+        if (fraction < 1) {
+            st.leftBehind += waiting - room;
+        }
         double board = 0;
         for (int d = 0; d < queue.length; d++) {
             double b = queue[d] * fraction;
@@ -576,7 +583,7 @@ public final class SimulationEngine {
                 queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,
-                    riskLevel(predicted), queues));
+                    riskLevel(predicted), st.leftBehind, queues));
         }
         return new SimulationSnapshot(simTime, clock(simTime), strategy.name(), trainViews, stationViews,
                 List.copyOf(events), metrics());
@@ -589,7 +596,9 @@ public final class SimulationEngine {
         double served = stations.values().stream().mapToDouble(s -> s.served).sum();
         double delivered = stations.values().stream().mapToDouble(s -> s.delivered).sum();
         double transfers = stations.values().stream().mapToDouble(s -> s.transfers).sum();
-        return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, headwayCv());
+        double leftBehind = stations.values().stream().mapToDouble(s -> s.leftBehind).sum();
+        return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind,
+                headwayCv());
     }
 
     /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
@@ -673,4 +682,5 @@ public final class SimulationEngine {
 
     public double stationDelivered(String stationId) { return stations.get(stationId).delivered; }
     public double stationTransfers(String stationId) { return stations.get(stationId).transfers; }
+    public double stationLeftBehind(String stationId) { return stations.get(stationId).leftBehind; }
 }
