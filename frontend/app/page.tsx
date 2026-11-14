@@ -34,6 +34,8 @@ export default function Home() {
               <b>{(m.passengersDelivered > 0 ? m.transfers / m.passengersDelivered : 0).toFixed(2)}</b>
               <span>transfers per journey</span>
             </div>
+            <div className="kpi"><b>{Math.round(m.passengersHeldAtEntrance)}</b><span>held at entrances</span></div>
+            <div className="kpi"><b>{Math.round(m.passengersLeftBehind)}</b><span>left behind by full trains</span></div>
             <div className="kpi"><b>{m.headwayCoefficientOfVariation.toFixed(2)}</b><span>headway CV (bunching)</span></div>
           </section>
         )}

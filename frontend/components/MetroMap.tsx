@@ -34,13 +34,16 @@ export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapsho
       {network.stations.map((s) => {
         const st = stationState.get(s.id);
         const r = 6 + Math.min(14, (st?.waiting ?? 0) / 40);
+        const held = st && st.heldAtEntrance >= 1 ? `, ${Math.round(st.heldAtEntrance)} held at entrance` : "";
+        const capacity = s.platformCapacity ? ` (platforms hold ${s.platformCapacity})` : "";
+        const leftBehind = st && st.leftBehind >= 1 ? `\n  left behind by full trains so far: ${Math.round(st.leftBehind)}` : "";
         const queues = (st?.queues ?? [])
           .map((q) => `\n  ${lineName.get(q.lineId) ?? q.lineId} → ${station(q.towardsStationId).name}: ${Math.round(q.waiting)}`)
           .join("");
         return (
           <g key={s.id}>
             <circle cx={x(s.lon)} cy={y(s.lat)} r={r} fill="#0d1117" stroke={RISK_COLOR[st?.overloadRisk ?? "LOW"]} strokeWidth={3}>
-              <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${queues}`}</title>
+              <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting${capacity}${held}, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${leftBehind}${queues}`}</title>
             </circle>
             <text x={x(s.lon) + 12} y={y(s.lat) - 10}>{s.name}</text>
           </g>
