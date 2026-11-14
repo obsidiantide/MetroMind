@@ -8,15 +8,17 @@ final class SectionClosure {
     final String lineId;
     /** Position (index in the line's station list) of the section's end nearer the line's first station. */
     final int lowerPosition;
+    ClosureResponse response;
     double remainingSeconds;
 
-    SectionClosure(String lineId, int lowerPosition, double remainingSeconds) {
+    SectionClosure(String lineId, int lowerPosition, ClosureResponse response, double remainingSeconds) {
         this.lineId = lineId;
         this.lowerPosition = lowerPosition;
+        this.response = response;
         this.remainingSeconds = remainingSeconds;
     }
 
     SectionClosure copy() {
-        return new SectionClosure(lineId, lowerPosition, remainingSeconds);
+        return new SectionClosure(lineId, lowerPosition, response, remainingSeconds);
     }
 }
