@@ -86,4 +86,20 @@ class PlatformCrowdingTest {
         }
         return total;
     }
+
+    @Test
+    void snapshotReportsEntranceQueuesAndCountsThemInTheForecast() {
+        SimulationEngine engine = new SimulationEngine(singleLineWithCapacity(40, 60), START,
+                HeadwayStrategy.NO_CONTROL);
+        while (engine.stationHeldAtEntrance("C") <= 0) {
+            engine.step(1);
+        }
+        SimulationSnapshot snapshot = engine.snapshot();
+        SimulationSnapshot.StationView c = snapshot.stations().stream()
+                .filter(s -> s.id().equals("C")).findFirst().orElseThrow();
+        assertThat(c.heldAtEntrance()).isEqualTo(engine.stationHeldAtEntrance("C"));
+        assertThat(c.waiting()).isLessThanOrEqualTo(60 + 1e-9);
+        assertThat(snapshot.metrics().passengersHeldAtEntrance()).isEqualTo(c.heldAtEntrance());
+        assertThat(engine.predictWaiting("C", 0)).isGreaterThanOrEqualTo(c.heldAtEntrance());
+    }
 }
