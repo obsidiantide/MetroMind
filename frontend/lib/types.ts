@@ -17,7 +17,7 @@ export interface TrainView {
 export interface QueueView { lineId: string; towardsStationId: string; waiting: number }
 export interface StationView {
   id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH";
-  heldAtEntrance: number; leftBehind: number; queues: QueueView[];
+  heldAtEntrance: number; leftBehind: number; queues: QueueView[]; closed: boolean;
 }
 export type ClosureResponse = "WAIT" | "TURN_BACK";
 export interface ClosedSectionView {
