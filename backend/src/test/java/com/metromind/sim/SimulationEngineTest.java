@@ -63,6 +63,20 @@ class SimulationEngineTest {
     }
 
     @Test
+    void ridingTimeIntegratesPassengersOnBoard() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        engine.run(900, 1);
+        double onboard = engine.trains().stream().mapToDouble(TrainState::passengers).sum();
+        assertThat(onboard).isPositive();
+        double before = engine.passengerRideSeconds();
+        SimulationEngine copy = engine.copy();
+        assertThat(copy.passengerRideSeconds()).isEqualTo(before);
+
+        engine.step(1);
+        assertThat(engine.passengerRideSeconds() - before).isCloseTo(onboard, within(1e-6));
+    }
+
+    @Test
     void neverTwoTrainsInTheSameBlock() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.injectBreakdown("L1-1", 900);

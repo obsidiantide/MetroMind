@@ -58,6 +58,8 @@ public final class SimulationEngine {
     private HeadwayStrategy strategy;
     private double simTime;
     private boolean recordArrivals;
+    /** Integral of passengers on board over time, all trains (passenger-seconds). */
+    private double rideSeconds;
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -116,6 +118,7 @@ public final class SimulationEngine {
         this.strategy = other.strategy;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
+        this.rideSeconds = other.rideSeconds;
     }
 
     /** Deep copy, used for counterfactual ("what-if") runs. */
@@ -181,6 +184,7 @@ public final class SimulationEngine {
         simTime += dt;
         accumulateDemand(dt);
         for (TrainState t : trains) {
+            rideSeconds += t.passengers * dt;
             advance(t, dt);
         }
     }
@@ -632,6 +636,9 @@ public final class SimulationEngine {
     }
 
     public double stationWaitSeconds(String stationId) { return stations.get(stationId).waitSeconds; }
+
+    /** Passenger-seconds spent on board trains so far (running, dwelling, held or stuck). */
+    public double passengerRideSeconds() { return rideSeconds; }
     public double stationPeakWaiting(String stationId) { return stations.get(stationId).peakWaiting; }
     public double stationWaiting(String stationId) { return stations.get(stationId).totalWaiting(); }
 
