@@ -65,6 +65,13 @@ public class SimulationService {
         }
     }
 
+    public void closeSection(String lineId, String fromStationId, String toStationId, double seconds,
+                             ClosureResponse response) {
+        synchronized (engine) {
+            engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
+        }
+    }
+
     public void setStrategy(String name) {
         synchronized (engine) {
             engine.setStrategy(HeadwayStrategy.byName(name));
