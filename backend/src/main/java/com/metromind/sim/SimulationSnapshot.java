@@ -15,9 +15,10 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      * @param heldAtEntrance passengers kept outside because the platforms are full (not included in {@code waiting})
      * @param leftBehind     passengers so far who could not board a full train in their direction (counted per train)
      * @param queues         waiting passengers broken down by line and direction of travel
+     * @param closed         trains run through without stopping; its passengers use the neighbouring stations
      */
     public record StationView(String id, double waiting, double predictedWaiting15m, String overloadRisk,
-                              double heldAtEntrance, double leftBehind, List<QueueView> queues) {
+                              double heldAtEntrance, double leftBehind, List<QueueView> queues, boolean closed) {
     }
 
     /** @param towardsStationId terminal the queued passengers are travelling towards */
