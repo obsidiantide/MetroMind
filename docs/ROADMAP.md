@@ -35,7 +35,7 @@ Mark items `[x]` when merged.
 ### Optimisation and comparison
 - [x] Strategy: adaptive dispatching that adds / withdraws trains from depot when overload is predicted
 - [x] Strategy: skip-stop / short-turning for recovery (short-turning; skip-stop tracked below)
-- [ ] Strategy benchmark endpoint: run N random incident scenarios and rank strategies (mean, p95 passenger wait)
+- [x] Strategy benchmark endpoint: run N random incident scenarios and rank strategies (mean, p95 passenger wait)
 - [ ] Recovery-time metric: how long until headways return to normal after an incident
 - [ ] Dynamic headway target that tracks predicted demand
 
