@@ -43,6 +43,10 @@ public final class SimulationEngine {
     static final double OVERLOAD_HIGH = 400;
     static final double OVERLOAD_MEDIUM = 200;
     private static final int MAX_EVENTS = 100;
+    /** How often strategies that dispatch from the depot review each line's fleet, in simulated seconds. */
+    static final double DISPATCH_INTERVAL_SECONDS = 60;
+    /** Horizon of the overload forecast that triggers dispatching. */
+    static final double DISPATCH_FORECAST_SECONDS = 900;
 
     private final MetroNetwork network;
     private final Map<String, Line> lines = new LinkedHashMap<>();
@@ -62,6 +66,11 @@ public final class SimulationEngine {
     private final Map<String, Double> closedStations = new LinkedHashMap<>();
     /** Simulated time at which each currently closed station was closed. */
     private final Map<String, Double> stationClosedSince = new LinkedHashMap<>();
+    /** Spare trains waiting in each line's depot. */
+    private final Map<String, Integer> depot = new LinkedHashMap<>();
+    /** Trains each line has brought out of its depot so far; numbers new trains so ids are never reused. */
+    private final Map<String, Integer> dispatchedCount = new LinkedHashMap<>();
+    private double nextDispatchCheck;
     private HeadwayStrategy strategy;
     private double simTime;
     private boolean recordArrivals;
@@ -79,6 +88,8 @@ public final class SimulationEngine {
                 cum[k + 1] = cum[k] + line.runSecondsFromStop(k) + NOMINAL_DWELL;
             }
             cumulativeStopSeconds.put(line.id(), cum);
+            depot.put(line.id(), line.spareTrains());
+            dispatchedCount.put(line.id(), 0);
             for (String sid : line.stationIds()) {
                 linesByStation.computeIfAbsent(sid, k -> new ArrayList<>()).add(line.id());
             }
@@ -122,6 +133,7 @@ public final class SimulationEngine {
             }
             stations.put(s.id(), st);
         }
+        this.nextDispatchCheck = startTime + DISPATCH_INTERVAL_SECONDS;
         placeTrains();
     }
 
@@ -140,6 +152,9 @@ public final class SimulationEngine {
         other.closures.forEach(c -> this.closures.add(c.copy()));
         this.closedStations.putAll(other.closedStations);
         this.stationClosedSince.putAll(other.stationClosedSince);
+        this.depot.putAll(other.depot);
+        this.dispatchedCount.putAll(other.dispatchedCount);
+        this.nextDispatchCheck = other.nextDispatchCheck;
         this.strategy = other.strategy;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
@@ -212,6 +227,14 @@ public final class SimulationEngine {
         for (TrainState t : trains) {
             rideSeconds += t.passengers * dt;
             advance(t, dt);
+        }
+        if (simTime >= nextDispatchCheck - 1e-9) {
+            while (simTime >= nextDispatchCheck - 1e-9) {
+                nextDispatchCheck += DISPATCH_INTERVAL_SECONDS;
+            }
+            if (strategy.dispatchesFromDepot()) {
+                reviewFleets();
+            }
         }
     }
 
@@ -289,7 +312,7 @@ public final class SimulationEngine {
         }
         if (!t.holdDecided) {
             t.holdDecided = true;
-            double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / line.trainCount();
+            double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / trainsInService(line.id());
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t), target);
             if (isTerminalStop(line, t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
@@ -701,6 +724,89 @@ public final class SimulationEngine {
         return closedStations.containsKey(stationId);
     }
 
+    // ------------------------------------------------------------------ depot
+
+    /**
+     * Brings a spare train into service on every line whose overload forecast is high, one train per line and
+     * review. Trains enter at the first terminal, next to the depot, once its platform and the track into it
+     * are clear.
+     */
+    private void reviewFleets() {
+        for (Line line : lines.values()) {
+            if (depot.get(line.id()) > 0 && lineForecast(line) >= OVERLOAD_HIGH && depotExitClear(line)) {
+                dispatch(line);
+            }
+        }
+    }
+
+    /**
+     * Highest 15-minute forecast among the line's own platform queues, so overload on a crossing line does not
+     * draw trains onto this one. Closed stations are left out: no train can relieve them.
+     */
+    double lineForecast(Line line) {
+        double mult = DemandProfile.multiplier(simTime + DISPATCH_FORECAST_SECONDS / 2);
+        double worst = 0;
+        for (String sid : line.stationIds()) {
+            if (closedStations.containsKey(sid)) {
+                continue;
+            }
+            StationState st = stations.get(sid);
+            double atStation = 0;
+            for (StationState.QueueKey key : st.waiting.keySet()) {
+                if (key.lineId().equals(line.id())) {
+                    atStation += predictQueue(st, key, DISPATCH_FORECAST_SECONDS, mult);
+                }
+            }
+            worst = Math.max(worst, atStation);
+        }
+        return worst;
+    }
+
+    private boolean depotExitClear(Line line) {
+        if (closedStations.containsKey(line.stationIds().get(0))) {
+            return false;
+        }
+        int last = line.loopLength() - 1;
+        for (TrainState o : trains) {
+            if (o.lineId.equals(line.id()) && ((o.stop == 0 && o.phase != TrainPhase.RUNNING)
+                    || (o.stop == last && o.phase == TrainPhase.RUNNING))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Puts a spare train on the first terminal's platform, with its own timetable starting now. */
+    private void dispatch(Line line) {
+        int number = line.trainCount() + dispatchedCount.merge(line.id(), 1, Integer::sum);
+        TrainState t = new TrainState(line.id() + "-" + number, line.id(), line.trainCapacity(),
+                network.stations().size());
+        t.stop = 0;
+        t.scheduledArrival = simTime;
+        t.phase = TrainPhase.DWELLING;
+        double board = board(t, line, stations.get(line.stationIds().get(0)));
+        t.phaseRemaining = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * board));
+        trains.add(t);
+        depot.merge(line.id(), -1, Integer::sum);
+        emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train %s left the depot to relieve line %s".formatted(
+                t.id, line.id()));
+    }
+
+    /** Trains currently running on a line (at least 1, so it can divide a loop time). */
+    int trainsInService(String lineId) {
+        int n = 0;
+        for (TrainState t : trains) {
+            if (t.lineId.equals(lineId)) {
+                n++;
+            }
+        }
+        return Math.max(1, n);
+    }
+
+    public int depotTrains(String lineId) {
+        return depot.getOrDefault(lineId, 0);
+    }
+
     // ------------------------------------------------------------------ prediction
 
     /**
@@ -716,29 +822,34 @@ public final class SimulationEngine {
         double mult = DemandProfile.multiplier(simTime + horizon / 2);
         double predicted = 0;
         for (StationState.QueueKey key : st.waiting.keySet()) {
-            Line line = lines.get(key.lineId());
-            double rate = boardingRate(st, key, mult);
-            double lineRate = 0;
-            for (String sid : line.stationIds()) {
-                lineRate += boardingRate(stations.get(sid), key, mult);
-            }
-            // A train's spare room is shared by every station it serves in this direction, roughly in proportion
-            // to demand, so this queue can only count on its share of it.
-            double share = lineRate > 0 ? rate / lineRate : 0;
-            double expected = st.waiting(key) + rate * horizon;
-            for (TrainState t : trains) {
-                if (!t.lineId.equals(key.lineId())) {
-                    continue;
-                }
-                int stop = nextCallStop(t, line, stationId, key.direction());
-                if (stop >= 0 && secondsUntilStop(t, line, stop) <= horizon) {
-                    double residual = Math.max(0, t.capacity - passengersAboardAfter(t, line, stop));
-                    expected -= residual * share;
-                }
-            }
-            predicted += Math.max(0, expected);
+            predicted += predictQueue(st, key, horizon, mult);
         }
         return predicted + st.heldAtEntrance;
+    }
+
+    /** Forecast for one platform queue of a station; see {@link #predictWaiting(String, double)}. */
+    private double predictQueue(StationState st, StationState.QueueKey key, double horizon, double mult) {
+        Line line = lines.get(key.lineId());
+        double rate = boardingRate(st, key, mult);
+        double lineRate = 0;
+        for (String sid : line.stationIds()) {
+            lineRate += boardingRate(stations.get(sid), key, mult);
+        }
+        // A train's spare room is shared by every station it serves in this direction, roughly in proportion
+        // to demand, so this queue can only count on its share of it.
+        double share = lineRate > 0 ? rate / lineRate : 0;
+        double expected = st.waiting(key) + rate * horizon;
+        for (TrainState t : trains) {
+            if (!t.lineId.equals(key.lineId())) {
+                continue;
+            }
+            int stop = nextCallStop(t, line, st.id, key.direction());
+            if (stop >= 0 && secondsUntilStop(t, line, stop) <= horizon) {
+                double residual = Math.max(0, t.capacity - passengersAboardAfter(t, line, stop));
+                expected -= residual * share;
+            }
+        }
+        return Math.max(0, expected);
     }
 
     /** Expected passengers per second joining queue {@code key} at a station (0 if it has no such queue). */

@@ -144,6 +144,6 @@ class IncidentApiTest {
                 .andExpect(jsonPath("$[0].report.injectedDelaySeconds").value(90.0))
                 .andExpect(jsonPath("$[0].report.horizonSeconds").value(300.0))
                 .andExpect(jsonPath("$[0].report.bestStrategy").isString())
-                .andExpect(jsonPath("$[0].report.outcomes.length()").value(3));
+                .andExpect(jsonPath("$[0].report.outcomes.length()").value(4));
     }
 }
