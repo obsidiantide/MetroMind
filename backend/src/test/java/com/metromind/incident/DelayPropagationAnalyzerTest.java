@@ -1,5 +1,7 @@
 package com.metromind.incident;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.metromind.network.MetroNetwork;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.TestNetworks;
@@ -7,6 +9,7 @@ import com.metromind.sim.TrainPhase;
 import com.metromind.sim.TrainState;
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
 import java.util.Comparator;
 import java.util.List;
 
@@ -62,6 +65,32 @@ class DelayPropagationAnalyzerTest {
         assertThat(report.bestStrategy()).isEqualTo(best.strategy());
         for (DelayImpactReport.StrategyOutcome o : report.outcomes()) {
             assertThat(o.totalPassengerTravelMinutes()).isGreaterThan(o.totalPassengerWaitMinutes());
+        }
+    }
+
+    /**
+     * Regression: on the seed network a one-minute delay of RED-4 at 08:10 used to report about 375
+     * passenger-minutes <em>less</em> platform waiting than the baseline. The passengers had not been spared any
+     * time: the bunched trains (they started snapped to platforms) picked them up sooner and they spent the
+     * difference, and more, on board. Counting on-board time, a delay must cost passengers time.
+     */
+    @Test
+    void shortDelayCostsPassengersTimeOnTheSeedNetwork() throws Exception {
+        MetroNetwork network;
+        try (InputStream in = getClass().getResourceAsStream("/network/metropolis.json")) {
+            network = new ObjectMapper().readValue(in, MetroNetwork.class);
+        }
+        for (double start : new double[] {8 * 3600, 17.5 * 3600}) {
+            SimulationEngine live = new SimulationEngine(network, start, HeadwayStrategy.NO_CONTROL);
+            live.run(600, 1);
+            for (TrainState train : live.trains()) {
+                DelayImpactReport.StrategyOutcome outcome = new DelayPropagationAnalyzer()
+                        .analyze(live, train.id(), 60, 1800, List.of(HeadwayStrategy.NO_CONTROL))
+                        .outcomes().get(0);
+                assertThat(outcome.totalExtraTravelMinutes())
+                        .as("delaying %s at %s", train.id(), start)
+                        .isPositive();
+            }
         }
     }
 
