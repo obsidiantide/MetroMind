@@ -16,6 +16,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Train movement | Discrete-time engine, 1 s step, fixed-block signalling (segment + next platform) |
 | Passenger flow | Fluid demand model with morning/evening peaks; origin–destination matrix (gravity model or explicit weights); fastest-route assignment with transfers at interchanges; one queue per station, line and direction, tracked by destination; crowding-dependent dwell times |
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
+| Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime |
@@ -114,6 +115,23 @@ Passengers take the fastest route: each segment costs its nominal run time plus 
 half its headway and a change of line adds a 120 s walk. They leave the train at their destination, or at an
 interchange where they join the queue for their next line. Snapshot `metrics` report `passengersServed`
 (boardings, one per line ridden), `passengersDelivered` (completed journeys) and `transfers` (line changes).
+
+### Platform capacity and crowding
+
+A station may declare how many passengers its platforms hold, all queues together:
+
+```json
+{ "id": "R3", "name": "Central", "lat": 40.375, "lon": 49.82, "baseArrivalsPerMinute": 12, "platformCapacity": 450 }
+```
+
+While the platforms are full, new passengers wait at the entrance and are let in as trains clear the queues.
+Passengers changing lines are always let through, so an interchange can briefly exceed its limit. Time at the
+entrance counts as waiting (it is included in delay-impact analysis), and the overload forecast adds the
+entrance queue on top of the platform forecast. Stations without the field have unlimited platforms.
+
+Snapshots report per station `heldAtEntrance` and `leftBehind` (passengers who could not board a full train in
+their direction, counted once per train missed), and network-wide `passengersHeldAtEntrance` and
+`passengersLeftBehind`.
 
 ## Project layout
 
