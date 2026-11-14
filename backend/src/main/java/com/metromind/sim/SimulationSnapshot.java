@@ -55,10 +55,12 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      * @param transfers           line changes made at interchanges
      * @param passengersLeftBehind passengers who could not board a full train, counted once per train missed
      * @param passengersHeldAtEntrance passengers currently kept outside stations with full platforms
+     * @param trainsInService    trains running on all lines, including any brought out of a depot
+     * @param trainsInDepot      spare trains waiting in the depots
      */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
                           double passengersServed, double passengersDelivered, double transfers,
                           double passengersLeftBehind, double passengersHeldAtEntrance,
-                          double headwayCoefficientOfVariation) {
+                          double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot) {
     }
 }

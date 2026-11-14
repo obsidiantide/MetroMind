@@ -41,6 +41,8 @@ class AdaptiveDispatchTest {
 
         assertThat(engine.trains()).extracting(TrainState::id).containsExactly("L1-1", "L1-2", "L1-3", "L1-4");
         assertThat(engine.depotTrains("L1")).isZero();
+        assertThat(engine.snapshot().metrics().trainsInService()).isEqualTo(4);
+        assertThat(engine.snapshot().metrics().trainsInDepot()).isZero();
         assertThat(engine.snapshot().recentEvents()).filteredOn(e -> e.type() == SimEvent.Type.TRAIN_DISPATCHED)
                 .extracting(SimEvent::subjectId).containsExactly("L1-3", "L1-4");
     }
@@ -101,6 +103,7 @@ class AdaptiveDispatchTest {
         engine.run(4 * 3600, 1); // into the midday lull
         assertThat(engine.trains()).hasSize(2);
         assertThat(engine.depotTrains("L1")).isEqualTo(2);
+        assertThat(engine.snapshot().metrics().trainsInDepot()).isEqualTo(2);
         assertThat(engine.snapshot().recentEvents()).anyMatch(e -> e.type() == SimEvent.Type.TRAIN_WITHDRAWN);
     }
 
