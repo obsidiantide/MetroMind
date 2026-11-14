@@ -3,7 +3,8 @@ package com.metromind.sim;
 import java.util.List;
 
 public record SimulationSnapshot(double simTime, String clock, String strategy, List<TrainView> trains,
-                                 List<StationView> stations, List<SimEvent> recentEvents, Metrics metrics) {
+                                 List<StationView> stations, List<SimEvent> recentEvents, Metrics metrics,
+                                 List<ClosedSectionView> closedSections) {
 
     public record TrainView(String id, String lineId, String fromStationId, String toStationId, double progress,
                             double lat, double lon, TrainPhase phase, double delaySeconds, double load,
@@ -21,6 +22,16 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
 
     /** @param towardsStationId terminal the queued passengers are travelling towards */
     public record QueueView(String lineId, String towardsStationId, double waiting) {
+    }
+
+    /**
+     * A closed stretch of track. {@code fromStationId} is the end nearer the line's first station.
+     *
+     * @param response         what trains do on reaching the closure
+     * @param remainingSeconds time until the section reopens
+     */
+    public record ClosedSectionView(String lineId, String fromStationId, String toStationId,
+                                    ClosureResponse response, double remainingSeconds) {
     }
 
     /**
