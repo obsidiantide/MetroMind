@@ -49,6 +49,23 @@ class DelayPropagationAnalyzerTest {
     }
 
     @Test
+    void bestStrategyHasTheShortestTotalTravelTime() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(600, 1);
+
+        DelayImpactReport report = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-3", 240, 1800, HeadwayStrategy.all());
+
+        DelayImpactReport.StrategyOutcome best = report.outcomes().stream()
+                .min(Comparator.comparingDouble(DelayImpactReport.StrategyOutcome::totalPassengerTravelMinutes))
+                .orElseThrow();
+        assertThat(report.bestStrategy()).isEqualTo(best.strategy());
+        for (DelayImpactReport.StrategyOutcome o : report.outcomes()) {
+            assertThat(o.totalPassengerTravelMinutes()).isGreaterThan(o.totalPassengerWaitMinutes());
+        }
+    }
+
+    @Test
     void analysisDoesNotMutateLiveEngine() {
         SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
         live.run(300, 1);

@@ -7,9 +7,13 @@ import java.util.List;
  * once with the incident and once without, for each headway strategy.
  *
  * <p>{@code totalExtraPassengerWaitMinutes} is relative to the same strategy's baseline (how much the incident
- * hurts); {@code totalPassengerWaitMinutes} is absolute over the horizon and is what strategies are ranked by.
- * {@code totalExtraRideMinutes} is the extra time passengers spend on board (e.g. stuck behind the incident
- * train), so {@code totalExtraTravelMinutes} = extra wait + extra ride is the full cost of the incident.
+ * hurts); {@code totalPassengerWaitMinutes} is absolute over the horizon. {@code totalExtraRideMinutes} is the
+ * extra time passengers spend on board (e.g. stuck behind the incident train), so {@code totalExtraTravelMinutes}
+ * = extra wait + extra ride is the full cost of the incident.
+ *
+ * <p>Strategies are ranked by {@code totalPassengerTravelMinutes}: absolute platform wait plus time on board over
+ * the horizon. Ranking by platform wait alone would favour strategies that hold trains, since a held train
+ * moves waiting from the platform onto the train without making anyone's journey shorter.
  */
 public record DelayImpactReport(String trainId, double injectedDelaySeconds, double horizonSeconds,
                                 List<StrategyOutcome> outcomes, String bestStrategy) {
@@ -17,6 +21,7 @@ public record DelayImpactReport(String trainId, double injectedDelaySeconds, dou
     public record StrategyOutcome(String strategy, int trainsAffected, double maxTrainDelaySeconds,
                                   double totalExtraPassengerWaitMinutes, double totalPassengerWaitMinutes,
                                   double totalExtraRideMinutes, double totalExtraTravelMinutes,
+                                  double totalPassengerTravelMinutes,
                                   double headwayCvAtHorizon,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
     }

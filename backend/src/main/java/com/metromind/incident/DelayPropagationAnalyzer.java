@@ -13,8 +13,8 @@ import java.util.List;
  * Answers "train X is delayed by N seconds: how does it affect the rest of the network?".
  *
  * <p>For every headway strategy it forks the live engine twice (baseline / with incident), runs both for the
- * horizon and diffs train arrival times and passenger waiting time. The strategy with the smallest total
- * passenger wait in the incident run is reported as the best one.
+ * horizon and diffs train arrival times, passenger waiting and on-board time. The strategy with the smallest
+ * total passenger travel time (platform wait + ride) in the incident run is reported as the best one.
  */
 public final class DelayPropagationAnalyzer {
 
@@ -29,7 +29,7 @@ public final class DelayPropagationAnalyzer {
             outcomes.add(runCounterfactual(live, trainId, delaySeconds, horizonSeconds, strategy));
         }
         String best = outcomes.stream()
-                .min(Comparator.comparingDouble(DelayImpactReport.StrategyOutcome::totalPassengerWaitMinutes))
+                .min(Comparator.comparingDouble(DelayImpactReport.StrategyOutcome::totalPassengerTravelMinutes))
                 .map(DelayImpactReport.StrategyOutcome::strategy).orElse(null);
         return new DelayImpactReport(trainId, delaySeconds, horizonSeconds, outcomes, best);
     }
@@ -78,6 +78,7 @@ public final class DelayPropagationAnalyzer {
         double extraRide = (perturbed.passengerRideSeconds() - baseline.passengerRideSeconds()) / 60.0;
         return new DelayImpactReport.StrategyOutcome(strategy.name(), affected, max, totalExtra, totalAbs,
                 extraRide, totalExtra + extraRide,
+                totalAbs + (perturbed.passengerRideSeconds() - live.passengerRideSeconds()) / 60.0,
                 perturbed.snapshot().metrics().headwayCoefficientOfVariation(), trainImpacts, stationImpacts);
     }
 
