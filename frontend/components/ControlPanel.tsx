@@ -63,7 +63,10 @@ export function ControlPanel({ snapshot }: { snapshot: Snapshot | null }) {
           <h2>Impact of {Math.round(report.injectedDelaySeconds / 60)} min delay on {report.trainId}</h2>
           <table>
             <thead>
-              <tr><th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Total wait</th></tr>
+              <tr>
+                <th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Extra on board</th>
+                <th>Total travel</th>
+              </tr>
             </thead>
             <tbody>
               {report.outcomes.map((o) => (
@@ -72,11 +75,15 @@ export function ControlPanel({ snapshot }: { snapshot: Snapshot | null }) {
                   <td>{o.trainsAffected}</td>
                   <td>{Math.round(o.maxTrainDelaySeconds)} s</td>
                   <td>{Math.round(o.totalExtraPassengerWaitMinutes)} min</td>
-                  <td>{Math.round(o.totalPassengerWaitMinutes)} min</td>
+                  <td>{Math.round(o.totalExtraRideMinutes)} min</td>
+                  <td>{Math.round(o.totalPassengerTravelMinutes)} min</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className="muted">
+            Strategies are ranked by total travel time (platform wait + time on board) over the horizon.
+          </p>
           <p className="muted">
             Most affected trains ({report.outcomes[0].strategy}):{" "}
             {report.outcomes[0].trains.slice(0, 4).map((t) => `${t.trainId} +${Math.round(t.extraDelaySeconds)}s`).join(", ")}
