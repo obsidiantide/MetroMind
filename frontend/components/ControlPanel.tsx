@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { ClosureResponse, DelayImpactReport, MetroNetwork, Snapshot } from "@/lib/types";
 
+/** What each headway strategy does, shown under the selector. */
+const STRATEGY_HELP: Record<string, string> = {
+  NO_CONTROL: "Trains leave as soon as dwelling is done; bunching grows freely.",
+  FORWARD_HOLDING: "Trains wait at platforms until the gap to the train ahead is close to the target headway.",
+  BALANCED: "Trains are held to split the difference between the gaps ahead and behind.",
+  ADAPTIVE_DISPATCH:
+    "Balanced holding; spare trains leave the depot when a line is forecast to overload and return when demand eases.",
+  SHORT_TURN:
+    "Balanced holding; a train running 4+ min late with a follower close behind reverses early to recover its timetable.",
+};
+
 export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
@@ -54,12 +65,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
         <select value={snapshot?.strategy ?? ""} onChange={(e) => run(() => api.setStrategy(e.target.value))}>
           {strategies.map((s) => <option key={s}>{s}</option>)}
         </select>
-        {snapshot?.strategy === "ADAPTIVE_DISPATCH" && (
-          <p className="muted">
-            Balanced holding; spare trains leave the depot when a line is forecast to overload and return when
-            demand eases.
-          </p>
-        )}
+        {snapshot && STRATEGY_HELP[snapshot.strategy] && <p className="muted">{STRATEGY_HELP[snapshot.strategy]}</p>}
       </section>
 
       <section className="panel">
