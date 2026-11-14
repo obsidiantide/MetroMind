@@ -8,12 +8,15 @@ import java.util.List;
  *
  * <p>{@code totalExtraPassengerWaitMinutes} is relative to the same strategy's baseline (how much the incident
  * hurts); {@code totalPassengerWaitMinutes} is absolute over the horizon and is what strategies are ranked by.
+ * {@code totalExtraRideMinutes} is the extra time passengers spend on board (e.g. stuck behind the incident
+ * train), so {@code totalExtraTravelMinutes} = extra wait + extra ride is the full cost of the incident.
  */
 public record DelayImpactReport(String trainId, double injectedDelaySeconds, double horizonSeconds,
                                 List<StrategyOutcome> outcomes, String bestStrategy) {
 
     public record StrategyOutcome(String strategy, int trainsAffected, double maxTrainDelaySeconds,
                                   double totalExtraPassengerWaitMinutes, double totalPassengerWaitMinutes,
+                                  double totalExtraRideMinutes, double totalExtraTravelMinutes,
                                   double headwayCvAtHorizon,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
     }
