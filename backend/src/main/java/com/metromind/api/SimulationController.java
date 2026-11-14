@@ -2,6 +2,7 @@ package com.metromind.api;
 
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.network.MetroNetwork;
+import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.Departure;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationService;
@@ -74,6 +75,20 @@ public class SimulationController {
     @PostMapping("/incidents/breakdown")
     public ResponseEntity<Void> breakdown(@Valid @RequestBody IncidentRequest req) {
         simulation.injectBreakdown(req.trainId(), req.seconds());
+        return ResponseEntity.accepted().build();
+    }
+
+    /** @param response what trains do at the closure; defaults to {@link ClosureResponse#WAIT} */
+    public record SectionClosureRequest(@NotBlank String lineId, @NotBlank String fromStationId,
+                                        @NotBlank String toStationId, @Min(1) @Max(7200) double seconds,
+                                        ClosureResponse response) {
+    }
+
+    /** Signal or track failure: closes the track between two adjacent stations of a line, both directions. */
+    @PostMapping("/incidents/section-closure")
+    public ResponseEntity<Void> closeSection(@Valid @RequestBody SectionClosureRequest req) {
+        simulation.closeSection(req.lineId(), req.fromStationId(), req.toStationId(), req.seconds(),
+                req.response() == null ? ClosureResponse.WAIT : req.response());
         return ResponseEntity.accepted().build();
     }
 
