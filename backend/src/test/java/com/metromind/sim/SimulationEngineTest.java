@@ -41,6 +41,28 @@ class SimulationEngineTest {
     }
 
     @Test
+    void trainsStartEvenlySpacedAlongTheLoop() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        // Loop of 10 x 145 s, 4 trains: one every 362.5 s, which is not a whole number of stops.
+        for (TrainState t : engine.trains()) {
+            assertThat(engine.forwardHeadway(t)).isCloseTo(362.5, within(1e-6));
+        }
+        assertThat(engine.headwayCv()).isCloseTo(0.0, within(1e-9));
+        assertThat(engine.train("L1-2").phase()).isEqualTo(TrainPhase.RUNNING);
+        assertThat(engine.train("L1-2").delaySeconds()).isZero();
+    }
+
+    @Test
+    void unevenRunTimesStillStartWithEvenHeadways() {
+        Line line = new Line("R", "Red", "#f00", List.of("A", "B", "C", "D", "E", "F"),
+                List.of(191, 193, 193, 193, 193), 6, 900);
+        var network = new com.metromind.network.MetroNetwork("Test", TestNetworks.singleLine().stations(),
+                List.of(line));
+        SimulationEngine engine = new SimulationEngine(network, START, HeadwayStrategy.NO_CONTROL);
+        assertThat(engine.headwayCv()).isLessThan(0.05);
+    }
+
+    @Test
     void neverTwoTrainsInTheSameBlock() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.injectBreakdown("L1-1", 900);

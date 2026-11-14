@@ -123,6 +123,12 @@ public final class SimulationEngine {
         return new SimulationEngine(this);
     }
 
+    /**
+     * Spaces each line's trains evenly along its loop: train {@code i} starts exactly {@code i / n} of the
+     * nominal loop time from stop 0, either dwelling at a platform or part-way through a segment. Snapping trains
+     * to platforms instead would leave uneven gaps (and bunching) whenever the loop is not a whole multiple of
+     * the headway, which skews any comparison against the initial state.
+     */
     private void placeTrains() {
         for (Line line : network.lines()) {
             double[] cum = cumulativeStopSeconds.get(line.id());
@@ -134,8 +140,12 @@ public final class SimulationEngine {
                 while (stop + 1 < line.loopLength() && cum[stop + 1] <= target) {
                     stop++;
                 }
+                double offset = target - cum[stop];
+                // Fixed-block signalling allows one train per platform-plus-segment block: if the even position
+                // falls in an occupied block (headway shorter than a long block), start at the next platform.
                 if (stop <= used) {
                     stop = used + 1;
+                    offset = 0;
                 }
                 if (stop >= line.loopLength()) {
                     throw new IllegalStateException("Too many trains for line " + line.id());
@@ -144,9 +154,15 @@ public final class SimulationEngine {
                 TrainState t = new TrainState(line.id() + "-" + (i + 1), line.id(), line.trainCapacity(),
                         network.stations().size());
                 t.stop = stop;
-                t.phase = TrainPhase.DWELLING;
-                t.phaseRemaining = NOMINAL_DWELL;
-                t.scheduledArrival = simTime;
+                t.scheduledArrival = simTime - offset;
+                if (offset < NOMINAL_DWELL) {
+                    t.phase = TrainPhase.DWELLING;
+                    t.phaseRemaining = NOMINAL_DWELL - offset;
+                } else {
+                    t.phase = TrainPhase.RUNNING;
+                    t.segmentDuration = line.runSecondsFromStop(stop);
+                    t.segmentElapsed = offset - NOMINAL_DWELL;
+                }
                 trains.add(t);
             }
         }
