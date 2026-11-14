@@ -561,6 +561,63 @@ public final class SimulationEngine {
         return remaining;
     }
 
+    // ------------------------------------------------------------------ timetable
+
+    /**
+     * Departure board for a station: every train due to leave it within {@code horizon} seconds, in either
+     * direction, with its timetabled and expected departure, soonest expected first. A train counts once per
+     * call, at the first time it leaves the station.
+     */
+    public List<Departure> departures(String stationId, double horizon) {
+        network.station(stationId); // validate
+        List<Departure> board = new ArrayList<>();
+        for (TrainState t : trains) {
+            Line line = lines.get(t.lineId);
+            double[] cum = cumulativeStopSeconds.get(line.id());
+            double loop = cum[line.loopLength()];
+            int best = -1;
+            double bestAhead = Double.MAX_VALUE;
+            for (int k = 0; k < line.loopLength(); k++) {
+                if (!line.stationAtStop(k).equals(stationId)) {
+                    continue;
+                }
+                double ahead = cum[k] - cum[t.stop];
+                boolean atPlatform = t.phase != TrainPhase.RUNNING && k == t.stop;
+                if (ahead < 0 || (ahead == 0 && !atPlatform)) {
+                    ahead += loop;
+                }
+                if (ahead < bestAhead) {
+                    bestAhead = ahead;
+                    best = k;
+                }
+            }
+            if (best < 0) {
+                continue;
+            }
+            double planned = plannedDeparture(t) + bestAhead;
+            double expected = bestAhead == 0
+                    ? simTime + Math.max(0, t.blockedRemaining) + remainingAtPlatform(t)
+                    : simTime + secondsUntilStop(t, line, best) + NOMINAL_DWELL;
+            if (expected - simTime > horizon) {
+                continue;
+            }
+            List<String> ids = line.stationIds();
+            String towards = line.directionAtStop(best) > 0 ? ids.get(ids.size() - 1) : ids.get(0);
+            board.add(new Departure(t.id, line.id(), towards, planned, clock(planned), expected, expected - planned));
+        }
+        board.sort(Comparator.comparingDouble(Departure::expectedTime));
+        return board;
+    }
+
+    /** Seconds before a train standing at a platform is free to leave (ignoring signals). */
+    private double remainingAtPlatform(TrainState t) {
+        double remaining = t.phase == TrainPhase.WAITING_SIGNAL ? 0 : Math.max(0, t.phaseRemaining);
+        if (!t.holdDecided && isTerminalStop(lines.get(t.lineId), t.stop)) {
+            remaining = Math.max(remaining, plannedDeparture(t) - simTime);
+        }
+        return remaining;
+    }
+
     private void updateOverloadAlerts() {
         for (String sid : stations.keySet()) {
             String risk = riskLevel(predictWaiting(sid, 900));
