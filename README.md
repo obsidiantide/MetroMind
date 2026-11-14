@@ -96,6 +96,8 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
+| GET | `/api/incidents?limit=50` | Incident history, newest first |
+| GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
 WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/state`.
@@ -181,6 +183,15 @@ still turns trains round). Its departure board is empty and its station view has
   count as delivered there.
 - Passengers who planned to change lines at a closed interchange stay aboard to the next open station and are
   re-routed from there using the normal route table, which may still take them through the closed station.
+
+### Incident history
+
+Every incident injected through the API (delay, breakdown, track or station closure) is recorded with the
+simulation time, its subject (train, line or station), its duration and, for track closures, the section and
+how trains react (`"detail": "R4-R5, TURN_BACK"`). Each what-if analysis is recorded too, with its full report.
+With persistence enabled they are stored in PostgreSQL (`incident` and `incident_analysis`, the report as
+JSONB) and survive restarts; in the `standalone` profile the last 500 incidents and 50 analyses are kept in
+memory.
 
 ## Project layout
 
