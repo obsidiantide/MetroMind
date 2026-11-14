@@ -17,7 +17,12 @@ final class StationState {
      * decay time constant it estimates the current transfer inflow rate.
      */
     final Map<QueueKey, Double> recentTransfers = new LinkedHashMap<>();
-    /** Integral of waiting passengers over time (passenger-seconds). */
+    /**
+     * Passengers kept outside the platforms because they were full (see {@code Station#platformCapacity}). Their
+     * destinations follow {@link #arrivalShare}, so a single count is enough.
+     */
+    double heldAtEntrance;
+    /** Integral of waiting passengers over time, on the platforms or at the entrance (passenger-seconds). */
     double waitSeconds;
     /** Boardings, including passengers boarding their second or later line. */
     double served;
@@ -73,6 +78,7 @@ final class StationState {
         s.delivered = delivered;
         s.transfers = transfers;
         s.leftBehind = leftBehind;
+        s.heldAtEntrance = heldAtEntrance;
         s.peakWaiting = peakWaiting;
         return s;
     }

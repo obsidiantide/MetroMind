@@ -197,16 +197,20 @@ public final class SimulationEngine {
             if (st.waiting.isEmpty()) {
                 continue;
             }
-            double arrivals = s.baseArrivalsPerMinute() * mult * dt / 60.0;
+            double entering = st.heldAtEntrance + s.baseArrivalsPerMinute() * mult * dt / 60.0;
+            double admitted = s.hasPlatformLimit()
+                    ? Math.min(entering, Math.max(0, s.platformCapacity() - st.totalWaiting()))
+                    : entering;
+            st.heldAtEntrance = entering - admitted;
             st.arrivalShare.forEach((key, share) -> {
                 double[] queue = st.waiting.get(key);
                 for (int d = 0; d < queue.length; d++) {
-                    queue[d] += arrivals * share[d];
+                    queue[d] += admitted * share[d];
                 }
             });
             st.recentTransfers.replaceAll((key, v) -> v * decay);
             double total = st.totalWaiting();
-            st.waitSeconds += total * dt;
+            st.waitSeconds += (total + st.heldAtEntrance) * dt;
             st.peakWaiting = Math.max(st.peakWaiting, total);
         }
     }
@@ -683,4 +687,5 @@ public final class SimulationEngine {
     public double stationDelivered(String stationId) { return stations.get(stationId).delivered; }
     public double stationTransfers(String stationId) { return stations.get(stationId).transfers; }
     public double stationLeftBehind(String stationId) { return stations.get(stationId).leftBehind; }
+    public double stationHeldAtEntrance(String stationId) { return stations.get(stationId).heldAtEntrance; }
 }
