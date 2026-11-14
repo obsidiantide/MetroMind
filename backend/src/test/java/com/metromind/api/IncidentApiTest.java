@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -88,5 +89,42 @@ class IncidentApiTest {
                         .content("""
                                 {"stationId": "G5", "seconds": 0}"""))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listsInjectedIncidentsNewestFirst() throws Exception {
+        mvc.perform(post("/api/incidents/delay").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "RED-1", "seconds": 30}"""))
+                .andExpect(status().isAccepted());
+        mvc.perform(post("/api/incidents/section-closure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "BLUE", "fromStationId": "B1", "toStationId": "B2", "seconds": 60}"""))
+                .andExpect(status().isAccepted());
+
+        mvc.perform(get("/api/incidents").param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].kind").value("SECTION_CLOSURE"))
+                .andExpect(jsonPath("$[0].subjectId").value("BLUE"))
+                .andExpect(jsonPath("$[0].detail").value("B1-B2, WAIT"))
+                .andExpect(jsonPath("$[1].kind").value("DELAY"))
+                .andExpect(jsonPath("$[1].subjectId").value("RED-1"))
+                .andExpect(jsonPath("$[1].seconds").value(30.0));
+    }
+
+    @Test
+    void rejectedIncidentsAreNotRecorded() throws Exception {
+        mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stationId": "NOPE", "seconds": 60}"""))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/incidents"))
+                .andExpect(jsonPath("$[*].subjectId", not(hasItem("NOPE"))));
+    }
+
+    @Test
+    void historyLimitIsValidated() throws Exception {
+        mvc.perform(get("/api/incidents").param("limit", "0")).andExpect(status().isBadRequest());
     }
 }
