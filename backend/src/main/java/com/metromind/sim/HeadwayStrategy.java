@@ -24,6 +24,14 @@ public interface HeadwayStrategy {
         return false;
     }
 
+    /**
+     * Whether a train running well behind schedule may be short-turned: reversed at an intermediate platform so it
+     * takes over a slot in the opposite direction, leaving the stations beyond to the train close behind it.
+     */
+    default boolean shortTurnsLateTrains() {
+        return false;
+    }
+
     /** No control: trains depart as soon as dwelling is done. Bunching grows freely. */
     HeadwayStrategy NO_CONTROL = new HeadwayStrategy() {
         public String name() { return "NO_CONTROL"; }
@@ -58,6 +66,18 @@ public interface HeadwayStrategy {
         public boolean dispatchesFromDepot() { return true; }
     };
 
+    /**
+     * Two-way balancing plus short-turning for recovery: a train that has fallen far behind its timetable, with
+     * a follower bunched up close behind, turns back early instead of carrying its lateness to the terminal.
+     */
+    HeadwayStrategy SHORT_TURN = new HeadwayStrategy() {
+        public String name() { return "SHORT_TURN"; }
+        public double holdSeconds(double f, double b, double target) {
+            return BALANCED.holdSeconds(f, b, target);
+        }
+        public boolean shortTurnsLateTrains() { return true; }
+    };
+
     double MAX_HOLD_SECONDS = 120;
 
     private static double clamp(double v) {
@@ -70,11 +90,12 @@ public interface HeadwayStrategy {
             case "FORWARD_HOLDING" -> FORWARD_HOLDING;
             case "BALANCED" -> BALANCED;
             case "ADAPTIVE_DISPATCH" -> ADAPTIVE_DISPATCH;
+            case "SHORT_TURN" -> SHORT_TURN;
             default -> throw new IllegalArgumentException("Unknown strategy " + name);
         };
     }
 
     static java.util.List<HeadwayStrategy> all() {
-        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH);
+        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN);
     }
 }

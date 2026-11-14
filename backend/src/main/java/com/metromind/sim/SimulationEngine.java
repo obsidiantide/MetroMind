@@ -47,6 +47,13 @@ public final class SimulationEngine {
     static final double DISPATCH_INTERVAL_SECONDS = 60;
     /** Horizon of the overload forecast that triggers dispatching. */
     static final double DISPATCH_FORECAST_SECONDS = 900;
+    /** Lateness from which strategies that short-turn trains consider reversing one early. */
+    static final double SHORT_TURN_LATENESS_SECONDS = 240;
+    /**
+     * A train is only short-turned when its follower is closer than this fraction of the target headway, so the
+     * stations it abandons are served again soon.
+     */
+    static final double SHORT_TURN_FOLLOWER_FRACTION = 0.5;
 
     private final MetroNetwork network;
     private final Map<String, Line> lines = new LinkedHashMap<>();
@@ -313,6 +320,15 @@ public final class SimulationEngine {
         if (!t.holdDecided) {
             t.holdDecided = true;
             double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / trainsInService(line.id());
+            if (shouldShortTurn(t, line, target)) {
+                String stationId = line.stationAtStop(t.stop);
+                double lateness = t.delaySeconds;
+                if (tryTurnBack(t, line)) {
+                    emit(SimEvent.Type.TRAIN_SHORT_TURNED, t.id, "Train %s, %.0f s late, short-turned at %s"
+                            .formatted(t.id, lateness, network.station(stationId).name()));
+                    return; // dwelling again on the opposite platform; the hold is decided when it is ready
+                }
+            }
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t), target);
             if (isTerminalStop(line, t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
@@ -324,6 +340,20 @@ public final class SimulationEngine {
             }
         }
         tryDepart(t);
+    }
+
+    /**
+     * Whether to reverse a late train at its current intermediate platform: the strategy allows it, the train is
+     * at least {@link #SHORT_TURN_LATENESS_SECONDS} late, the station is open and the train behind is bunched up
+     * close enough to serve the stations this one gives up.
+     */
+    private boolean shouldShortTurn(TrainState t, Line line, double targetHeadway) {
+        return strategy.shortTurnsLateTrains()
+                && !isTerminalStop(line, t.stop)
+                && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS
+                && !closedStations.containsKey(line.stationAtStop(t.stop))
+                && trainsInService(line.id()) > 1
+                && backwardHeadway(t) < SHORT_TURN_FOLLOWER_FRACTION * targetHeadway;
     }
 
     private static boolean isTerminalStop(Line line, int stop) {

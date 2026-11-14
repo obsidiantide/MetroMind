@@ -1,5 +1,6 @@
 package com.metromind.api;
 
+import com.metromind.sim.HeadwayStrategy;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -144,6 +145,6 @@ class IncidentApiTest {
                 .andExpect(jsonPath("$[0].report.injectedDelaySeconds").value(90.0))
                 .andExpect(jsonPath("$[0].report.horizonSeconds").value(300.0))
                 .andExpect(jsonPath("$[0].report.bestStrategy").isString())
-                .andExpect(jsonPath("$[0].report.outcomes.length()").value(4));
+                .andExpect(jsonPath("$[0].report.outcomes.length()").value(HeadwayStrategy.all().size()));
     }
 }

@@ -25,7 +25,7 @@ class DelayPropagationAnalyzerTest {
         DelayImpactReport report = new DelayPropagationAnalyzer()
                 .analyze(live, "L1-2", 240, 1800, HeadwayStrategy.all());
 
-        assertThat(report.outcomes()).hasSize(4);
+        assertThat(report.outcomes()).hasSize(HeadwayStrategy.all().size());
         DelayImpactReport.StrategyOutcome none = report.outcomes().get(0);
         assertThat(none.strategy()).isEqualTo("NO_CONTROL");
         assertThat(none.trains().get(0).trainId()).isEqualTo("L1-2");
