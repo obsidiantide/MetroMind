@@ -2,6 +2,8 @@ package com.metromind.sim;
 
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.DelayPropagationAnalyzer;
+import com.metromind.incident.IncidentHistory;
+import com.metromind.incident.IncidentRecord;
 import com.metromind.network.MetroNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,13 +21,16 @@ public class SimulationService {
     private final SimulationEngine engine;
     private final SimulationProperties props;
     private final List<SnapshotListener> listeners;
+    private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private volatile boolean paused;
     private volatile SimulationSnapshot last;
 
-    public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners) {
+    public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners,
+                             IncidentHistory history) {
         this.props = props;
         this.listeners = listeners;
+        this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
         this.last = engine.snapshot();
     }
@@ -56,12 +61,14 @@ public class SimulationService {
     public void injectDelay(String trainId, double seconds) {
         synchronized (engine) {
             engine.injectDelay(trainId, seconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.DELAY, trainId, seconds, "");
         }
     }
 
     public void injectBreakdown(String trainId, double repairSeconds) {
         synchronized (engine) {
             engine.injectBreakdown(trainId, repairSeconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.BREAKDOWN, trainId, repairSeconds, "");
         }
     }
 
@@ -69,13 +76,21 @@ public class SimulationService {
                              ClosureResponse response) {
         synchronized (engine) {
             engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
+            history.record(engine.simTime(), IncidentRecord.Kind.SECTION_CLOSURE, lineId, seconds,
+                    "%s-%s, %s".formatted(fromStationId, toStationId, response));
         }
     }
 
     public void closeStation(String stationId, double seconds) {
         synchronized (engine) {
             engine.closeStation(stationId, seconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.STATION_CLOSURE, stationId, seconds, "");
         }
+    }
+
+    /** Incidents injected so far, most recent first. */
+    public List<IncidentRecord> incidentHistory(int limit) {
+        return history.recent(limit);
     }
 
     public void setStrategy(String name) {
