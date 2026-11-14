@@ -31,6 +31,19 @@ export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapsho
           opacity={0.75}
         />
       ))}
+      {snapshot?.closedSections.map((c) => {
+        const [a, b] = [station(c.fromStationId), station(c.toStationId)];
+        const action = c.response === "TURN_BACK" ? "trains turn back" : "trains wait";
+        return (
+          <line
+            key={`${c.lineId}-${c.fromStationId}`}
+            x1={x(a.lon)} y1={y(a.lat)} x2={x(b.lon)} y2={y(b.lat)}
+            stroke="#f85149" strokeWidth={10} strokeDasharray="6 6" strokeLinecap="butt"
+          >
+            <title>{`${lineName.get(c.lineId) ?? c.lineId} closed ${a.name}–${b.name}, ${action}, reopens in ${Math.ceil(c.remainingSeconds / 60)} min`}</title>
+          </line>
+        );
+      })}
       {network.stations.map((s) => {
         const st = stationState.get(s.id);
         const r = 6 + Math.min(14, (st?.waiting ?? 0) / 40);

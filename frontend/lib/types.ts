@@ -19,10 +19,15 @@ export interface StationView {
   id: string; waiting: number; predictedWaiting15m: number; overloadRisk: "LOW" | "MEDIUM" | "HIGH";
   heldAtEntrance: number; leftBehind: number; queues: QueueView[];
 }
+export type ClosureResponse = "WAIT" | "TURN_BACK";
+export interface ClosedSectionView {
+  lineId: string; fromStationId: string; toStationId: string; response: ClosureResponse; remainingSeconds: number;
+}
 export interface SimEvent { simTime: number; type: string; subjectId: string; message: string }
 export interface Snapshot {
   simTime: number; clock: string; strategy: string; trains: TrainView[]; stations: StationView[];
   recentEvents: SimEvent[];
+  closedSections: ClosedSectionView[];
   metrics: {
     averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
     passengersDelivered: number; transfers: number; passengersLeftBehind: number; passengersHeldAtEntrance: number;
