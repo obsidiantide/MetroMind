@@ -92,6 +92,16 @@ public class SimulationController {
         return ResponseEntity.accepted().build();
     }
 
+    public record StationClosureRequest(@NotBlank String stationId, @Min(1) @Max(7200) double seconds) {
+    }
+
+    /** Closes a station: trains run through it and its passengers use the neighbouring stations. */
+    @PostMapping("/incidents/station-closure")
+    public ResponseEntity<Void> closeStation(@Valid @RequestBody StationClosureRequest req) {
+        simulation.closeStation(req.stationId(), req.seconds());
+        return ResponseEntity.accepted().build();
+    }
+
     /** What-if: impact of delaying a train, compared across all headway strategies. Does not touch live state. */
     @PostMapping("/analysis/delay-impact")
     public DelayImpactReport delayImpact(@Valid @RequestBody IncidentRequest req,
