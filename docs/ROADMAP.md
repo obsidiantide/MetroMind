@@ -29,7 +29,7 @@ Mark items `[x]` when merged.
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
 - [x] Station closure (trains skip the station, demand redistributes to neighbours)
-- [ ] Persist incidents and their analysis results to the `incident` table; `GET /api/incidents` history
+- [x] Persist incidents and their analysis results to the `incident` table; `GET /api/incidents` history
 - [ ] Automatic incident clearing timeline in the UI
 
 ### Optimisation and comparison
