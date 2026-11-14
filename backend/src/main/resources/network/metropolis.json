@@ -140,6 +140,7 @@
         193
       ],
       "trainCount": 6,
+      "spareTrains": 2,
       "trainCapacity": 900
     },
     {
@@ -162,6 +163,7 @@
         187
       ],
       "trainCount": 5,
+      "spareTrains": 1,
       "trainCapacity": 900
     },
     {

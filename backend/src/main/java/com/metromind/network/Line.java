@@ -10,11 +10,22 @@ import java.util.List;
  * @param runSeconds     nominal running time between consecutive stations (size = stations - 1)
  * @param trainCount     trains in service on this line
  * @param trainCapacity  passengers per train
+ * @param spareTrains    extra trains kept in a depot next to the first terminal; strategies that dispatch from the
+ *                       depot may bring them into service (0 if the network file leaves it out)
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
-                   int trainCount, int trainCapacity) {
+                   int trainCount, int trainCapacity, int spareTrains) {
+
+    /** Line with no spare trains in its depot. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, 0);
+    }
 
     public Line {
+        if (spareTrains < 0) {
+            throw new IllegalArgumentException("Line " + id + ": spareTrains must not be negative");
+        }
         if (stationIds.size() < 2) {
             throw new IllegalArgumentException("Line " + id + " needs at least two stations");
         }
