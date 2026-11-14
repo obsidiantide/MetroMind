@@ -4,7 +4,7 @@ import java.util.List;
 
 public record SimulationSnapshot(double simTime, String clock, String strategy, List<TrainView> trains,
                                  List<StationView> stations, List<SimEvent> recentEvents, Metrics metrics,
-                                 List<ClosedSectionView> closedSections) {
+                                 List<ClosedSectionView> closedSections, List<ActiveIncidentView> activeIncidents) {
 
     public record TrainView(String id, String lineId, String fromStationId, String toStationId, double progress,
                             double lat, double lon, TrainPhase phase, double delaySeconds, double load,
@@ -33,6 +33,20 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      */
     public record ClosedSectionView(String lineId, String fromStationId, String toStationId,
                                     ClosureResponse response, double remainingSeconds) {
+    }
+
+    public enum IncidentKind { TRAIN_DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE }
+
+    /**
+     * An incident still in force, with its automatic clearing time.
+     *
+     * @param subjectId        train id, line id (track section) or station id
+     * @param startedAt        simulated time the incident began
+     * @param clearsAt         simulated time it is expected to clear on its own
+     * @param remainingSeconds {@code clearsAt - simTime}
+     */
+    public record ActiveIncidentView(IncidentKind kind, String subjectId, String description, double startedAt,
+                                     double clearsAt, double remainingSeconds) {
     }
 
     /**

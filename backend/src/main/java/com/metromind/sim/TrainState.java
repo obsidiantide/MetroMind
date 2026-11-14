@@ -23,6 +23,8 @@ public final class TrainState {
     double delaySeconds;
     /** Freezes the train regardless of phase (injected delay or technical failure). */
     double blockedRemaining;
+    /** Simulated time at which the current stoppage ({@link #blockedRemaining} &gt; 0) began. */
+    double blockedSince;
     boolean failed;
     boolean holdDecided;
     boolean delayAlertActive;
@@ -47,6 +49,7 @@ public final class TrainState {
         t.scheduledArrival = scheduledArrival;
         t.delaySeconds = delaySeconds;
         t.blockedRemaining = blockedRemaining;
+        t.blockedSince = blockedSince;
         t.failed = failed;
         t.holdDecided = holdDecided;
         t.delayAlertActive = delayAlertActive;
