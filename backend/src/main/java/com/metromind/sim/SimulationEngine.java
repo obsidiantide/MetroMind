@@ -444,7 +444,8 @@ public final class SimulationEngine {
      * queue (line + direction) is forecast separately: current queue + expected arrivals (new trips routed to
      * this queue plus recent transfers into it) − the share of free space of the trains that will call at the
      * station in that direction within the horizon. A train travelling the other way cannot relieve a queue, so
-     * a surplus in one direction never offsets a backlog in the other.
+     * a surplus in one direction never offsets a backlog in the other. Passengers held at the entrance of a full
+     * station are added on top: they are waiting too, and will only reach the platform as it clears.
      */
     public double predictWaiting(String stationId, double horizon) {
         StationState st = stations.get(stationId);
@@ -473,7 +474,7 @@ public final class SimulationEngine {
             }
             predicted += Math.max(0, expected);
         }
-        return predicted;
+        return predicted + st.heldAtEntrance;
     }
 
     /** Expected passengers per second joining queue {@code key} at a station (0 if it has no such queue). */
@@ -587,7 +588,7 @@ public final class SimulationEngine {
                 queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,
-                    riskLevel(predicted), st.leftBehind, queues));
+                    riskLevel(predicted), st.heldAtEntrance, st.leftBehind, queues));
         }
         return new SimulationSnapshot(simTime, clock(simTime), strategy.name(), trainViews, stationViews,
                 List.copyOf(events), metrics());
@@ -601,7 +602,8 @@ public final class SimulationEngine {
         double delivered = stations.values().stream().mapToDouble(s -> s.delivered).sum();
         double transfers = stations.values().stream().mapToDouble(s -> s.transfers).sum();
         double leftBehind = stations.values().stream().mapToDouble(s -> s.leftBehind).sum();
-        return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind,
+        double held = stations.values().stream().mapToDouble(s -> s.heldAtEntrance).sum();
+        return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind, held,
                 headwayCv());
     }
 
