@@ -88,6 +88,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 |---|---|---|
 | GET | `/api/network` | Stations and lines |
 | GET | `/api/state` | Latest simulation snapshot |
+| GET | `/api/stations/{id}/departures?horizonSeconds=1800` | Departure board: planned vs expected departures |
 | GET | `/api/strategies` | Available headway strategies |
 | PUT | `/api/strategy` | `{ "strategy": "BALANCED" }` |
 | POST | `/api/incidents/delay` | `{ "trainId": "RED-3", "seconds": 240 }` |
@@ -115,6 +116,23 @@ Passengers take the fastest route: each segment costs its nominal run time plus 
 half its headway and a change of line adds a 120 s walk. They leave the train at their destination, or at an
 interchange where they join the queue for their next line. Snapshot `metrics` report `passengersServed`
 (boardings, one per line ridden), `passengersDelivered` (completed journeys) and `transfers` (line changes).
+
+### Timetable and departure boards
+
+Trains start evenly spaced around each line's loop, and that start defines their timetable: planned arrivals
+advance by the nominal run time plus a 25 s dwell. Delay alerts compare each arrival with this timetable. A train
+that reaches a terminal early (short dwells off-peak) waits there for its planned departure, so earliness does not
+carry into the next trip; late trains leave as soon as they can.
+
+`GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
+
+```json
+{ "trainId": "BLUE-2", "lineId": "BLUE", "towardsStationId": "B6", "plannedTime": 29130.0,
+  "plannedClock": "08:05:30", "expectedTime": 29372.0, "delaySeconds": 242.0 }
+```
+
+The expected time is estimated from the train's position, nominal run times and any blockage, so a negative
+`delaySeconds` means the train is running early.
 
 ### Platform capacity and crowding
 
