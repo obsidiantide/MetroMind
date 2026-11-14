@@ -73,8 +73,11 @@ class StationClosureTest {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.closeStation("D", 120);
         assertThat(engine.stationClosed("D")).isTrue();
+        assertThat(engine.snapshot().stations()).filteredOn(SimulationSnapshot.StationView::closed)
+                .extracting(SimulationSnapshot.StationView::id).containsExactly("D");
         engine.run(121, 1);
         assertThat(engine.stationClosed("D")).isFalse();
+        assertThat(engine.snapshot().stations()).noneMatch(SimulationSnapshot.StationView::closed);
         assertThat(engine.snapshot().recentEvents())
                 .anyMatch(e -> e.type() == SimEvent.Type.INCIDENT_CLEARED && e.subjectId().equals("D"));
         engine.run(60, 1);

@@ -897,7 +897,8 @@ public final class SimulationEngine {
                 queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,
-                    riskLevel(predicted), st.heldAtEntrance, st.leftBehind, queues));
+                    riskLevel(predicted), st.heldAtEntrance, st.leftBehind, queues,
+                    closedStations.containsKey(st.id)));
         }
         return new SimulationSnapshot(simTime, clock(simTime), strategy.name(), trainViews, stationViews,
                 List.copyOf(events), metrics(), closedSections());
