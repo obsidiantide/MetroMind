@@ -25,6 +25,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ lineId, fromStationId, toStationId, seconds, response }),
     }),
+  closeStation: (stationId: string, seconds: number) =>
+    call<void>("/api/incidents/station-closure", { method: "POST", body: JSON.stringify({ stationId, seconds }) }),
   analyze: (trainId: string, seconds: number) =>
     call<DelayImpactReport>("/api/analysis/delay-impact", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
 };

@@ -11,6 +11,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
   const [section, setSection] = useState("");
   const [closureMinutes, setClosureMinutes] = useState(10);
   const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
+  const [closedStation, setClosedStation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +77,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
 
       {sections.length > 0 && (
         <section className="panel">
-          <h2>Track closure</h2>
+          <h2>Closures</h2>
           <select value={section || sections[0].key} onChange={(e) => setSection(e.target.value)} aria-label="Section">
             {sections.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
@@ -88,8 +89,22 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
               <option value="TURN_BACK">Trains turn back</option>
               <option value="WAIT">Trains wait</option>
             </select>
-            <button disabled={busy} onClick={() => run(closeSection)}>Close</button>
+            <button disabled={busy} onClick={() => run(closeSection)}>Close track</button>
           </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <select value={closedStation || network!.stations[0].id} onChange={(e) => setClosedStation(e.target.value)}
+                    aria-label="Station">
+              {network!.stations.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <button disabled={busy}
+                    onClick={() => run(() => api.closeStation(closedStation || network!.stations[0].id, closureMinutes * 60))}>
+              Close station
+            </button>
+          </div>
+          <p className="muted">
+            Track: trains wait at the signal or turn back at the last open station. Station: trains run through and
+            passengers use the neighbouring stations.
+          </p>
         </section>
       )}
 
