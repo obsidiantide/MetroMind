@@ -53,6 +53,19 @@ export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapsho
         const queues = (st?.queues ?? [])
           .map((q) => `\n  ${lineName.get(q.lineId) ?? q.lineId} → ${station(q.towardsStationId).name}: ${Math.round(q.waiting)}`)
           .join("");
+        if (st?.closed) {
+          const [cx, cy, d] = [x(s.lon), y(s.lat), 5];
+          return (
+            <g key={s.id} opacity={0.8}>
+              <circle cx={cx} cy={cy} r={8} fill="#0d1117" stroke="#8b949e" strokeWidth={3}>
+                <title>{`${s.name}: closed, trains run through; passengers use the neighbouring stations`}</title>
+              </circle>
+              <path d={`M${cx - d},${cy - d}L${cx + d},${cy + d}M${cx + d},${cy - d}L${cx - d},${cy + d}`}
+                    stroke="#f85149" strokeWidth={2.5} pointerEvents="none" />
+              <text x={cx + 12} y={cy - 10} textDecoration="line-through">{s.name}</text>
+            </g>
+          );
+        }
         return (
           <g key={s.id}>
             <circle cx={x(s.lon)} cy={y(s.lat)} r={r} fill="#0d1117" stroke={RISK_COLOR[st?.overloadRisk ?? "LOW"]} strokeWidth={3}>
