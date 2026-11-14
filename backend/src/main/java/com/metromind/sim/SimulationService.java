@@ -71,6 +71,12 @@ public class SimulationService {
         }
     }
 
+    public List<Departure> departures(String stationId, double horizonSeconds) {
+        synchronized (engine) {
+            return engine.departures(stationId, horizonSeconds);
+        }
+    }
+
     public void setPaused(boolean paused) {
         this.paused = paused;
     }
