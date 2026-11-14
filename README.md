@@ -96,6 +96,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
+| POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800` | Rank strategies over random incident scenarios |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
@@ -212,6 +213,23 @@ steps off to wait for that follower, and the train takes over the timetable slot
 starts its return on time. Each reversal appears as a `TRAIN_SHORT_TURNED` event. On the test line, a train held
 for 7 minutes is short-turned once, and 30 minutes later the line's worst lateness is about half of what
 balanced holding alone leaves.
+
+### Strategy benchmark
+
+One what-if run answers "which strategy handles *this* incident best"; the benchmark answers "which strategy
+copes best in general". `POST /api/analysis/benchmark` draws `scenarios` random incidents from `seed` (a train of
+the current fleet, delayed for 1–10 minutes or broken down for 5–20 minutes), runs every strategy against every
+scenario from the same copy of the live state for `horizonSeconds`, and measures the mean platform wait per
+boarding in each run. Strategies are ranked by the mean of that over the scenarios, then by its 95th percentile
+(the bad day), then by name:
+
+```json
+{ "rank": 1, "strategy": "NO_CONTROL", "meanWaitSeconds": 336.7, "p95WaitSeconds": 535.7,
+  "meanTravelMinutes": 26480.0, "waitSecondsPerScenario": [263.4, 218.1, 329.6, 535.7] }
+```
+
+The same seed and starting state always give the same report, and the live simulation is never touched.
+Limits: 1–50 scenarios, a horizon of 5–60 minutes.
 
 ### Incident clearing timeline
 
