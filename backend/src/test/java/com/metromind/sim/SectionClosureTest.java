@@ -81,4 +81,53 @@ class SectionClosureTest {
         assertThatThrownBy(() -> engine.closeSection("NOPE", "A", "B", 60))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Unknown line");
     }
+
+    @Test
+    void turnBackReversesTheTrainAndUnloadsItsPassengers() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleTrain(), START, HeadwayStrategy.NO_CONTROL);
+        engine.closeSection("L1", "C", "D", 3600, ClosureResponse.TURN_BACK);
+        // Run until the train has reached C outbound and reversed.
+        for (int i = 0; i < 900 && !(engine.train("L1-1").stop() == 8); i++) {
+            engine.step(1);
+        }
+        TrainState t = engine.train("L1-1");
+        assertThat(t.stop()).as("C, inbound").isEqualTo(8);
+        // Passengers for D, E and F were put back on C's outbound platform; nobody aboard is heading that way.
+        assertThat(engine.trainPassengersTo("L1-1", "D")).isZero();
+        assertThat(engine.trainPassengersTo("L1-1", "F")).isZero();
+        assertThat(engine.stationWaiting("C", "L1", 1, "F")).isPositive();
+
+        // The train shuttles A–C and never enters the closed section.
+        for (int i = 0; i < 1800; i++) {
+            engine.step(1);
+            int stop = engine.train("L1-1").stop();
+            assertThat(stop).isNotIn(3, 4, 5, 6, 7);
+        }
+        assertThat(engine.stationDelivered("A")).isPositive();
+    }
+
+    @Test
+    void turnBackKeepsServiceRunningWhereWaitingDoesNot() {
+        SimulationEngine base = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        SimulationEngine wait = base.copy();
+        SimulationEngine turn = base.copy();
+        wait.closeSection("L1", "D", "E", 1800, ClosureResponse.WAIT);
+        turn.closeSection("L1", "D", "E", 1800, ClosureResponse.TURN_BACK);
+        wait.run(1500, 1);
+        turn.run(1500, 1);
+
+        double waitDelivered = wait.snapshot().metrics().passengersDelivered();
+        double turnDelivered = turn.snapshot().metrics().passengersDelivered();
+        assertThat(turnDelivered).isGreaterThan(waitDelivered);
+        assertThat(turn.stationWaiting("B")).isLessThan(wait.stationWaiting("B"));
+    }
+
+    @Test
+    void trainCannotTurnBackAtATerminal() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleTrain(), START, HeadwayStrategy.NO_CONTROL);
+        engine.closeSection("L1", "A", "B", 600, ClosureResponse.TURN_BACK);
+        engine.run(300, 1);
+        assertThat(engine.train("L1-1").stop()).isZero();
+        assertThat(engine.train("L1-1").phase()).isEqualTo(TrainPhase.WAITING_SIGNAL);
+    }
 }
