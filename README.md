@@ -19,7 +19,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
-| Incidents & failures | Inject delays or breakdowns on any train at runtime |
+| Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
 ### The delay-propagation mechanic
@@ -93,6 +93,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | PUT | `/api/strategy` | `{ "strategy": "BALANCED" }` |
 | POST | `/api/incidents/delay` | `{ "trainId": "RED-3", "seconds": 240 }` |
 | POST | `/api/incidents/breakdown` | `{ "trainId": "BLUE-2", "seconds": 600 }` |
+| POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
@@ -150,6 +151,22 @@ entrance queue on top of the platform forecast. Stations without the field have 
 Snapshots report per station `heldAtEntrance` and `leftBehind` (passengers who could not board a full train in
 their direction, counted once per train missed), and network-wide `passengersHeldAtEntrance` and
 `passengersLeftBehind`.
+
+### Track section closures
+
+A signal or track failure closes the track between two adjacent stations of a line, in both directions, for a
+given time. A train already inside the section finishes its run; no other train may enter it. The `response`
+decides what trains do on reaching the closure:
+
+- `WAIT` (default): the train stays at the platform before the section with a red signal. Trains behind it queue
+  up station by station, as fixed-block signalling would make them.
+- `TURN_BACK`: the train reverses at the last open station and serves the rest of the line in the other
+  direction. Everyone still on board gets off there and waits on the platform for the line to reopen, and nobody
+  boards a train that is about to turn. A train cannot turn at a terminal, or while the opposite platform is
+  occupied; it waits until it can.
+
+Snapshots list active closures under `closedSections`, with the time left before each section reopens. The
+departure board and the overload forecast do not yet account for closures.
 
 ## Project layout
 
