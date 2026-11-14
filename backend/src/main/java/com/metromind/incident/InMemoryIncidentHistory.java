@@ -1,5 +1,6 @@
 package com.metromind.incident;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayDeque;
@@ -8,8 +9,9 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 
-/** Incident history kept in memory: keeps the last {@value #CAPACITY} incidents in memory. */
+/** Incident history for runs without a database: keeps the last {@value #CAPACITY} incidents in memory. */
 @Component
+@ConditionalOnProperty(name = "metromind.persistence.enabled", havingValue = "false")
 public class InMemoryIncidentHistory implements IncidentHistory {
 
     static final int CAPACITY = 500;
