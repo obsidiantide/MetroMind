@@ -19,7 +19,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing) |
-| Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back |
+| Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
 ### The delay-propagation mechanic
@@ -94,6 +94,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/incidents/delay` | `{ "trainId": "RED-3", "seconds": 240 }` |
 | POST | `/api/incidents/breakdown` | `{ "trainId": "BLUE-2", "seconds": 600 }` |
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
+| POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
@@ -167,6 +168,19 @@ decides what trains do on reaching the closure:
 
 Snapshots list active closures under `closedSections`, with the time left before each section reopens. The
 departure board and the overload forecast do not yet account for closures.
+
+### Station closures
+
+A closed station keeps its doors shut: trains run through it without stopping or being held (a closed terminal
+still turns trains round). Its departure board is empty and its station view has `closed: true`.
+
+- Passengers on the platforms or at the entrance when it closes walk to the neighbouring stations (adjacent on
+  any line, split evenly) and queue at their entrances. New passengers arriving while it is closed do the same.
+  In the fluid model they then travel like the neighbour's own passengers.
+- Passengers on board who were heading for the closed station get off at the first open station after it and
+  count as delivered there.
+- Passengers who planned to change lines at a closed interchange stay aboard to the next open station and are
+  re-routed from there using the normal route table, which may still take them through the closed station.
 
 ## Project layout
 
