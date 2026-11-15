@@ -17,6 +17,15 @@ public interface HeadwayStrategy {
     double holdSeconds(double forwardHeadway, double backwardHeadway, double targetHeadway);
 
     /**
+     * The headway this strategy aims for, passed to {@link #holdSeconds} as {@code targetHeadway}. The engine
+     * supplies the line's even headway (loop time divided by trains in service) and the demand multiplier forecast
+     * for the next few minutes; the default keeps the even headway whatever the demand.
+     */
+    default double targetHeadway(double evenHeadway, double forecastDemandMultiplier) {
+        return evenHeadway;
+    }
+
+    /**
      * Whether the engine may bring spare trains out of a line's depot under this strategy when it predicts
      * overload, and send extra trains back when demand eases.
      */

@@ -49,6 +49,8 @@ public final class SimulationEngine {
     static final double DISPATCH_FORECAST_SECONDS = 900;
     /** Lateness from which strategies that short-turn trains consider reversing one early. */
     static final double SHORT_TURN_LATENESS_SECONDS = 240;
+    /** How far ahead the demand forecast handed to {@link HeadwayStrategy#targetHeadway} looks. */
+    static final double HOLD_DEMAND_FORECAST_SECONDS = 300;
     /**
      * A train is only short-turned when its follower is closer than this fraction of the target headway, so the
      * stations it abandons are served again soon.
@@ -329,7 +331,9 @@ public final class SimulationEngine {
                     return; // dwelling again on the opposite platform; the hold is decided when it is ready
                 }
             }
-            double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t), target);
+            double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
+            double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
+                    strategy.targetHeadway(target, demand));
             if (isTerminalStop(line, t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
