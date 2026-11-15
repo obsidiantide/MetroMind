@@ -59,17 +59,24 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
      *                                short-turns late trains)
      * @param shortTurnsByStation     short turns over all scenarios by the station where they happened, most first
      *                                (ties by station id)
+     * @param meanStopsSkipped        stops late trains ran through per scenario, on average (0 unless the strategy
+     *                                skips stops)
+     * @param meanPassengersCarriedPast passengers per scenario, on average, carried past their stop by a skip and
+     *                                left to ride back from the next one
+     * @param stopsSkippedByStation   skipped stops over all scenarios by station, most first (ties by station id)
      */
     public record StrategyRanking(int rank, String strategy, double meanWaitSeconds, double p95WaitSeconds,
                                   double meanTravelMinutes, Double meanRecoverySeconds, int unrecoveredScenarios,
                                   double meanShortTurns, Map<String, Integer> shortTurnsByStation,
+                                  double meanStopsSkipped, double meanPassengersCarriedPast,
+                                  Map<String, Integer> stopsSkippedByStation,
                                   List<Double> waitSecondsPerScenario) {
 
         /** The same ranking at position {@code newRank}. */
         public StrategyRanking withRank(int newRank) {
             return new StrategyRanking(newRank, strategy, meanWaitSeconds, p95WaitSeconds, meanTravelMinutes,
                     meanRecoverySeconds, unrecoveredScenarios, meanShortTurns, shortTurnsByStation,
-                    waitSecondsPerScenario);
+                    meanStopsSkipped, meanPassengersCarriedPast, stopsSkippedByStation, waitSecondsPerScenario);
         }
     }
 }
