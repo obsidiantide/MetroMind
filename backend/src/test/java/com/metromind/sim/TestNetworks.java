@@ -31,6 +31,17 @@ public final class TestNetworks {
     }
 
     /**
+     * {@link #singleLine()} with a quiet stop at D: few passengers start there, and since the gravity model sends
+     * trips in proportion to ridership, few travel to it either. A late train may skip such a stop.
+     */
+    public static MetroNetwork singleLineWithQuietStop() {
+        MetroNetwork base = singleLine();
+        List<Station> stations = base.stations().stream()
+                .map(s -> s.id().equals("D") ? new Station("D", "D", s.lat(), s.lon(), 0.5) : s).toList();
+        return new MetroNetwork("Test", stations, base.lines());
+    }
+
+    /**
      * {@link #singleLine()} crossed at C by a second line X–C–Y (2 trains), so trips such as A→Y need a transfer.
      */
     public static MetroNetwork twoLines() {
