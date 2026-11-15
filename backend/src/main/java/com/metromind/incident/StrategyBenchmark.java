@@ -27,6 +27,7 @@ public final class StrategyBenchmark {
     static final double MIN_REPAIR_SECONDS = 300;
     static final double MAX_REPAIR_SECONDS = 1200;
     private static final double DT = 1.0;
+    static final double RECOVERY_SAMPLE_SECONDS = 30;
 
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies) {
@@ -42,11 +43,23 @@ public final class StrategyBenchmark {
         for (HeadwayStrategy strategy : strategies) {
             List<Double> waits = new ArrayList<>();
             double travelMinutes = 0;
+            SimulationEngine baseline = live.copy();
+            baseline.setStrategy(strategy);
+            List<Double> baselineCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizonSeconds,
+                    RECOVERY_SAMPLE_SECONDS, DT);
+            double recoverySum = 0;
+            int recovered = 0;
             for (BenchmarkReport.Scenario scenario : scenarios) {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
                 inject(run, scenario);
-                run.run(horizonSeconds, DT);
+                HeadwayRecovery.Result recovery = HeadwayRecovery.measure(baselineCv,
+                        HeadwayRecovery.sampleHeadwayCv(run, horizonSeconds, RECOVERY_SAMPLE_SECONDS, DT),
+                        RECOVERY_SAMPLE_SECONDS);
+                if (recovery.recovered()) {
+                    recoverySum += recovery.recoverySeconds();
+                    recovered++;
+                }
                 double boarded = run.snapshot().metrics().passengersServed() - startBoarded;
                 double waited = totalWaitSeconds(run) - startWait;
                 waits.add(boarded > 0 ? waited / boarded : 0);
@@ -54,7 +67,8 @@ public final class StrategyBenchmark {
             }
             double mean = waits.stream().mapToDouble(Double::doubleValue).average().orElse(0);
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
-                    travelMinutes / scenarios.size(), List.copyOf(waits)));
+                    travelMinutes / scenarios.size(), recovered > 0 ? recoverySum / recovered : null,
+                    scenarios.size() - recovered, List.copyOf(waits)));
         }
         unranked.sort(Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanWaitSeconds)
                 .thenComparingDouble(BenchmarkReport.StrategyRanking::p95WaitSeconds)
@@ -63,7 +77,8 @@ public final class StrategyBenchmark {
         for (int i = 0; i < unranked.size(); i++) {
             BenchmarkReport.StrategyRanking r = unranked.get(i);
             rankings.add(new BenchmarkReport.StrategyRanking(i + 1, r.strategy(), r.meanWaitSeconds(),
-                    r.p95WaitSeconds(), r.meanTravelMinutes(), r.waitSecondsPerScenario()));
+                    r.p95WaitSeconds(), r.meanTravelMinutes(), r.meanRecoverySeconds(), r.unrecoveredScenarios(),
+                    r.waitSecondsPerScenario()));
         }
         return new BenchmarkReport(seed, horizonSeconds, scenarios, rankings);
     }
