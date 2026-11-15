@@ -109,6 +109,20 @@ public interface HeadwayStrategy {
     };
 
     /**
+     * Two-way balancing with both recovery tools: a moderately late train skips quiet stops, while a train late
+     * enough to be short-turned keeps calling at every stop so it can reverse as soon as a follower closes up
+     * behind it. Short turns take precedence because they recover a whole trip's lateness at once.
+     */
+    HeadwayStrategy SHORT_TURN_SKIP_STOP = new HeadwayStrategy() {
+        public String name() { return "SHORT_TURN_SKIP_STOP"; }
+        public double holdSeconds(double f, double b, double target) {
+            return BALANCED.holdSeconds(f, b, target);
+        }
+        public boolean shortTurnsLateTrains() { return true; }
+        public boolean skipsStopsForLateTrains() { return true; }
+    };
+
+    /**
      * Forward holding against a target that tracks forecast demand. Off-peak a train is held until the gap ahead
      * reaches the usual share of the even headway; as demand rises the target shrinks with the square root of the
      * demand multiplier (down to {@link #DEMAND_MIN_TARGET_FRACTION} of it), because in a peak every second of
@@ -151,12 +165,13 @@ public interface HeadwayStrategy {
             case "SHORT_TURN" -> SHORT_TURN;
             case "DEMAND_HOLDING" -> DEMAND_HOLDING;
             case "SKIP_STOP" -> SKIP_STOP;
+            case "SHORT_TURN_SKIP_STOP" -> SHORT_TURN_SKIP_STOP;
             default -> throw new IllegalArgumentException("Unknown strategy " + name);
         };
     }
 
     static java.util.List<HeadwayStrategy> all() {
         return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN, DEMAND_HOLDING,
-                SKIP_STOP);
+                SKIP_STOP, SHORT_TURN_SKIP_STOP);
     }
 }
