@@ -105,6 +105,8 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
+| POST | `/api/analysis/section-closure-impact` | What-if for a track-section closure (same body as `/api/incidents/section-closure`) |
+| POST | `/api/analysis/station-closure-impact` | What-if for a station closure (same body as `/api/incidents/station-closure`) |
 | POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
@@ -193,6 +195,21 @@ still turns trains round). Its departure board is empty and its station view has
   count as delivered there.
 - Passengers who planned to change lines at a closed interchange stay aboard to the next open station and are
   re-routed from there using the normal route table, which may still take them through the closed station.
+
+### What-if for closures
+
+Closures can be analysed before they are applied, like delays. `POST /api/analysis/section-closure-impact` and
+`POST /api/analysis/station-closure-impact` take the same bodies as the incident endpoints (and an optional
+`horizonSeconds`, default 1800), run every strategy with and without the closure from a copy of the live state
+and return the same per-strategy outcomes as the delay analysis, under the incident that was simulated:
+
+```json
+{ "incident": { "kind": "STATION_CLOSURE", "stationId": "R3", "seconds": 1200 },
+  "horizonSeconds": 1800, "bestStrategy": "BALANCED", "outcomes": [ ... ] }
+```
+
+An unknown station or a pair of stations that are not adjacent is a `400`. The dashboard's closure panel has a
+What-if button next to each closure. Closure analyses are not yet kept in the incident history.
 
 ### Adaptive dispatching
 
@@ -322,7 +339,7 @@ with a countdown to each clearing.
 
 Every incident injected through the API (delay, breakdown, track or station closure) is recorded with the
 simulation time, its subject (train, line or station), its duration and, for track closures, the section and
-how trains react (`"detail": "R4-R5, TURN_BACK"`). Each what-if analysis is recorded too, with its full report.
+how trains react (`"detail": "R4-R5, TURN_BACK"`). Each delay what-if analysis is recorded too, with its full report.
 With persistence enabled they are stored in PostgreSQL (`incident` and `incident_analysis`, the report as
 JSONB) and survive restarts; in the `standalone` profile the last 500 incidents and 50 analyses are kept in
 memory.
