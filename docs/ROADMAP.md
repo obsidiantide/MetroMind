@@ -49,7 +49,7 @@ Mark items `[x]` when merged.
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
 - [x] Redis-backed snapshot replay / time travel (store last N minutes)
-- [ ] PostGIS queries: nearest station to a point, stations within radius (`ST_DWithin`) exposed via API
+- [x] PostGIS queries: nearest station to a point, stations within radius (`ST_DWithin`) exposed via API
 - [ ] OpenAPI (springdoc) documentation
 - [ ] Integration tests with Testcontainers (PostGIS, Kafka, Redis)
 - [ ] Micrometer metrics for simulation tick time and analysis duration
