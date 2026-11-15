@@ -29,6 +29,7 @@ class BenchmarkApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.seed").value(11))
                 .andExpect(jsonPath("$.horizonSeconds").value(300.0))
+                .andExpect(jsonPath("$.metric").value("WAIT_PER_BOARDING"))
                 .andExpect(jsonPath("$.scenarios.length()").value(2))
                 .andExpect(jsonPath("$.scenarios[0].kind").isString())
                 .andExpect(jsonPath("$.scenarios[0].seconds").isNumber())
@@ -47,6 +48,22 @@ class BenchmarkApiTest {
                 .andExpect(jsonPath("$.scenarios[*].kind",
                         everyItem(oneOf("SECTION_CLOSURE", "STATION_CLOSURE"))))
                 .andExpect(jsonPath("$.scenarios[*].trainId").isEmpty());
+    }
+
+    @Test
+    void ranksByTravelTimeWhenAsked() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "2").param("seed", "11")
+                        .param("horizonSeconds", "300").param("metric", "TRAVEL_TIME"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metric").value("TRAVEL_TIME"))
+                .andExpect(jsonPath("$.rankings[0].meanTravelMinutes").isNumber())
+                .andExpect(jsonPath("$.rankings[0].p95TravelMinutes").isNumber());
+    }
+
+    @Test
+    void anUnknownMetricIsABadRequest() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("metric", "VIBES"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
