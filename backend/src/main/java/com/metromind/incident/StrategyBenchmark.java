@@ -24,8 +24,8 @@ import java.util.Random;
 /**
  * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a train
  * delayed or broken down, a track section or a station closed, each for a random time) from a seed, runs every
- * strategy against every scenario from the same copy of the live network, and compares the passenger wait they
- * lead to.
+ * strategy against every scenario from the same copy of the live network, and compares the passenger wait or
+ * total travel time they lead to.
  *
  * <p>Everything is deterministic: scenarios come from {@link Random} with the given seed (its algorithm is fixed by
  * the Java specification) and the engine itself has no randomness, so a seed and a starting state always produce
@@ -51,6 +51,14 @@ public final class StrategyBenchmark {
     /** As {@link #run(SimulationEngine, int, long, double, List)}, drawing only incidents of the given kinds. */
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds) {
+        return run(live, scenarioCount, seed, horizonSeconds, strategies, kinds,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING);
+    }
+
+    /** As {@link #run(SimulationEngine, int, long, double, List, Set)}, ranking strategies by {@code metric}. */
+    public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
+                               List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
+                               BenchmarkReport.RankingMetric metric) {
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
@@ -62,7 +70,7 @@ public final class StrategyBenchmark {
         List<BenchmarkReport.StrategyRanking> unranked = new ArrayList<>();
         for (HeadwayStrategy strategy : strategies) {
             List<Double> waits = new ArrayList<>();
-            double travelMinutes = 0;
+            List<Double> travels = new ArrayList<>();
             SimulationEngine baseline = live.copy();
             baseline.setStrategy(strategy);
             List<Double> baselineCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizonSeconds,
@@ -89,7 +97,7 @@ public final class StrategyBenchmark {
                 double boarded = run.snapshot().metrics().passengersServed() - startBoarded;
                 double waited = totalWaitSeconds(run) - startWait;
                 waits.add(boarded > 0 ? waited / boarded : 0);
-                travelMinutes += (waited + run.passengerRideSeconds() - startRide) / 60.0;
+                travels.add((waited + run.passengerRideSeconds() - startRide) / 60.0);
                 for (ShortTurn turn : run.shortTurnsSince(injectedAt)) {
                     turnsByStation.merge(turn.stationId(), 1, Integer::sum);
                     turns++;
@@ -102,19 +110,29 @@ public final class StrategyBenchmark {
             }
             double mean = waits.stream().mapToDouble(Double::doubleValue).average().orElse(0);
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
-                    travelMinutes / scenarios.size(), recovered > 0 ? recoverySum / recovered : null,
+                    travels.stream().mapToDouble(Double::doubleValue).average().orElse(0),
+                    percentile(travels, 0.95), recovered > 0 ? recoverySum / recovered : null,
                     scenarios.size() - recovered, (double) turns / scenarios.size(), mostFirst(turnsByStation),
                     (double) skips / scenarios.size(), carriedPast / scenarios.size(), mostFirst(skipsByStation),
                     List.copyOf(waits)));
         }
-        unranked.sort(Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanWaitSeconds)
-                .thenComparingDouble(BenchmarkReport.StrategyRanking::p95WaitSeconds)
-                .thenComparing(BenchmarkReport.StrategyRanking::strategy));
+        unranked.sort(order(metric));
         List<BenchmarkReport.StrategyRanking> rankings = new ArrayList<>();
         for (int i = 0; i < unranked.size(); i++) {
             rankings.add(unranked.get(i).withRank(i + 1));
         }
-        return new BenchmarkReport(seed, horizonSeconds, scenarios, rankings);
+        return new BenchmarkReport(seed, horizonSeconds, metric, scenarios, rankings);
+    }
+
+    /** Best first by the metric's mean, then its p95, then strategy name. */
+    static Comparator<BenchmarkReport.StrategyRanking> order(BenchmarkReport.RankingMetric metric) {
+        Comparator<BenchmarkReport.StrategyRanking> byMetric = switch (metric) {
+            case WAIT_PER_BOARDING -> Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanWaitSeconds)
+                    .thenComparingDouble(BenchmarkReport.StrategyRanking::p95WaitSeconds);
+            case TRAVEL_TIME -> Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanTravelMinutes)
+                    .thenComparingDouble(BenchmarkReport.StrategyRanking::p95TravelMinutes);
+        };
+        return byMetric.thenComparing(BenchmarkReport.StrategyRanking::strategy);
     }
 
     static List<BenchmarkReport.Scenario> drawScenarios(SimulationEngine live, int count, long seed) {
