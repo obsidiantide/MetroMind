@@ -18,7 +18,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
-| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains), `DEMAND_HOLDING` (forward holding against a demand-tracking target), `SKIP_STOP` (balancing plus late trains running through quiet stops) |
+| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains), `DEMAND_HOLDING` (forward holding against a demand-tracking target), `SKIP_STOP` (balancing plus late trains running through quiet stops), `SHORT_TURN_SKIP_STOP` (both recovery tools, short turns first) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
@@ -275,6 +275,15 @@ scenario and `stopsSkippedByStation`, the count at each station over all scenari
 ```
 
 The dashboard's what-if table shows the count and passengers carried past per strategy.
+
+### Short-turning and skip-stop combined
+
+`SHORT_TURN_SKIP_STOP` balances headways and uses both recovery tools. A train 2 to 4 minutes late may skip
+quiet stops under the skip-stop rules. A train 4 or more minutes late, late enough to be short-turned, never
+skips: it calls at every stop so it can reverse as soon as a follower closes up behind it, because a short turn
+wins back a whole trip's lateness at once while a skip only saves one dwell. On the test line with a quiet stop,
+a train delayed by 7 minutes is turned back where `SHORT_TURN` would turn it instead of running through the
+quiet stop, and a train delayed by 3 minutes skips exactly as under `SKIP_STOP`.
 
 ### Demand-tracking headway target
 
