@@ -300,13 +300,20 @@ boarding in each run. Strategies are ranked by the mean of that over the scenari
 
 ```json
 { "rank": 1, "strategy": "NO_CONTROL", "meanWaitSeconds": 336.7, "p95WaitSeconds": 535.7,
-  "meanTravelMinutes": 26480.0, "meanRecoverySeconds": 1260.0, "unrecoveredScenarios": 1,
+  "meanTravelMinutes": 26480.0, "p95TravelMinutes": 27310.5, "meanRecoverySeconds": 1260.0,
+  "unrecoveredScenarios": 1,
   "waitSecondsPerScenario": [263.4, 218.1, 329.6, 535.7] }
 ```
 
 `meanRecoverySeconds` averages the headway recovery time (as in the what-if analysis) over the scenarios the
 strategy recovered from within the horizon, and `unrecoveredScenarios` counts the rest; recovery is reported
 alongside the ranking and does not change it.
+
+Wait per boarding only sees time on platforms, so a strategy that holds trains longer or carries passengers past
+skipped stops can look better than it is. `?metric=TRAVEL_TIME` ranks by `meanTravelMinutes` instead (total
+passenger time over the horizon, platform wait plus time on board), then by its 95th percentile
+`p95TravelMinutes`, then by name. The report names the metric it was ranked by (`"metric": "TRAVEL_TIME"`); the
+default is `WAIT_PER_BOARDING`, and the figures for each strategy are the same under both.
 
 Each scenario lists only what its kind needs:
 
