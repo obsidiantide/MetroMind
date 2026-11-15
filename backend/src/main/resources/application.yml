@@ -28,6 +28,9 @@ metromind:
     tick-millis: 500
     start-clock: "07:30"
     strategy: NO_CONTROL
+  replay:
+    retention-minutes: 30  # simulated minutes of snapshots kept for time travel
+    interval-seconds: 10   # simulated seconds between kept snapshots
   kafka:
     enabled: true
   redis:
