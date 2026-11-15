@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.oneOf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +37,22 @@ class BenchmarkApiTest {
                 .andExpect(jsonPath("$.rankings[0].meanWaitSeconds").isNumber())
                 .andExpect(jsonPath("$.rankings[0].p95WaitSeconds").isNumber())
                 .andExpect(jsonPath("$.rankings[0].waitSecondsPerScenario.length()").value(2));
+    }
+
+    @Test
+    void drawsOnlyTheRequestedIncidentKinds() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "3").param("seed", "4")
+                        .param("horizonSeconds", "300").param("kinds", "SECTION_CLOSURE,STATION_CLOSURE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scenarios[*].kind",
+                        everyItem(oneOf("SECTION_CLOSURE", "STATION_CLOSURE"))))
+                .andExpect(jsonPath("$.scenarios[*].trainId").isEmpty());
+    }
+
+    @Test
+    void anUnknownIncidentKindIsABadRequest() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("kinds", "METEOR"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
