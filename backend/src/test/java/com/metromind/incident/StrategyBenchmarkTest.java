@@ -7,8 +7,10 @@ import com.metromind.sim.SimulationSnapshot;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -194,6 +196,32 @@ class StrategyBenchmarkTest {
         assertThat(report.rankings().get(0).meanWaitSeconds()).isEqualTo(report.rankings().get(1).meanWaitSeconds());
         assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::strategy)
                 .containsExactly("ADAPTIVE_DISPATCH", "BALANCED");
+    }
+
+    @Test
+    void shortTurnsAreCountedPerStrategyAndByStation() {
+        BenchmarkReport report = new StrategyBenchmark().run(live(), 6, 2, 1800,
+                List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.SHORT_TURN),
+                EnumSet.of(BenchmarkReport.IncidentKind.DELAY, BenchmarkReport.IncidentKind.BREAKDOWN));
+        BenchmarkReport.StrategyRanking shortTurn = report.rankings().stream()
+                .filter(r -> r.strategy().equals("SHORT_TURN")).findFirst().orElseThrow();
+        BenchmarkReport.StrategyRanking noControl = report.rankings().stream()
+                .filter(r -> r.strategy().equals("NO_CONTROL")).findFirst().orElseThrow();
+
+        assertThat(noControl.meanShortTurns()).isZero();
+        assertThat(noControl.shortTurnsByStation()).isEmpty();
+        assertThat(shortTurn.meanShortTurns()).isPositive();
+        int total = shortTurn.shortTurnsByStation().values().stream().mapToInt(Integer::intValue).sum();
+        assertThat(total).isEqualTo((int) Math.round(shortTurn.meanShortTurns() * 6));
+        // Terminals are never short-turn points.
+        assertThat(shortTurn.shortTurnsByStation()).doesNotContainKeys("A", "F");
+        assertThat(List.copyOf(shortTurn.shortTurnsByStation().values())).isSortedAccordingTo(Comparator.reverseOrder());
+    }
+
+    @Test
+    void stationCountsAreOrderedMostFirstThenById() {
+        Map<String, Integer> ordered = StrategyBenchmark.mostFirst(Map.of("C", 1, "B", 3, "A", 1, "D", 2));
+        assertThat(ordered.keySet()).containsExactly("B", "D", "A", "C");
     }
 
     @Test
