@@ -1,6 +1,8 @@
 package com.metromind.incident;
 
+import com.metromind.network.Line;
 import com.metromind.network.Station;
+import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.TrainState;
@@ -8,13 +10,16 @@ import com.metromind.sim.TrainState;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Random;
 
 /**
- * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a
- * train delayed or broken down for a random time) from a seed, runs every strategy against every scenario from
- * the same copy of the live network, and compares the passenger wait they lead to.
+ * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a train
+ * delayed or broken down, a track section or a station closed, each for a random time) from a seed, runs every
+ * strategy against every scenario from the same copy of the live network, and compares the passenger wait they
+ * lead to.
  *
  * <p>Everything is deterministic: scenarios come from {@link Random} with the given seed (its algorithm is fixed by
  * the Java specification) and the engine itself has no randomness, so a seed and a starting state always produce
@@ -26,15 +31,24 @@ public final class StrategyBenchmark {
     static final double MAX_DELAY_SECONDS = 600;
     static final double MIN_REPAIR_SECONDS = 300;
     static final double MAX_REPAIR_SECONDS = 1200;
+    static final double MIN_CLOSURE_SECONDS = 300;
+    static final double MAX_CLOSURE_SECONDS = 1200;
     private static final double DT = 1.0;
     static final double RECOVERY_SAMPLE_SECONDS = 30;
 
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies) {
+        return run(live, scenarioCount, seed, horizonSeconds, strategies,
+                EnumSet.allOf(BenchmarkReport.IncidentKind.class));
+    }
+
+    /** As {@link #run(SimulationEngine, int, long, double, List)}, drawing only incidents of the given kinds. */
+    public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
+                               List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds) {
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
-        List<BenchmarkReport.Scenario> scenarios = drawScenarios(live, scenarioCount, seed);
+        List<BenchmarkReport.Scenario> scenarios = drawScenarios(live, scenarioCount, seed, kinds);
         // Measured once up front: taking a snapshot updates the engine's overload alerts.
         double startBoarded = live.snapshot().metrics().passengersServed();
         double startWait = totalWaitSeconds(live);
@@ -83,28 +97,62 @@ public final class StrategyBenchmark {
         return new BenchmarkReport(seed, horizonSeconds, scenarios, rankings);
     }
 
-    /** Draws the scenarios: a train of the live fleet, a kind of incident and a duration in its range. */
     static List<BenchmarkReport.Scenario> drawScenarios(SimulationEngine live, int count, long seed) {
+        return drawScenarios(live, count, seed, EnumSet.allOf(BenchmarkReport.IncidentKind.class));
+    }
+
+    /**
+     * Draws the scenarios: for each one a kind among {@code kinds} (in declaration order, so a seed always maps to
+     * the same incidents), then its subject (a train of the live fleet, a pair of adjacent stations of a line, or a
+     * station) and a duration in the kind's range. A closed section gets a random response.
+     */
+    static List<BenchmarkReport.Scenario> drawScenarios(SimulationEngine live, int count, long seed,
+                                                        Set<BenchmarkReport.IncidentKind> kinds) {
+        if (kinds.isEmpty()) {
+            throw new IllegalArgumentException("A benchmark needs at least one kind of incident");
+        }
+        List<BenchmarkReport.IncidentKind> pool = List.copyOf(EnumSet.copyOf(kinds));
         List<String> trainIds = live.trains().stream().map(TrainState::id).toList();
+        List<Line> lines = live.network().lines();
+        List<Station> stations = live.network().stations();
         Random random = new Random(seed);
         List<BenchmarkReport.Scenario> scenarios = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            String trainId = trainIds.get(random.nextInt(trainIds.size()));
-            boolean breakdown = random.nextBoolean();
-            double seconds = breakdown
-                    ? MIN_REPAIR_SECONDS + random.nextInt((int) (MAX_REPAIR_SECONDS - MIN_REPAIR_SECONDS) + 1)
-                    : MIN_DELAY_SECONDS + random.nextInt((int) (MAX_DELAY_SECONDS - MIN_DELAY_SECONDS) + 1);
-            scenarios.add(new BenchmarkReport.Scenario(
-                    breakdown ? BenchmarkReport.IncidentKind.BREAKDOWN : BenchmarkReport.IncidentKind.DELAY,
-                    trainId, seconds));
+            BenchmarkReport.IncidentKind kind = pool.get(random.nextInt(pool.size()));
+            scenarios.add(switch (kind) {
+                case DELAY -> BenchmarkReport.Scenario.train(kind, trainIds.get(random.nextInt(trainIds.size())),
+                        between(random, MIN_DELAY_SECONDS, MAX_DELAY_SECONDS));
+                case BREAKDOWN -> BenchmarkReport.Scenario.train(kind,
+                        trainIds.get(random.nextInt(trainIds.size())),
+                        between(random, MIN_REPAIR_SECONDS, MAX_REPAIR_SECONDS));
+                case SECTION_CLOSURE -> {
+                    Line line = lines.get(random.nextInt(lines.size()));
+                    int from = random.nextInt(line.stationIds().size() - 1);
+                    ClosureResponse response = ClosureResponse.values()[random.nextInt(ClosureResponse.values().length)];
+                    yield BenchmarkReport.Scenario.sectionClosure(line.id(), line.stationIds().get(from),
+                            line.stationIds().get(from + 1), response,
+                            between(random, MIN_CLOSURE_SECONDS, MAX_CLOSURE_SECONDS));
+                }
+                case STATION_CLOSURE -> BenchmarkReport.Scenario.stationClosure(
+                        stations.get(random.nextInt(stations.size())).id(),
+                        between(random, MIN_CLOSURE_SECONDS, MAX_CLOSURE_SECONDS));
+            });
         }
         return scenarios;
+    }
+
+    /** A whole number of seconds in {@code [min, max]}. */
+    private static double between(Random random, double min, double max) {
+        return min + random.nextInt((int) (max - min) + 1);
     }
 
     private static void inject(SimulationEngine engine, BenchmarkReport.Scenario scenario) {
         switch (scenario.kind()) {
             case DELAY -> engine.injectDelay(scenario.trainId(), scenario.seconds());
             case BREAKDOWN -> engine.injectBreakdown(scenario.trainId(), scenario.seconds());
+            case SECTION_CLOSURE -> engine.closeSection(scenario.lineId(), scenario.fromStationId(),
+                    scenario.toStationId(), scenario.seconds(), scenario.response());
+            case STATION_CLOSURE -> engine.closeStation(scenario.stationId(), scenario.seconds());
         }
     }
 

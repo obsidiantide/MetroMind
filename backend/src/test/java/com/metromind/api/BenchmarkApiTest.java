@@ -29,7 +29,7 @@ class BenchmarkApiTest {
                 .andExpect(jsonPath("$.horizonSeconds").value(300.0))
                 .andExpect(jsonPath("$.scenarios.length()").value(2))
                 .andExpect(jsonPath("$.scenarios[0].kind").isString())
-                .andExpect(jsonPath("$.scenarios[0].trainId").isString())
+                .andExpect(jsonPath("$.scenarios[0].seconds").isNumber())
                 .andExpect(jsonPath("$.rankings.length()").value(HeadwayStrategy.all().size()))
                 .andExpect(jsonPath("$.rankings[0].rank").value(1))
                 .andExpect(jsonPath("$.rankings[0].meanWaitSeconds").isNumber())

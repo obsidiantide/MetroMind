@@ -1,5 +1,8 @@
 package com.metromind.incident;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.metromind.sim.ClosureResponse;
+
 import java.util.List;
 
 /**
@@ -18,10 +21,31 @@ import java.util.List;
 public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> scenarios,
                               List<StrategyRanking> rankings) {
 
-    public enum IncidentKind { DELAY, BREAKDOWN }
+    public enum IncidentKind { DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE }
 
-    /** One incident injected at the start of the horizon. */
-    public record Scenario(IncidentKind kind, String trainId, double seconds) {
+    /**
+     * One incident injected at the start of the horizon. Only the fields its kind needs are set (the others are
+     * null and left out of the JSON): {@code trainId} for a delay or breakdown; {@code lineId},
+     * {@code fromStationId}, {@code toStationId} and {@code response} for a track-section closure; {@code stationId}
+     * for a station closure. {@code seconds} is how long it lasts.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Scenario(IncidentKind kind, String trainId, String lineId, String fromStationId,
+                           String toStationId, ClosureResponse response, String stationId, double seconds) {
+
+        public static Scenario train(IncidentKind kind, String trainId, double seconds) {
+            return new Scenario(kind, trainId, null, null, null, null, null, seconds);
+        }
+
+        public static Scenario sectionClosure(String lineId, String fromStationId, String toStationId,
+                                              ClosureResponse response, double seconds) {
+            return new Scenario(IncidentKind.SECTION_CLOSURE, null, lineId, fromStationId, toStationId, response,
+                    null, seconds);
+        }
+
+        public static Scenario stationClosure(String stationId, double seconds) {
+            return new Scenario(IncidentKind.STATION_CLOSURE, null, null, null, null, null, stationId, seconds);
+        }
     }
 
     /**
