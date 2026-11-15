@@ -42,12 +42,17 @@ export interface Snapshot {
     stopsSkipped: number; passengersCarriedPast: number;
   };
 }
+export interface ShortTurn {
+  trainId: string; lineId: string; stationId: string; simTime: number; latenessSeconds: number;
+}
 export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;
   totalPassengerWaitMinutes: number; totalExtraRideMinutes: number; totalExtraTravelMinutes: number;
   totalPassengerTravelMinutes: number; headwayCvAtHorizon: number;
   /** Seconds until headways were back to baseline regularity; null if still disrupted at the horizon. */
   headwayRecoverySeconds: number | null; peakHeadwayCvExcess: number;
+  /** Trains the strategy reversed early during the incident run, oldest first. */
+  shortTurns: ShortTurn[];
   trains: { trainId: string; extraDelaySeconds: number }[];
   stations: { stationId: string; extraWaitMinutes: number; peakWaitingDelta: number }[];
 }
