@@ -7,6 +7,7 @@ import com.metromind.sim.SimulationSnapshot;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -241,6 +242,53 @@ class StrategyBenchmarkTest {
         // Terminals are never skipped.
         assertThat(skipStop.stopsSkippedByStation()).doesNotContainKeys("A", "F");
         assertThat(List.copyOf(skipStop.stopsSkippedByStation().values())).isSortedAccordingTo(Comparator.reverseOrder());
+    }
+
+    @Test
+    void travelTimeMetricRanksByMeanTravelThenP95() {
+        BenchmarkReport report = new StrategyBenchmark().run(live(), 4, 42, 1200, HeadwayStrategy.all(),
+                EnumSet.allOf(BenchmarkReport.IncidentKind.class), BenchmarkReport.RankingMetric.TRAVEL_TIME);
+
+        assertThat(report.metric()).isEqualTo(BenchmarkReport.RankingMetric.TRAVEL_TIME);
+        assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::rank)
+                .containsExactlyElementsOf(IntStream.rangeClosed(1, report.rankings().size())
+                        .boxed().toList());
+        assertThat(report.rankings()).isSortedAccordingTo(StrategyBenchmark.order(
+                BenchmarkReport.RankingMetric.TRAVEL_TIME));
+        assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::meanTravelMinutes)
+                .isSortedAccordingTo(Comparator.naturalOrder());
+        assertThat(report.rankings()).allSatisfy(r ->
+                assertThat(r.p95TravelMinutes()).isGreaterThanOrEqualTo(r.meanTravelMinutes() - 1e-9));
+    }
+
+    @Test
+    void bothMetricsMeasureTheSameRuns() {
+        SimulationEngine live = live();
+        BenchmarkReport byWait = new StrategyBenchmark().run(live, 3, 8, 900, HeadwayStrategy.all());
+        BenchmarkReport byTravel = new StrategyBenchmark().run(live, 3, 8, 900, HeadwayStrategy.all(),
+                EnumSet.allOf(BenchmarkReport.IncidentKind.class), BenchmarkReport.RankingMetric.TRAVEL_TIME);
+
+        assertThat(byWait.metric()).isEqualTo(BenchmarkReport.RankingMetric.WAIT_PER_BOARDING);
+        assertThat(byTravel.scenarios()).isEqualTo(byWait.scenarios());
+        // Only the order differs: every strategy has the same figures under both metrics.
+        assertThat(byTravel.rankings().stream().map(r -> r.withRank(0)).toList())
+                .containsExactlyInAnyOrderElementsOf(byWait.rankings().stream().map(r -> r.withRank(0)).toList());
+    }
+
+    @Test
+    void travelOrderBreaksTiesOnP95ThenName() {
+        BenchmarkReport.StrategyRanking a = ranking("A", 10, 30);
+        BenchmarkReport.StrategyRanking b = ranking("B", 10, 20);
+        BenchmarkReport.StrategyRanking c = ranking("C", 10, 20);
+        BenchmarkReport.StrategyRanking d = ranking("D", 9, 50);
+        List<BenchmarkReport.StrategyRanking> sorted = new ArrayList<>(List.of(a, b, c, d));
+        sorted.sort(StrategyBenchmark.order(BenchmarkReport.RankingMetric.TRAVEL_TIME));
+        assertThat(sorted).extracting(BenchmarkReport.StrategyRanking::strategy).containsExactly("D", "B", "C", "A");
+    }
+
+    private static BenchmarkReport.StrategyRanking ranking(String strategy, double meanTravel, double p95Travel) {
+        return new BenchmarkReport.StrategyRanking(0, strategy, 0, 0, meanTravel, p95Travel, null, 0, 0, Map.of(),
+                0, 0, Map.of(), List.of());
     }
 
     @Test
