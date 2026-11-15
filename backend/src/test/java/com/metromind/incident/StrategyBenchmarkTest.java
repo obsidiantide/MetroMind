@@ -219,6 +219,31 @@ class StrategyBenchmarkTest {
     }
 
     @Test
+    void skippedStopsAreCountedPerStrategyAndByStation() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLineWithQuietStop(), 8 * 3600,
+                HeadwayStrategy.NO_CONTROL);
+        live.run(900, 1);
+        BenchmarkReport report = new StrategyBenchmark().run(live, 6, 2, 1800,
+                List.of(HeadwayStrategy.BALANCED, HeadwayStrategy.SKIP_STOP),
+                EnumSet.of(BenchmarkReport.IncidentKind.DELAY));
+        BenchmarkReport.StrategyRanking skipStop = report.rankings().stream()
+                .filter(r -> r.strategy().equals("SKIP_STOP")).findFirst().orElseThrow();
+        BenchmarkReport.StrategyRanking balanced = report.rankings().stream()
+                .filter(r -> r.strategy().equals("BALANCED")).findFirst().orElseThrow();
+
+        assertThat(balanced.meanStopsSkipped()).isZero();
+        assertThat(balanced.meanPassengersCarriedPast()).isZero();
+        assertThat(balanced.stopsSkippedByStation()).isEmpty();
+        assertThat(skipStop.meanStopsSkipped()).isPositive();
+        assertThat(skipStop.meanPassengersCarriedPast()).isPositive();
+        int total = skipStop.stopsSkippedByStation().values().stream().mapToInt(Integer::intValue).sum();
+        assertThat(total).isEqualTo((int) Math.round(skipStop.meanStopsSkipped() * 6));
+        // Terminals are never skipped.
+        assertThat(skipStop.stopsSkippedByStation()).doesNotContainKeys("A", "F");
+        assertThat(List.copyOf(skipStop.stopsSkippedByStation().values())).isSortedAccordingTo(Comparator.reverseOrder());
+    }
+
+    @Test
     void stationCountsAreOrderedMostFirstThenById() {
         Map<String, Integer> ordered = StrategyBenchmark.mostFirst(Map.of("C", 1, "B", 3, "A", 1, "D", 2));
         assertThat(ordered.keySet()).containsExactly("B", "D", "A", "C");
