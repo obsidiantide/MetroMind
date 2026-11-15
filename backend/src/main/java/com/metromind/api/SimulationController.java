@@ -3,6 +3,7 @@ package com.metromind.api;
 import com.metromind.incident.AnalysisRecord;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
+import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.network.MetroNetwork;
 import com.metromind.sim.ClosureResponse;
@@ -124,6 +125,28 @@ public class SimulationController {
     public DelayImpactReport delayImpact(@Valid @RequestBody IncidentRequest req,
                                          @RequestParam(defaultValue = "1800") @Min(60) @Max(7200) double horizonSeconds) {
         return simulation.analyzeDelay(req.trainId(), req.seconds(), horizonSeconds);
+    }
+
+    /**
+     * What-if: impact of closing a track section ({@code response} defaults to {@link ClosureResponse#WAIT}),
+     * compared across all headway strategies. Does not touch live state.
+     */
+    @PostMapping("/analysis/section-closure-impact")
+    public IncidentImpactReport sectionClosureImpact(@Valid @RequestBody SectionClosureRequest req,
+                                                     @RequestParam(defaultValue = "1800") @Min(60) @Max(7200)
+                                                     double horizonSeconds) {
+        return simulation.analyzeIncident(BenchmarkReport.Scenario.sectionClosure(req.lineId(), req.fromStationId(),
+                req.toStationId(), req.response() == null ? ClosureResponse.WAIT : req.response(), req.seconds()),
+                horizonSeconds);
+    }
+
+    /** What-if: impact of closing a station, compared across all headway strategies. Does not touch live state. */
+    @PostMapping("/analysis/station-closure-impact")
+    public IncidentImpactReport stationClosureImpact(@Valid @RequestBody StationClosureRequest req,
+                                                     @RequestParam(defaultValue = "1800") @Min(60) @Max(7200)
+                                                     double horizonSeconds) {
+        return simulation.analyzeIncident(BenchmarkReport.Scenario.stationClosure(req.stationId(), req.seconds()),
+                horizonSeconds);
     }
 
     /**
