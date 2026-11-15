@@ -45,6 +45,10 @@ export interface Snapshot {
 export interface ShortTurn {
   trainId: string; lineId: string; stationId: string; simTime: number; latenessSeconds: number;
 }
+export interface SkippedStop {
+  trainId: string; lineId: string; stationId: string; simTime: number; latenessSeconds: number;
+  passengersCarriedPast: number;
+}
 export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;
   totalPassengerWaitMinutes: number; totalExtraRideMinutes: number; totalExtraTravelMinutes: number;
@@ -53,6 +57,8 @@ export interface StrategyOutcome {
   headwayRecoverySeconds: number | null; peakHeadwayCvExcess: number;
   /** Trains the strategy reversed early during the incident run, oldest first. */
   shortTurns: ShortTurn[];
+  /** Stations late trains ran through during the incident run, oldest first. */
+  skippedStops: SkippedStop[];
   trains: { trainId: string; extraDelaySeconds: number }[];
   stations: { stationId: string; extraWaitMinutes: number; peakWaitingDelta: number }[];
 }
