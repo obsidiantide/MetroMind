@@ -97,6 +97,18 @@ public interface HeadwayStrategy {
     };
 
     /**
+     * Two-way balancing plus skip-stop for recovery: a late train with a follower close behind runs through quiet
+     * intermediate stops, saving their dwell, while the follower picks up the few passengers left waiting there.
+     */
+    HeadwayStrategy SKIP_STOP = new HeadwayStrategy() {
+        public String name() { return "SKIP_STOP"; }
+        public double holdSeconds(double f, double b, double target) {
+            return BALANCED.holdSeconds(f, b, target);
+        }
+        public boolean skipsStopsForLateTrains() { return true; }
+    };
+
+    /**
      * Forward holding against a target that tracks forecast demand. Off-peak a train is held until the gap ahead
      * reaches the usual share of the even headway; as demand rises the target shrinks with the square root of the
      * demand multiplier (down to {@link #DEMAND_MIN_TARGET_FRACTION} of it), because in a peak every second of
@@ -138,11 +150,13 @@ public interface HeadwayStrategy {
             case "ADAPTIVE_DISPATCH" -> ADAPTIVE_DISPATCH;
             case "SHORT_TURN" -> SHORT_TURN;
             case "DEMAND_HOLDING" -> DEMAND_HOLDING;
+            case "SKIP_STOP" -> SKIP_STOP;
             default -> throw new IllegalArgumentException("Unknown strategy " + name);
         };
     }
 
     static java.util.List<HeadwayStrategy> all() {
-        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN, DEMAND_HOLDING);
+        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN, DEMAND_HOLDING,
+                SKIP_STOP);
     }
 }
