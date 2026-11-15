@@ -19,6 +19,8 @@ public class KafkaSnapshotPublisher implements SnapshotListener {
 
     public static final String POSITIONS_TOPIC = "metromind.train-positions";
     public static final String EVENTS_TOPIC = "metromind.events";
+    /** Network-wide metrics (waiting passengers, headway regularity...), one message per tick. */
+    public static final String METRICS_TOPIC = "metromind.network-metrics";
 
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper mapper;
@@ -42,9 +44,13 @@ public class KafkaSnapshotPublisher implements SnapshotListener {
             }
         }
         lastEventTime = newest;
+        kafka.send(METRICS_TOPIC, "network", json(new NetworkMetrics(snapshot.simTime(), snapshot.metrics())));
     }
 
-    record Position(double simTime, SimulationSnapshot.TrainView train) {
+    public record Position(double simTime, SimulationSnapshot.TrainView train) {
+    }
+
+    public record NetworkMetrics(double simTime, SimulationSnapshot.Metrics metrics) {
     }
 
     private String json(Object o) {
