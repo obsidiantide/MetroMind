@@ -77,7 +77,7 @@ public final class StrategyBenchmark {
             for (BenchmarkReport.Scenario scenario : scenarios) {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
-                inject(run, scenario);
+                scenario.applyTo(run);
                 double injectedAt = run.simTime();
                 HeadwayRecovery.Result recovery = HeadwayRecovery.measure(baselineCv,
                         HeadwayRecovery.sampleHeadwayCv(run, horizonSeconds, RECOVERY_SAMPLE_SECONDS, DT),
@@ -164,16 +164,6 @@ public final class StrategyBenchmark {
     /** A whole number of seconds in {@code [min, max]}. */
     private static double between(Random random, double min, double max) {
         return min + random.nextInt((int) (max - min) + 1);
-    }
-
-    private static void inject(SimulationEngine engine, BenchmarkReport.Scenario scenario) {
-        switch (scenario.kind()) {
-            case DELAY -> engine.injectDelay(scenario.trainId(), scenario.seconds());
-            case BREAKDOWN -> engine.injectBreakdown(scenario.trainId(), scenario.seconds());
-            case SECTION_CLOSURE -> engine.closeSection(scenario.lineId(), scenario.fromStationId(),
-                    scenario.toStationId(), scenario.seconds(), scenario.response());
-            case STATION_CLOSURE -> engine.closeStation(scenario.stationId(), scenario.seconds());
-        }
     }
 
     /** Counts ordered from highest to lowest, ties by key, in an insertion-ordered map. */
