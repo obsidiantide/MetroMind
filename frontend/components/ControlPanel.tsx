@@ -127,7 +127,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
             <thead>
               <tr>
                 <th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Extra on board</th>
-                <th>Total travel</th>
+                <th>Total travel</th><th>Headways recover</th>
               </tr>
             </thead>
             <tbody>
@@ -139,6 +139,13 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
                   <td>{Math.round(o.totalExtraPassengerWaitMinutes)} min</td>
                   <td>{Math.round(o.totalExtraRideMinutes)} min</td>
                   <td>{Math.round(o.totalPassengerTravelMinutes)} min</td>
+                  <td title={`Peak headway CV +${o.peakHeadwayCvExcess.toFixed(2)} over baseline`}>
+                    {o.headwayRecoverySeconds === null
+                      ? "not within horizon"
+                      : o.headwayRecoverySeconds === 0
+                        ? "unaffected"
+                        : `${Math.round(o.headwayRecoverySeconds / 60)} min`}
+                  </td>
                 </tr>
               ))}
             </tbody>
