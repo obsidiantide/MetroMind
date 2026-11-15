@@ -68,6 +68,51 @@ class DelayPropagationAnalyzerTest {
         }
     }
 
+    @Test
+    void shortDelayDisruptsHeadwaysUntilTheTimetableAbsorbsIt() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(600, 1);
+
+        DelayImpactReport.StrategyOutcome outcome = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-2", 60, 3600, List.of(HeadwayStrategy.NO_CONTROL)).outcomes().get(0);
+
+        assertThat(outcome.peakHeadwayCvExcess()).isGreaterThan(HeadwayRecovery.CV_TOLERANCE);
+        assertThat(outcome.headwayRecoverySeconds()).isNotNull()
+                .isGreaterThan(0.0).isLessThan(3600.0);
+        assertThat(outcome.headwayRecoverySeconds() % DelayPropagationAnalyzer.RECOVERY_SAMPLE_SECONDS).isZero();
+    }
+
+    @Test
+    void longDelayIsStillDisruptingHeadwaysAtAShortHorizon() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(600, 1);
+
+        DelayImpactReport.StrategyOutcome outcome = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-2", 240, 1800, List.of(HeadwayStrategy.NO_CONTROL)).outcomes().get(0);
+
+        assertThat(outcome.headwayRecoverySeconds()).isNull();
+        assertThat(outcome.peakHeadwayCvExcess()).isGreaterThan(0.3);
+    }
+
+    @Test
+    void sampledRunStepsTheEnginesLikeOneLongRun() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.BALANCED);
+        live.run(600, 1);
+        SimulationEngine plain = live.copy();
+        SimulationEngine sampled = live.copy();
+        SimulationEngine other = live.copy();
+        plain.injectDelay("L1-1", 180);
+        sampled.injectDelay("L1-1", 180);
+
+        plain.run(1000, 1);
+        DelayPropagationAnalyzer.runSampled(other, sampled, 1000);
+
+        assertThat(sampled.simTime()).isEqualTo(plain.simTime());
+        assertThat(sampled.passengerRideSeconds()).isEqualTo(plain.passengerRideSeconds());
+        assertThat(sampled.headwayCv()).isEqualTo(plain.headwayCv());
+        assertThat(sampled.train("L1-1").arrivals()).isEqualTo(plain.train("L1-1").arrivals());
+    }
+
     /**
      * Regression: on the seed network a one-minute delay of RED-4 at 08:10 used to report about 375
      * passenger-minutes <em>less</em> platform waiting than the baseline. The passengers had not been spared any
