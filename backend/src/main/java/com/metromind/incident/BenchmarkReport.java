@@ -2,6 +2,7 @@ package com.metromind.incident;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.metromind.sim.ClosureResponse;
+import com.metromind.sim.SimulationEngine;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,16 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
 
         public static Scenario stationClosure(String stationId, double seconds) {
             return new Scenario(IncidentKind.STATION_CLOSURE, null, null, null, null, null, stationId, seconds);
+        }
+
+        /** Injects this incident into {@code engine} at its current time. */
+        public void applyTo(SimulationEngine engine) {
+            switch (kind) {
+                case DELAY -> engine.injectDelay(trainId, seconds);
+                case BREAKDOWN -> engine.injectBreakdown(trainId, seconds);
+                case SECTION_CLOSURE -> engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
+                case STATION_CLOSURE -> engine.closeStation(stationId, seconds);
+            }
         }
     }
 
