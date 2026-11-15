@@ -43,6 +43,8 @@ public final class SimulationEngine {
     static final double OVERLOAD_HIGH = 400;
     static final double OVERLOAD_MEDIUM = 200;
     private static final int MAX_EVENTS = 100;
+    /** Short turns kept in {@link #shortTurns()}; older ones are only counted. */
+    static final int MAX_SHORT_TURN_LOG = 1000;
     /** How often strategies that dispatch from the depot review each line's fleet, in simulated seconds. */
     static final double DISPATCH_INTERVAL_SECONDS = 60;
     /** Horizon of the overload forecast that triggers dispatching. */
@@ -100,6 +102,8 @@ public final class SimulationEngine {
     private double rideSeconds;
     /** Stops trains have run through under a skip-stop strategy so far. */
     private int stopsSkipped;
+    /** Most recent short turns, oldest first, at most {@link #MAX_SHORT_TURN_LOG}. */
+    private final Deque<ShortTurn> shortTurnLog = new ArrayDeque<>();
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -184,6 +188,7 @@ public final class SimulationEngine {
         this.recordArrivals = other.recordArrivals;
         this.rideSeconds = other.rideSeconds;
         this.stopsSkipped = other.stopsSkipped;
+        this.shortTurnLog.addAll(other.shortTurnLog);
     }
 
     /** Deep copy, used for counterfactual ("what-if") runs. */
@@ -344,6 +349,10 @@ public final class SimulationEngine {
                 if (tryTurnBack(t, line)) {
                     emit(SimEvent.Type.TRAIN_SHORT_TURNED, t.id, "Train %s, %.0f s late, short-turned at %s"
                             .formatted(t.id, lateness, network.station(stationId).name()));
+                    shortTurnLog.addLast(new ShortTurn(t.id, line.id(), stationId, simTime, lateness));
+                    while (shortTurnLog.size() > MAX_SHORT_TURN_LOG) {
+                        shortTurnLog.removeFirst();
+                    }
                     return; // dwelling again on the opposite platform; the hold is decided when it is ready
                 }
             }
@@ -1266,6 +1275,14 @@ public final class SimulationEngine {
     }
 
     public double stationWaitSeconds(String stationId) { return stations.get(stationId).waitSeconds; }
+
+    /** Recent short turns, oldest first (see {@link #MAX_SHORT_TURN_LOG}). */
+    public List<ShortTurn> shortTurns() { return List.copyOf(shortTurnLog); }
+
+    /** Short turns made at or after simulated time {@code since}, oldest first. */
+    public List<ShortTurn> shortTurnsSince(double since) {
+        return shortTurnLog.stream().filter(s -> s.simTime() >= since).toList();
+    }
 
     /** Passenger-seconds spent on board trains so far (running, dwelling, held or stuck). */
     public double passengerRideSeconds() { return rideSeconds; }
