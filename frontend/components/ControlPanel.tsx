@@ -1,7 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import type { ClosureResponse, DelayImpactReport, MetroNetwork, Snapshot } from "@/lib/types";
+import type { ClosureResponse, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
+
+/** A what-if result ready to show: what was simulated and how each strategy coped. */
+interface WhatIf {
+  title: string;
+  outcomes: StrategyOutcome[];
+  bestStrategy: string;
+}
 
 /** What each headway strategy does, shown under the selector. */
 const STRATEGY_HELP: Record<string, string> = {
@@ -32,7 +39,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
   const [seconds, setSeconds] = useState(240);
-  const [report, setReport] = useState<DelayImpactReport | null>(null);
+  const [report, setReport] = useState<WhatIf | null>(null);
   const [section, setSection] = useState("");
   const [closureMinutes, setClosureMinutes] = useState(10);
   const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
@@ -55,9 +62,31 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
       label: `${l.name}: ${stationName.get(l.stationIds[i])} – ${stationName.get(to)}`,
     })),
   );
-  const closeSection = () => {
+  const selectedSection = () => {
     const [lineId, from, to] = (section || sections[0]?.key || "").split("|");
+    return { lineId, from, to };
+  };
+  const closeSection = () => {
+    const { lineId, from, to } = selectedSection();
     return api.closeSection(lineId, from, to, closureMinutes * 60, closureResponse);
+  };
+  const analyzeDelay = async () => {
+    const r = await api.analyze(trainId, seconds);
+    setReport({ title: `Impact of ${Math.round(r.injectedDelaySeconds / 60)} min delay on ${r.trainId}`, ...r });
+  };
+  const analyzeSectionClosure = async () => {
+    const { lineId, from, to } = selectedSection();
+    const r = await api.analyzeSectionClosure(lineId, from, to, closureMinutes * 60, closureResponse);
+    setReport({
+      title: `Impact of closing ${stationName.get(from) ?? from} – ${stationName.get(to) ?? to} for ${closureMinutes} min`
+        + (closureResponse === "TURN_BACK" ? " (trains turn back)" : " (trains wait)"),
+      ...r,
+    });
+  };
+  const analyzeStationClosure = async () => {
+    const stationId = closedStation || network!.stations[0].id;
+    const r = await api.analyzeStationClosure(stationId, closureMinutes * 60);
+    setReport({ title: `Impact of closing ${stationName.get(stationId) ?? stationId} for ${closureMinutes} min`, ...r });
   };
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -94,7 +123,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
         <div className="row" style={{ marginTop: 8 }}>
           <button disabled={busy} onClick={() => run(() => api.delay(trainId, seconds))}>Delay</button>
           <button disabled={busy} onClick={() => run(() => api.breakdown(trainId, seconds))}>Breakdown</button>
-          <button disabled={busy} onClick={() => run(async () => setReport(await api.analyze(trainId, seconds)))}>
+          <button disabled={busy} onClick={() => run(analyzeDelay)}>
             What-if analysis
           </button>
         </div>
@@ -116,6 +145,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
               <option value="WAIT">Trains wait</option>
             </select>
             <button disabled={busy} onClick={() => run(closeSection)}>Close track</button>
+            <button disabled={busy} onClick={() => run(analyzeSectionClosure)}>What-if</button>
           </div>
           <div className="row" style={{ marginTop: 8 }}>
             <select value={closedStation || network!.stations[0].id} onChange={(e) => setClosedStation(e.target.value)}
@@ -126,6 +156,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
                     onClick={() => run(() => api.closeStation(closedStation || network!.stations[0].id, closureMinutes * 60))}>
               Close station
             </button>
+            <button disabled={busy} onClick={() => run(analyzeStationClosure)}>What-if</button>
           </div>
           <p className="muted">
             Track: trains wait at the signal or turn back at the last open station. Station: trains run through and
@@ -136,7 +167,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
 
       {report && (
         <section className="panel">
-          <h2>Impact of {Math.round(report.injectedDelaySeconds / 60)} min delay on {report.trainId}</h2>
+          <h2>{report.title}</h2>
           <table>
             <thead>
               <tr>
