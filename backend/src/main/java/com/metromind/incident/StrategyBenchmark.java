@@ -6,6 +6,7 @@ import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.ShortTurn;
 import com.metromind.sim.SimulationEngine;
+import com.metromind.sim.SkippedStop;
 import com.metromind.sim.TrainState;
 
 import java.util.ArrayList;
@@ -70,6 +71,9 @@ public final class StrategyBenchmark {
             int recovered = 0;
             Map<String, Integer> turnsByStation = new HashMap<>();
             int turns = 0;
+            Map<String, Integer> skipsByStation = new HashMap<>();
+            int skips = 0;
+            double carriedPast = 0;
             for (BenchmarkReport.Scenario scenario : scenarios) {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
@@ -90,11 +94,17 @@ public final class StrategyBenchmark {
                     turnsByStation.merge(turn.stationId(), 1, Integer::sum);
                     turns++;
                 }
+                for (SkippedStop skip : run.skippedStopsSince(injectedAt)) {
+                    skipsByStation.merge(skip.stationId(), 1, Integer::sum);
+                    skips++;
+                    carriedPast += skip.passengersCarriedPast();
+                }
             }
             double mean = waits.stream().mapToDouble(Double::doubleValue).average().orElse(0);
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
                     travelMinutes / scenarios.size(), recovered > 0 ? recoverySum / recovered : null,
                     scenarios.size() - recovered, (double) turns / scenarios.size(), mostFirst(turnsByStation),
+                    (double) skips / scenarios.size(), carriedPast / scenarios.size(), mostFirst(skipsByStation),
                     List.copyOf(waits)));
         }
         unranked.sort(Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanWaitSeconds)
