@@ -37,6 +37,40 @@ class StrategyBenchmarkTest {
     }
 
     @Test
+    void countsScenariosRecoveredFromAndAveragesTheirRecoveryTime() {
+        BenchmarkReport report = new StrategyBenchmark().run(live(), 4, 7, 2400,
+                List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED));
+
+        assertThat(report.rankings()).allSatisfy(r -> {
+            assertThat(r.unrecoveredScenarios()).isBetween(0, 4);
+            if (r.unrecoveredScenarios() == 4) {
+                assertThat(r.meanRecoverySeconds()).isNull();
+            } else {
+                assertThat(r.meanRecoverySeconds()).isBetween(0.0, 2400.0);
+            }
+        });
+    }
+
+    @Test
+    void delayScenarioRecoversLikeTheSameWhatIfAnalysis() {
+        SimulationEngine live = live();
+        long seed = 0;
+        while (StrategyBenchmark.drawScenarios(live, 1, seed).get(0).kind() != BenchmarkReport.IncidentKind.DELAY) {
+            seed++;
+        }
+        BenchmarkReport.Scenario scenario = StrategyBenchmark.drawScenarios(live, 1, seed).get(0);
+
+        BenchmarkReport.StrategyRanking ranking = new StrategyBenchmark()
+                .run(live, 1, seed, 3600, List.of(HeadwayStrategy.BALANCED)).rankings().get(0);
+        DelayImpactReport.StrategyOutcome whatIf = new DelayPropagationAnalyzer()
+                .analyze(live, scenario.trainId(), scenario.seconds(), 3600, List.of(HeadwayStrategy.BALANCED))
+                .outcomes().get(0);
+
+        assertThat(ranking.meanRecoverySeconds()).isEqualTo(whatIf.headwayRecoverySeconds());
+        assertThat(ranking.unrecoveredScenarios()).isEqualTo(whatIf.headwayRecoverySeconds() == null ? 1 : 0);
+    }
+
+    @Test
     void sameSeedAndStateGiveTheSameReport() {
         SimulationEngine live = live();
         List<HeadwayStrategy> two = List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.SHORT_TURN);
