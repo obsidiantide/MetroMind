@@ -31,6 +31,7 @@ class ShortTurnTest {
                 SimulationEngine engine = delayed(s);
                 engine.run(1800, 1);
                 assertThat(shortTurns(engine)).as(s.name()).isEmpty();
+                assertThat(engine.shortTurns()).as(s.name()).isEmpty();
             }
         }
     }
@@ -45,6 +46,32 @@ class ShortTurnTest {
         });
         // Reversing hands the train a later slot in the opposite direction, so it is no longer reported late.
         assertThat(engine.train("L1-2").delaySeconds()).isLessThan(SimulationEngine.SHORT_TURN_LATENESS_SECONDS);
+    }
+
+    @Test
+    void eachShortTurnIsLoggedWithItsStationAndLateness() {
+        SimulationEngine engine = delayed(HeadwayStrategy.SHORT_TURN);
+        double before = engine.simTime();
+        engine.run(1800, 1);
+        assertThat(engine.shortTurns()).singleElement().satisfies(turn -> {
+            assertThat(turn.trainId()).isEqualTo("L1-2");
+            assertThat(turn.lineId()).isEqualTo("L1");
+            assertThat(turn.stationId()).isEqualTo("D");
+            assertThat(turn.simTime()).isBetween(before, engine.simTime());
+            assertThat(turn.latenessSeconds()).isGreaterThanOrEqualTo(SimulationEngine.SHORT_TURN_LATENESS_SECONDS);
+        });
+        assertThat(engine.shortTurnsSince(before)).isEqualTo(engine.shortTurns());
+        assertThat(engine.shortTurnsSince(engine.simTime())).isEmpty();
+    }
+
+    @Test
+    void copiesKeepTheShortTurnLogSoFarButNotLaterTurns() {
+        SimulationEngine engine = delayed(HeadwayStrategy.SHORT_TURN);
+        SimulationEngine before = engine.copy();
+        engine.run(1800, 1);
+        SimulationEngine after = engine.copy();
+        assertThat(before.shortTurns()).isEmpty();
+        assertThat(after.shortTurns()).isEqualTo(engine.shortTurns());
     }
 
     @Test
