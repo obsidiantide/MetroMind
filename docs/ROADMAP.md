@@ -44,7 +44,7 @@ Mark items `[x]` when merged.
 - [x] Skipped-stop report: stops skipped, where, and passengers carried past, in what-if and benchmark results
 - [x] What-if analysis for track-section and station closures, not only train delays
 - [x] Benchmark ranking metric selectable: platform wait per boarding or total passenger travel time
-- [ ] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
+- [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
 
 ### Platform
 - [ ] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
