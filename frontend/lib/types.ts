@@ -65,3 +65,12 @@ export interface StrategyOutcome {
 export interface DelayImpactReport {
   trainId: string; injectedDelaySeconds: number; horizonSeconds: number; outcomes: StrategyOutcome[]; bestStrategy: string;
 }
+export type ScenarioKind = "DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE";
+/** An incident injected by a what-if analysis or benchmark; only the fields its kind needs are present. */
+export interface IncidentScenario {
+  kind: ScenarioKind; seconds: number; trainId?: string; lineId?: string; fromStationId?: string;
+  toStationId?: string; response?: ClosureResponse; stationId?: string;
+}
+export interface IncidentImpactReport {
+  incident: IncidentScenario; horizonSeconds: number; outcomes: StrategyOutcome[]; bestStrategy: string;
+}
