@@ -31,6 +31,11 @@ final class StationState {
     /** Passengers who changed lines here. */
     double transfers;
     /**
+     * Passengers who got off here after their train ran through their destination (skip-stop) and queued for a
+     * train back. They are not counted as {@link #transfers}: they stay on the same line.
+     */
+    double carriedPast;
+    /**
      * Passengers who were on the platform when a train left in their direction but could not board because it was
      * full. Someone left behind by two trains in a row counts twice, as in operators' "denied boardings".
      */
@@ -77,6 +82,7 @@ final class StationState {
         s.served = served;
         s.delivered = delivered;
         s.transfers = transfers;
+        s.carriedPast = carriedPast;
         s.leftBehind = leftBehind;
         s.heldAtEntrance = heldAtEntrance;
         s.peakWaiting = peakWaiting;

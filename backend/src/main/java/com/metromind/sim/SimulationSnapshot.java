@@ -57,10 +57,14 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      * @param passengersHeldAtEntrance passengers currently kept outside stations with full platforms
      * @param trainsInService    trains running on all lines, including any brought out of a depot
      * @param trainsInDepot      spare trains waiting in the depots
+     * @param stopsSkipped       stops trains ran through under a skip-stop strategy
+     * @param passengersCarriedPast passengers whose train ran through their destination, who rode back from the
+     *                           next stop (not counted as transfers)
      */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
                           double passengersServed, double passengersDelivered, double transfers,
                           double passengersLeftBehind, double passengersHeldAtEntrance,
-                          double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot) {
+                          double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
+                          int stopsSkipped, double passengersCarriedPast) {
     }
 }

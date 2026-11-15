@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class SkipStopTest {
 
@@ -33,6 +34,7 @@ class SkipStopTest {
                 SimulationEngine engine = delayed(s);
                 engine.run(1800, 1);
                 assertThat(skips(engine)).as(s.name()).isEmpty();
+                assertThat(engine.snapshot().metrics().stopsSkipped()).as(s.name()).isZero();
             }
         }
     }
@@ -78,6 +80,12 @@ class SkipStopTest {
         // At E they get off and queue for a train back towards A, which calls at D.
         assertThat(engine.trainPassengersTo("L1-2", "D")).isZero();
         assertThat(engine.stationWaiting("E", "L1", -1, "D")).isGreaterThanOrEqualTo(carriedPast - 1e-9);
+        // Riding back along the same line is not a change of line.
+        assertThat(engine.stationCarriedPast("E")).isCloseTo(carriedPast, within(1e-9));
+        assertThat(engine.stationTransfers("E")).isZero();
+        var metrics = engine.snapshot().metrics();
+        assertThat(metrics.stopsSkipped()).isEqualTo(1);
+        assertThat(metrics.passengersCarriedPast()).isCloseTo(carriedPast, within(1e-9));
     }
 
     @Test

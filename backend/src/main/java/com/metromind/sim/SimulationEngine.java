@@ -98,6 +98,8 @@ public final class SimulationEngine {
     private boolean recordArrivals;
     /** Integral of passengers on board over time, all trains (passenger-seconds). */
     private double rideSeconds;
+    /** Stops trains have run through under a skip-stop strategy so far. */
+    private int stopsSkipped;
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -181,6 +183,7 @@ public final class SimulationEngine {
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
         this.rideSeconds = other.rideSeconds;
+        this.stopsSkipped = other.stopsSkipped;
     }
 
     /** Deep copy, used for counterfactual ("what-if") runs. */
@@ -467,6 +470,7 @@ public final class SimulationEngine {
             t.phaseRemaining = 0;
             t.holdDecided = true; // the point is to catch up, so no headway hold either
             t.skippedLastStop = true;
+            stopsSkipped++;
             emit(SimEvent.Type.TRAIN_SKIPPED_STOP, t.id, "Train %s, %.0f s late, ran through %s"
                     .formatted(t.id, t.delaySeconds, network.station(stationId).name()));
             return;
@@ -503,7 +507,12 @@ public final class SimulationEngine {
                 st.delivered += amount;
             } else {
                 st.waiting.get(next)[d] += amount;
-                st.transfers += amount;
+                // Going back along the same line only happens after being carried past a skipped stop.
+                if (next.lineId().equals(line.id())) {
+                    st.carriedPast += amount;
+                } else {
+                    st.transfers += amount;
+                }
                 st.recentTransfers.merge(next, amount, Double::sum);
             }
         }
@@ -1205,11 +1214,12 @@ public final class SimulationEngine {
         double served = stations.values().stream().mapToDouble(s -> s.served).sum();
         double delivered = stations.values().stream().mapToDouble(s -> s.delivered).sum();
         double transfers = stations.values().stream().mapToDouble(s -> s.transfers).sum();
+        double carriedPast = stations.values().stream().mapToDouble(s -> s.carriedPast).sum();
         double leftBehind = stations.values().stream().mapToDouble(s -> s.leftBehind).sum();
         double held = stations.values().stream().mapToDouble(s -> s.heldAtEntrance).sum();
         int inDepot = depot.values().stream().mapToInt(Integer::intValue).sum();
         return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind, held,
-                headwayCv(), trains.size(), inDepot);
+                headwayCv(), trains.size(), inDepot, stopsSkipped, carriedPast);
     }
 
     /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
@@ -1293,6 +1303,7 @@ public final class SimulationEngine {
 
     public double stationDelivered(String stationId) { return stations.get(stationId).delivered; }
     public double stationTransfers(String stationId) { return stations.get(stationId).transfers; }
+    public double stationCarriedPast(String stationId) { return stations.get(stationId).carriedPast; }
     public double stationLeftBehind(String stationId) { return stations.get(stationId).leftBehind; }
     public double stationHeldAtEntrance(String stationId) { return stations.get(stationId).heldAtEntrance; }
 }
