@@ -1,4 +1,4 @@
-import type { ClosureResponse, DelayImpactReport, MetroNetwork } from "./types";
+import type { ClosureResponse, DelayImpactReport, IncidentImpactReport, MetroNetwork } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? API_URL.replace(/^http/, "ws") + "/ws";
@@ -29,4 +29,15 @@ export const api = {
     call<void>("/api/incidents/station-closure", { method: "POST", body: JSON.stringify({ stationId, seconds }) }),
   analyze: (trainId: string, seconds: number) =>
     call<DelayImpactReport>("/api/analysis/delay-impact", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
+  analyzeSectionClosure: (lineId: string, fromStationId: string, toStationId: string, seconds: number,
+                          response: ClosureResponse) =>
+    call<IncidentImpactReport>("/api/analysis/section-closure-impact", {
+      method: "POST",
+      body: JSON.stringify({ lineId, fromStationId, toStationId, seconds, response }),
+    }),
+  analyzeStationClosure: (stationId: string, seconds: number) =>
+    call<IncidentImpactReport>("/api/analysis/station-closure-impact", {
+      method: "POST",
+      body: JSON.stringify({ stationId, seconds }),
+    }),
 };
