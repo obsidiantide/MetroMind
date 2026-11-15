@@ -91,7 +91,8 @@ public final class DelayPropagationAnalyzer {
                 extraRide, totalExtra + extraRide,
                 totalAbs + (perturbed.passengerRideSeconds() - live.passengerRideSeconds()) / 60.0,
                 perturbed.snapshot().metrics().headwayCoefficientOfVariation(), recovery.recoverySeconds(),
-                recovery.peakCvExcess(), perturbed.shortTurnsSince(injectedAt), trainImpacts, stationImpacts);
+                recovery.peakCvExcess(), perturbed.shortTurnsSince(injectedAt),
+                perturbed.skippedStopsSince(injectedAt), trainImpacts, stationImpacts);
     }
 
     /** Runs both engines to the horizon, sampling their headway CV to measure how the incident run recovers. */
