@@ -18,7 +18,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight |
-| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains) |
+| Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains), `DEMAND_HOLDING` (forward holding against a demand-tracking target) |
 | Incidents & failures | Inject delays or breakdowns on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
@@ -222,6 +222,17 @@ steps off to wait for that follower, and the train takes over the timetable slot
 starts its return on time. Each reversal appears as a `TRAIN_SHORT_TURNED` event. On the test line, a train held
 for 7 minutes is short-turned once, and 30 minutes later the line's worst lateness is about half of what
 balanced holding alone leaves.
+
+### Demand-tracking headway target
+
+Every strategy receives a target headway; by default it is the line's even headway (loop time divided by trains
+in service). A strategy can override `targetHeadway(evenHeadway, forecastDemandMultiplier)`, where the engine
+passes the time-of-day demand multiplier forecast 5 minutes ahead. `DEMAND_HOLDING` uses forward holding and
+keeps the even headway as its target off-peak (multiplier up to 0.8), then shrinks it with the square root of
+demand, to no less than 60 % of the even headway. In a peak every second a train is held delays a full train
+and lets platforms fill, so it trades some regularity for keeping trains moving. At night it behaves exactly
+like `FORWARD_HOLDING`; around the morning peak on the test line it cuts passengers' time on board after a
+delay compared with `FORWARD_HOLDING`.
 
 ### Strategy benchmark
 
