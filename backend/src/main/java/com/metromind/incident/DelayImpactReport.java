@@ -14,6 +14,10 @@ import java.util.List;
  * <p>Strategies are ranked by {@code totalPassengerTravelMinutes}: absolute platform wait plus time on board over
  * the horizon. Ranking by platform wait alone would favour strategies that hold trains, since a held train
  * moves waiting from the platform onto the train without making anyone's journey shorter.
+ *
+ * <p>{@code headwayRecoverySeconds} is how long after the incident the headways were back to the baseline's
+ * regularity for good (see {@link HeadwayRecovery}); {@code null} when they were still disrupted at the horizon.
+ * {@code peakHeadwayCvExcess} is the worst bunching the incident caused, as headway CV above the baseline.
  */
 public record DelayImpactReport(String trainId, double injectedDelaySeconds, double horizonSeconds,
                                 List<StrategyOutcome> outcomes, String bestStrategy) {
@@ -22,7 +26,8 @@ public record DelayImpactReport(String trainId, double injectedDelaySeconds, dou
                                   double totalExtraPassengerWaitMinutes, double totalPassengerWaitMinutes,
                                   double totalExtraRideMinutes, double totalExtraTravelMinutes,
                                   double totalPassengerTravelMinutes,
-                                  double headwayCvAtHorizon,
+                                  double headwayCvAtHorizon, Double headwayRecoverySeconds,
+                                  double peakHeadwayCvExcess,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
     }
 
