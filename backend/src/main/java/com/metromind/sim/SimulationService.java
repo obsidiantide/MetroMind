@@ -142,12 +142,13 @@ public class SimulationService {
      * copy of the live state. Like the delay analysis it never touches the live engine.
      */
     public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds,
-                                               Set<BenchmarkReport.IncidentKind> kinds) {
+                                               Set<BenchmarkReport.IncidentKind> kinds,
+                                               BenchmarkReport.RankingMetric metric) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
         }
-        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds);
+        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric);
     }
 
     /** What-if analyses run so far, most recent first. */

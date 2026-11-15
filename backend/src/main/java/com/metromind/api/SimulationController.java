@@ -153,16 +153,19 @@ public class SimulationController {
      * Strategy benchmark: runs every headway strategy against the same {@code scenarios} random incidents, drawn
      * from {@code seed}, and ranks them by mean and p95 passenger wait. {@code kinds} (comma-separated, e.g.
      * {@code DELAY,STATION_CLOSURE}) limits the incidents drawn; by default train delays, breakdowns, track-section
-     * closures and station closures are all used. Does not touch live state.
+     * closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
+     * (default) or {@code TRAVEL_TIME}. Does not touch live state.
      */
     @PostMapping("/analysis/benchmark")
     public BenchmarkReport benchmark(@RequestParam(defaultValue = "10") @Min(1) @Max(50) int scenarios,
                                      @RequestParam(defaultValue = "1") long seed,
                                      @RequestParam(defaultValue = "1800") @Min(300) @Max(3600) double horizonSeconds,
-                                     @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds) {
+                                     @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
+                                     @RequestParam(defaultValue = "WAIT_PER_BOARDING")
+                                     BenchmarkReport.RankingMetric metric) {
         Set<BenchmarkReport.IncidentKind> drawn = kinds == null || kinds.isEmpty()
                 ? EnumSet.allOf(BenchmarkReport.IncidentKind.class) : EnumSet.copyOf(kinds);
-        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn);
+        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn, metric);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
