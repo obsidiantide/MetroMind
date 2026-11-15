@@ -6,6 +6,7 @@ import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,7 +26,7 @@ class StrategyBenchmarkTest {
         assertThat(report.scenarios()).hasSize(4);
         assertThat(report.rankings()).hasSize(HeadwayStrategy.all().size());
         assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::rank)
-                .containsExactly(1, 2, 3, 4, 5);
+                .containsExactlyElementsOf(IntStream.rangeClosed(1, HeadwayStrategy.all().size()).boxed().toList());
         assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::strategy)
                 .containsExactlyInAnyOrderElementsOf(HeadwayStrategy.all().stream().map(HeadwayStrategy::name).toList());
         assertThat(report.rankings()).extracting(BenchmarkReport.StrategyRanking::meanWaitSeconds).isSorted();
