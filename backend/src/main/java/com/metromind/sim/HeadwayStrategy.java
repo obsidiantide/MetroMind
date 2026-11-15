@@ -87,7 +87,35 @@ public interface HeadwayStrategy {
         public boolean shortTurnsLateTrains() { return true; }
     };
 
+    /**
+     * Forward holding against a target that tracks forecast demand. Off-peak a train is held until the gap ahead
+     * reaches the usual share of the even headway; as demand rises the target shrinks with the square root of the
+     * demand multiplier (down to {@link #DEMAND_MIN_TARGET_FRACTION} of it), because in a peak every second of
+     * holding delays a full train and lets platforms fill up, so regularity is traded for throughput.
+     */
+    HeadwayStrategy DEMAND_HOLDING = new HeadwayStrategy() {
+        public String name() { return "DEMAND_HOLDING"; }
+        public double targetHeadway(double evenHeadway, double forecastDemandMultiplier) {
+            return evenHeadway * demandTargetFraction(forecastDemandMultiplier);
+        }
+        public double holdSeconds(double f, double b, double target) {
+            return FORWARD_HOLDING.holdSeconds(f, b, target);
+        }
+    };
+
     double MAX_HOLD_SECONDS = 120;
+    /** Demand multiplier at or below which {@link #DEMAND_HOLDING} keeps the full even headway as its target. */
+    double DEMAND_REFERENCE_MULTIPLIER = 0.8;
+    /** Smallest fraction of the even headway {@link #DEMAND_HOLDING} aims for, however high demand gets. */
+    double DEMAND_MIN_TARGET_FRACTION = 0.6;
+
+    /** Fraction of the even headway {@link #DEMAND_HOLDING} targets at the given demand multiplier. */
+    static double demandTargetFraction(double demandMultiplier) {
+        if (demandMultiplier <= DEMAND_REFERENCE_MULTIPLIER) {
+            return 1.0;
+        }
+        return Math.max(DEMAND_MIN_TARGET_FRACTION, Math.sqrt(DEMAND_REFERENCE_MULTIPLIER / demandMultiplier));
+    }
 
     private static double clamp(double v) {
         return Math.max(0, Math.min(MAX_HOLD_SECONDS, v));
@@ -100,11 +128,12 @@ public interface HeadwayStrategy {
             case "BALANCED" -> BALANCED;
             case "ADAPTIVE_DISPATCH" -> ADAPTIVE_DISPATCH;
             case "SHORT_TURN" -> SHORT_TURN;
+            case "DEMAND_HOLDING" -> DEMAND_HOLDING;
             default -> throw new IllegalArgumentException("Unknown strategy " + name);
         };
     }
 
     static java.util.List<HeadwayStrategy> all() {
-        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN);
+        return java.util.List.of(NO_CONTROL, FORWARD_HOLDING, BALANCED, ADAPTIVE_DISPATCH, SHORT_TURN, DEMAND_HOLDING);
     }
 }
