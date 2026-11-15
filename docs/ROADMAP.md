@@ -40,7 +40,7 @@ Mark items `[x]` when merged.
 - [x] Dynamic headway target that tracks predicted demand (`DEMAND_HOLDING`)
 - [x] Strategy: skip-stop (a late train runs through low-demand stations; their passengers ride on to the next stop)
 - [x] Benchmark scenarios with track-section and station closures, not only train delays and breakdowns
-- [ ] Short-turn report: count and location of short turns in what-if and benchmark results
+- [x] Short-turn report: count and location of short turns in what-if and benchmark results
 
 ### Platform
 - [ ] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
