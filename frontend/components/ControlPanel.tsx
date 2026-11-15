@@ -141,7 +141,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
             <thead>
               <tr>
                 <th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Extra on board</th>
-                <th>Total travel</th><th>Headways recover</th><th>Short turns</th>
+                <th>Total travel</th><th>Headways recover</th><th>Short turns</th><th>Skipped stops</th>
               </tr>
             </thead>
             <tbody>
@@ -168,6 +168,16 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
                     {o.shortTurns.length === 0
                       ? "–"
                       : `${o.shortTurns.length} (${distinct(o.shortTurns.map((t) => stationName.get(t.stationId) ?? t.stationId)).join(", ")})`}
+                  </td>
+                  <td
+                    title={o.skippedStops
+                      .map((s) => `${s.trainId} through ${stationName.get(s.stationId) ?? s.stationId}, ${clock(s.simTime)}, `
+                        + `${Math.round(s.passengersCarriedPast)} carried past`)
+                      .join("\n")}
+                  >
+                    {o.skippedStops.length === 0
+                      ? "–"
+                      : `${o.skippedStops.length} (${Math.round(o.skippedStops.reduce((sum, s) => sum + s.passengersCarriedPast, 0))} carried past)`}
                   </td>
                 </tr>
               ))}
