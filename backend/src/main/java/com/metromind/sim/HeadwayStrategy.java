@@ -41,6 +41,15 @@ public interface HeadwayStrategy {
         return false;
     }
 
+    /**
+     * Whether a train running behind schedule may skip a quiet intermediate stop: it runs through without opening
+     * its doors, leaving the few passengers waiting there to the train close behind it. Passengers on board for the
+     * skipped station ride on to the next stop and come back on a train in the opposite direction.
+     */
+    default boolean skipsStopsForLateTrains() {
+        return false;
+    }
+
     /** No control: trains depart as soon as dwelling is done. Bunching grows freely. */
     HeadwayStrategy NO_CONTROL = new HeadwayStrategy() {
         public String name() { return "NO_CONTROL"; }
