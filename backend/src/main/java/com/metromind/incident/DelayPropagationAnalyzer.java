@@ -50,6 +50,7 @@ public final class DelayPropagationAnalyzer {
         Map<String, Integer> startArrivals = new HashMap<>();
         live.trains().forEach(t -> startArrivals.put(t.id(), t.arrivals().size()));
         perturbed.injectDelay(trainId, delaySeconds);
+        double injectedAt = perturbed.simTime();
         HeadwayRecovery.Result recovery = runSampled(baseline, perturbed, horizon);
 
         List<DelayImpactReport.TrainImpact> trainImpacts = new ArrayList<>();
@@ -90,7 +91,7 @@ public final class DelayPropagationAnalyzer {
                 extraRide, totalExtra + extraRide,
                 totalAbs + (perturbed.passengerRideSeconds() - live.passengerRideSeconds()) / 60.0,
                 perturbed.snapshot().metrics().headwayCoefficientOfVariation(), recovery.recoverySeconds(),
-                recovery.peakCvExcess(), trainImpacts, stationImpacts);
+                recovery.peakCvExcess(), perturbed.shortTurnsSince(injectedAt), trainImpacts, stationImpacts);
     }
 
     /** Runs both engines to the horizon, sampling their headway CV to measure how the incident run recovers. */

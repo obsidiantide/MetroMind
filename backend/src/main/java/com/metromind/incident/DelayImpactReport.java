@@ -1,5 +1,7 @@
 package com.metromind.incident;
 
+import com.metromind.sim.ShortTurn;
+
 import java.util.List;
 
 /**
@@ -18,6 +20,9 @@ import java.util.List;
  * <p>{@code headwayRecoverySeconds} is how long after the incident the headways were back to the baseline's
  * regularity for good (see {@link HeadwayRecovery}); {@code null} when they were still disrupted at the horizon.
  * {@code peakHeadwayCvExcess} is the worst bunching the incident caused, as headway CV above the baseline.
+ *
+ * <p>{@code shortTurns} lists the trains the strategy reversed early during the incident run (only strategies that
+ * short-turn late trains make any), oldest first, so the report shows where service was cut back and when.
  */
 public record DelayImpactReport(String trainId, double injectedDelaySeconds, double horizonSeconds,
                                 List<StrategyOutcome> outcomes, String bestStrategy) {
@@ -27,7 +32,7 @@ public record DelayImpactReport(String trainId, double injectedDelaySeconds, dou
                                   double totalExtraRideMinutes, double totalExtraTravelMinutes,
                                   double totalPassengerTravelMinutes,
                                   double headwayCvAtHorizon, Double headwayRecoverySeconds,
-                                  double peakHeadwayCvExcess,
+                                  double peakHeadwayCvExcess, List<ShortTurn> shortTurns,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
     }
 
