@@ -395,11 +395,13 @@ public final class SimulationEngine {
      * allows it, the train is at least {@link #SKIP_STOP_LATENESS_SECONDS} late, the stop is an intermediate one
      * that is not an interchange (skipping it would strand transfers), the train did not skip its previous stop,
      * it is lagging between its neighbours (see {@link #SKIP_STOP_FOLLOWER_FRACTION}), and fewer than
-     * {@link #SKIP_STOP_MAX_PASSENGERS} passengers would board or alight here.
+     * {@link #SKIP_STOP_MAX_PASSENGERS} passengers would board or alight here. Under a strategy that also
+     * short-turns, a train late enough to be short-turned never skips: it calls so it can turn back here.
      */
     private boolean shouldSkipStop(TrainState t, Line line, StationState st) {
         if (!strategy.skipsStopsForLateTrains()
                 || t.delaySeconds < SKIP_STOP_LATENESS_SECONDS
+                || (strategy.shortTurnsLateTrains() && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS)
                 || t.skippedLastStop
                 || isTerminalStop(line, t.stop)
                 || linesByStation.get(st.id).size() > 1

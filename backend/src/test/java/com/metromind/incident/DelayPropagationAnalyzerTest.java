@@ -46,8 +46,9 @@ class DelayPropagationAnalyzerTest {
                 .analyze(live, "L1-2", 420, 1800, HeadwayStrategy.all());
 
         assertThat(report.outcomes()).allSatisfy(o -> {
-            if (o.strategy().equals("SHORT_TURN")) {
-                assertThat(o.shortTurns()).singleElement().satisfies(turn -> {
+            HeadwayStrategy strategy = HeadwayStrategy.byName(o.strategy());
+            if (strategy.shortTurnsLateTrains()) {
+                assertThat(o.shortTurns()).as(o.strategy()).singleElement().satisfies(turn -> {
                     assertThat(turn.trainId()).isEqualTo("L1-2");
                     assertThat(turn.stationId()).isEqualTo("D");
                     assertThat(turn.simTime()).isBetween(injectedAt, injectedAt + 1800);
@@ -70,8 +71,12 @@ class DelayPropagationAnalyzerTest {
                 .analyze(live, "L1-2", 240, 1800, HeadwayStrategy.all());
 
         assertThat(report.outcomes()).allSatisfy(o -> {
-            if (o.strategy().equals("SKIP_STOP")) {
-                assertThat(o.skippedStops()).isNotEmpty().allSatisfy(skip -> {
+            HeadwayStrategy strategy = HeadwayStrategy.byName(o.strategy());
+            if (strategy == HeadwayStrategy.SKIP_STOP) {
+                assertThat(o.skippedStops()).isNotEmpty();
+            }
+            if (strategy.skipsStopsForLateTrains()) {
+                assertThat(o.skippedStops()).as(o.strategy()).allSatisfy(skip -> {
                     assertThat(skip.trainId()).isEqualTo("L1-2");
                     assertThat(skip.stationId()).isNotIn("A", "F");
                     assertThat(skip.simTime()).isBetween(injectedAt, injectedAt + 1800);

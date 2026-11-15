@@ -23,11 +23,11 @@ class ShortTurnTest {
     }
 
     @Test
-    void onlyShortTurnStrategyReversesTrainsEarly() {
-        assertThat(HeadwayStrategy.SHORT_TURN.shortTurnsLateTrains()).isTrue();
+    void onlyShortTurningStrategiesReverseTrainsEarly() {
+        assertThat(HeadwayStrategy.all()).filteredOn(HeadwayStrategy::shortTurnsLateTrains)
+                .containsExactly(HeadwayStrategy.SHORT_TURN, HeadwayStrategy.SHORT_TURN_SKIP_STOP);
         for (HeadwayStrategy s : HeadwayStrategy.all()) {
-            if (s != HeadwayStrategy.SHORT_TURN) {
-                assertThat(s.shortTurnsLateTrains()).as(s.name()).isFalse();
+            if (!s.shortTurnsLateTrains()) {
                 SimulationEngine engine = delayed(s);
                 engine.run(1800, 1);
                 assertThat(shortTurns(engine)).as(s.name()).isEmpty();

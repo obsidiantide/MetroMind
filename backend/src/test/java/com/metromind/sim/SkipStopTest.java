@@ -26,11 +26,11 @@ class SkipStopTest {
     }
 
     @Test
-    void onlySkipStopStrategyRunsThroughStations() {
-        assertThat(HeadwayStrategy.SKIP_STOP.skipsStopsForLateTrains()).isTrue();
+    void onlySkipStopStrategiesRunThroughStations() {
+        assertThat(HeadwayStrategy.all()).filteredOn(HeadwayStrategy::skipsStopsForLateTrains)
+                .containsExactly(HeadwayStrategy.SKIP_STOP, HeadwayStrategy.SHORT_TURN_SKIP_STOP);
         for (HeadwayStrategy s : HeadwayStrategy.all()) {
-            if (s != HeadwayStrategy.SKIP_STOP) {
-                assertThat(s.skipsStopsForLateTrains()).as(s.name()).isFalse();
+            if (!s.skipsStopsForLateTrains()) {
                 SimulationEngine engine = delayed(s);
                 engine.run(1800, 1);
                 assertThat(skips(engine)).as(s.name()).isEmpty();
