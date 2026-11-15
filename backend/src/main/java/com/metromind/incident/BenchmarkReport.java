@@ -27,8 +27,12 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
     /**
      * @param waitSecondsPerScenario  mean wait per boarding in each scenario, in scenario order
      * @param meanTravelMinutes       mean over scenarios of total passenger time (platform wait + on board)
+     * @param meanRecoverySeconds     mean headway recovery time (see {@link HeadwayRecovery}) over the scenarios the
+     *                                strategy recovered from within the horizon; {@code null} if it recovered from none
+     * @param unrecoveredScenarios    scenarios whose headways were still disrupted at the horizon
      */
     public record StrategyRanking(int rank, String strategy, double meanWaitSeconds, double p95WaitSeconds,
-                                  double meanTravelMinutes, List<Double> waitSecondsPerScenario) {
+                                  double meanTravelMinutes, Double meanRecoverySeconds, int unrecoveredScenarios,
+                                  List<Double> waitSecondsPerScenario) {
     }
 }
