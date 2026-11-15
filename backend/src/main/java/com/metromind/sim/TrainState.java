@@ -28,6 +28,8 @@ public final class TrainState {
     boolean failed;
     boolean holdDecided;
     boolean delayAlertActive;
+    /** Whether the train ran through its last stop without calling (skip-stop); it never skips two in a row. */
+    boolean skippedLastStop;
     final List<Double> arrivals = new ArrayList<>();
 
     TrainState(String id, String lineId, int capacity, int stationCount) {
@@ -53,6 +55,7 @@ public final class TrainState {
         t.failed = failed;
         t.holdDecided = holdDecided;
         t.delayAlertActive = delayAlertActive;
+        t.skippedLastStop = skippedLastStop;
         t.arrivals.addAll(arrivals);
         return t;
     }

@@ -56,6 +56,19 @@ public final class SimulationEngine {
      * stations it abandons are served again soon.
      */
     static final double SHORT_TURN_FOLLOWER_FRACTION = 0.5;
+    /** Lateness from which strategies that skip stops let a train run through a quiet station. */
+    static final double SKIP_STOP_LATENESS_SECONDS = 120;
+    /**
+     * A stop counts as quiet when fewer passengers than this would board or alight there; skipping a busier one
+     * would cost its passengers more than the train recovers.
+     */
+    static final double SKIP_STOP_MAX_PASSENGERS = 40;
+    /**
+     * A stop is only skipped when the gap to the train behind is shorter than this fraction of the gap ahead: the
+     * train is lagging between its neighbours (lateness alone is common to every train in a busy peak), and its
+     * follower will soon serve the platform.
+     */
+    static final double SKIP_STOP_FOLLOWER_FRACTION = 0.8;
 
     private final MetroNetwork network;
     private final Map<String, Line> lines = new LinkedHashMap<>();
@@ -360,6 +373,42 @@ public final class SimulationEngine {
                 && backwardHeadway(t) < SHORT_TURN_FOLLOWER_FRACTION * targetHeadway;
     }
 
+    /**
+     * Whether a train that has just reached a platform should run through it instead of calling: the strategy
+     * allows it, the train is at least {@link #SKIP_STOP_LATENESS_SECONDS} late, the stop is an intermediate one
+     * that is not an interchange (skipping it would strand transfers), the train did not skip its previous stop,
+     * it is lagging between its neighbours (see {@link #SKIP_STOP_FOLLOWER_FRACTION}), and fewer than
+     * {@link #SKIP_STOP_MAX_PASSENGERS} passengers would board or alight here.
+     */
+    private boolean shouldSkipStop(TrainState t, Line line, StationState st) {
+        if (!strategy.skipsStopsForLateTrains()
+                || t.delaySeconds < SKIP_STOP_LATENESS_SECONDS
+                || t.skippedLastStop
+                || isTerminalStop(line, t.stop)
+                || linesByStation.get(st.id).size() > 1
+                || trainsInService(line.id()) < 2) {
+            return false;
+        }
+        if (backwardHeadway(t) >= SKIP_STOP_FOLLOWER_FRACTION * forwardHeadway(t)) {
+            return false;
+        }
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        double boarding = queue == null ? 0 : StationState.sum(queue);
+        return boarding + alightingAt(t, line) < SKIP_STOP_MAX_PASSENGERS;
+    }
+
+    /** Passengers on {@code t} who would leave the train if it called at its current stop. */
+    private double alightingAt(TrainState t, Line line) {
+        boolean[] stays = routes.staysAboard(routes.lineIndex(line.id()), t.stop);
+        double alighting = 0;
+        for (int d = 0; d < t.onboard.length; d++) {
+            if (!stays[d]) {
+                alighting += t.onboard[d];
+            }
+        }
+        return alighting;
+    }
+
     private static boolean isTerminalStop(Line line, int stop) {
         return stop == 0 || stop == line.stationIds().size() - 1;
     }
@@ -414,6 +463,15 @@ public final class SimulationEngine {
             return;
         }
         StationState st = stations.get(stationId);
+        if (shouldSkipStop(t, line, st)) {
+            t.phaseRemaining = 0;
+            t.holdDecided = true; // the point is to catch up, so no headway hold either
+            t.skippedLastStop = true;
+            emit(SimEvent.Type.TRAIN_SKIPPED_STOP, t.id, "Train %s, %.0f s late, ran through %s"
+                    .formatted(t.id, t.delaySeconds, network.station(stationId).name()));
+            return;
+        }
+        t.skippedLastStop = false;
         double alight = alight(t, line, st);
         double board = board(t, line, st);
 
