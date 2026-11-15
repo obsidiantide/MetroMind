@@ -44,6 +44,8 @@ export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;
   totalPassengerWaitMinutes: number; totalExtraRideMinutes: number; totalExtraTravelMinutes: number;
   totalPassengerTravelMinutes: number; headwayCvAtHorizon: number;
+  /** Seconds until headways were back to baseline regularity; null if still disrupted at the horizon. */
+  headwayRecoverySeconds: number | null; peakHeadwayCvExcess: number;
   trains: { trainId: string; extraDelaySeconds: number }[];
   stations: { stationId: string; extraWaitMinutes: number; peakWaitingDelta: number }[];
 }
