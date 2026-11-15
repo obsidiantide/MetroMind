@@ -223,6 +223,17 @@ starts its return on time. Each reversal appears as a `TRAIN_SHORT_TURNED` event
 for 7 minutes is short-turned once, and 30 minutes later the line's worst lateness is about half of what
 balanced holding alone leaves.
 
+The engine logs every short turn (train, line, station, time, lateness; the last 1000 are kept). Each what-if
+outcome lists the turns its strategy made during the incident run under `shortTurns`, and each benchmark
+ranking reports `meanShortTurns` per scenario and `shortTurnsByStation`, the count at each station over all
+scenarios, most first:
+
+```json
+{ "strategy": "SHORT_TURN", "meanShortTurns": 0.5, "shortTurnsByStation": { "R4": 2, "R5": 1 } }
+```
+
+The dashboard's what-if table shows the count and stations per strategy.
+
 ### Skip-stop for recovery
 
 Under the `SKIP_STOP` strategy a train that is at least 2 minutes behind its timetable may run through an
