@@ -23,6 +23,8 @@ const STRATEGY_HELP: Record<string, string> = {
     "Forward holding against a target that shrinks as demand rises, so peak trains are held less and keep moving.",
   SKIP_STOP:
     "Balanced holding; a late train lagging between its neighbours runs through quiet stops, and its follower serves them.",
+  SHORT_TURN_SKIP_STOP:
+    "Balanced holding; a train 2–4 min late skips quiet stops, and one 4+ min late calls at every stop so it can short-turn.",
 };
 
 /** Simulated seconds since midnight as HH:MM. */
