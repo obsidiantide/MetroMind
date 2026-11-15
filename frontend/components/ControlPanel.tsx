@@ -18,6 +18,16 @@ const STRATEGY_HELP: Record<string, string> = {
     "Balanced holding; a late train lagging between its neighbours runs through quiet stops, and its follower serves them.",
 };
 
+/** Simulated seconds since midnight as HH:MM. */
+function clock(simTime: number): string {
+  const minutes = Math.floor(simTime / 60) % (24 * 60);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function distinct(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
 export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
@@ -131,7 +141,7 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
             <thead>
               <tr>
                 <th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Extra on board</th>
-                <th>Total travel</th><th>Headways recover</th>
+                <th>Total travel</th><th>Headways recover</th><th>Short turns</th>
               </tr>
             </thead>
             <tbody>
@@ -149,6 +159,15 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
                       : o.headwayRecoverySeconds === 0
                         ? "unaffected"
                         : `${Math.round(o.headwayRecoverySeconds / 60)} min`}
+                  </td>
+                  <td
+                    title={o.shortTurns
+                      .map((t) => `${t.trainId} at ${stationName.get(t.stationId) ?? t.stationId}, ${clock(t.simTime)}`)
+                      .join("\n")}
+                  >
+                    {o.shortTurns.length === 0
+                      ? "–"
+                      : `${o.shortTurns.length} (${distinct(o.shortTurns.map((t) => stationName.get(t.stationId) ?? t.stationId)).join(", ")})`}
                   </td>
                 </tr>
               ))}
