@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 /** Owns the live engine, advances it on a timer and fans snapshots out to listeners. */
 @Service
@@ -127,12 +128,13 @@ public class SimulationService {
      * Ranks every headway strategy over {@code scenarios} random incidents drawn from {@code seed}, starting from a
      * copy of the live state. Like the delay analysis it never touches the live engine.
      */
-    public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds) {
+    public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds,
+                                               Set<BenchmarkReport.IncidentKind> kinds) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
         }
-        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all());
+        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds);
     }
 
     /** What-if analyses run so far, most recent first. */
