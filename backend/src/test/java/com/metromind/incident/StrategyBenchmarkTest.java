@@ -1,11 +1,15 @@
 package com.metromind.incident;
 
+import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationEngine;
+import com.metromind.sim.SimulationSnapshot;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +106,72 @@ class StrategyBenchmarkTest {
                         .isBetween(StrategyBenchmark.MIN_CLOSURE_SECONDS, StrategyBenchmark.MAX_CLOSURE_SECONDS);
             }
         });
+    }
+
+    @Test
+    void closureScenariosNameAdjacentStationsOrAStationOfTheNetwork() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.twoLines(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        List<BenchmarkReport.Scenario> scenarios = StrategyBenchmark.drawScenarios(live, 40, 3,
+                EnumSet.of(BenchmarkReport.IncidentKind.SECTION_CLOSURE, BenchmarkReport.IncidentKind.STATION_CLOSURE));
+        assertThat(scenarios).extracting(BenchmarkReport.Scenario::kind)
+                .containsOnly(BenchmarkReport.IncidentKind.SECTION_CLOSURE, BenchmarkReport.IncidentKind.STATION_CLOSURE)
+                .contains(BenchmarkReport.IncidentKind.SECTION_CLOSURE, BenchmarkReport.IncidentKind.STATION_CLOSURE);
+        assertThat(scenarios).extracting(BenchmarkReport.Scenario::lineId).contains("L1", "L2");
+        assertThat(scenarios).allSatisfy(s -> {
+            assertThat(s.trainId()).isNull();
+            if (s.kind() == BenchmarkReport.IncidentKind.SECTION_CLOSURE) {
+                List<String> ids = live.network().line(s.lineId()).stationIds();
+                int from = ids.indexOf(s.fromStationId());
+                assertThat(from).isNotNegative();
+                assertThat(ids.indexOf(s.toStationId())).isEqualTo(from + 1);
+                assertThat(s.response()).isNotNull();
+                assertThat(s.stationId()).isNull();
+            } else {
+                assertThat(s.stationId()).isIn("A", "B", "C", "D", "E", "F", "X", "Y");
+                assertThat(s.lineId()).isNull();
+            }
+        });
+        assertThat(scenarios).extracting(BenchmarkReport.Scenario::response)
+                .contains(ClosureResponse.WAIT, ClosureResponse.TURN_BACK);
+    }
+
+    @Test
+    void onlyTheRequestedKindsAreDrawn() {
+        List<BenchmarkReport.Scenario> delays = StrategyBenchmark.drawScenarios(live(), 10, 1,
+                EnumSet.of(BenchmarkReport.IncidentKind.DELAY));
+        assertThat(delays).extracting(BenchmarkReport.Scenario::kind).containsOnly(BenchmarkReport.IncidentKind.DELAY);
+        assertThatThrownBy(() -> StrategyBenchmark.drawScenarios(live(), 1, 1,
+                EnumSet.noneOf(BenchmarkReport.IncidentKind.class)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void closureScenariosAreRunInsteadOfTrainIncidents() {
+        SimulationEngine live = live();
+        Set<BenchmarkReport.IncidentKind> trains = EnumSet.of(BenchmarkReport.IncidentKind.DELAY);
+        BenchmarkReport closures = new StrategyBenchmark().run(live, 3, 9, 1200, List.of(HeadwayStrategy.BALANCED),
+                EnumSet.of(BenchmarkReport.IncidentKind.SECTION_CLOSURE, BenchmarkReport.IncidentKind.STATION_CLOSURE));
+        BenchmarkReport delays = new StrategyBenchmark().run(live, 3, 9, 1200, List.of(HeadwayStrategy.BALANCED),
+                trains);
+        assertThat(closures.scenarios()).noneMatch(s -> s.kind() == BenchmarkReport.IncidentKind.DELAY);
+        assertThat(closures.rankings().get(0).waitSecondsPerScenario()).hasSize(3)
+                .allSatisfy(w -> assertThat(w).isPositive());
+        // Same seed, different kinds: different incidents, so different results.
+        assertThat(closures.rankings().get(0).meanWaitSeconds())
+                .isNotEqualTo(delays.rankings().get(0).meanWaitSeconds());
+    }
+
+    @Test
+    void closureScenariosAreDeterministicAndLeaveTheLiveEngineOpen() {
+        SimulationEngine live = live();
+        Set<BenchmarkReport.IncidentKind> kinds =
+                EnumSet.of(BenchmarkReport.IncidentKind.SECTION_CLOSURE, BenchmarkReport.IncidentKind.STATION_CLOSURE);
+        List<HeadwayStrategy> two = List.of(HeadwayStrategy.BALANCED, HeadwayStrategy.SKIP_STOP);
+        BenchmarkReport first = new StrategyBenchmark().run(live, 4, 21, 900, two, kinds);
+        BenchmarkReport second = new StrategyBenchmark().run(live, 4, 21, 900, two, kinds);
+        assertThat(second).isEqualTo(first);
+        assertThat(live.snapshot().closedSections()).isEmpty();
+        assertThat(live.snapshot().stations()).noneMatch(SimulationSnapshot.StationView::closed);
     }
 
     @Test
