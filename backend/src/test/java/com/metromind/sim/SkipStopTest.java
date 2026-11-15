@@ -35,6 +35,7 @@ class SkipStopTest {
                 engine.run(1800, 1);
                 assertThat(skips(engine)).as(s.name()).isEmpty();
                 assertThat(engine.snapshot().metrics().stopsSkipped()).as(s.name()).isZero();
+                assertThat(engine.skippedStops()).as(s.name()).isEmpty();
             }
         }
     }
@@ -86,6 +87,41 @@ class SkipStopTest {
         var metrics = engine.snapshot().metrics();
         assertThat(metrics.stopsSkipped()).isEqualTo(1);
         assertThat(metrics.passengersCarriedPast()).isCloseTo(carriedPast, within(1e-9));
+    }
+
+    @Test
+    void eachSkippedStopIsLoggedWithThePassengersCarriedPast() {
+        SimulationEngine engine = delayed(HeadwayStrategy.SKIP_STOP);
+        double before = engine.simTime();
+        int guard = 0;
+        while (engine.skippedStops().isEmpty() && guard++ < 1800) {
+            engine.step(1);
+        }
+        double carriedPast = engine.trainPassengersTo("L1-2", "D");
+        assertThat(engine.skippedStops()).singleElement().satisfies(skip -> {
+            assertThat(skip.trainId()).isEqualTo("L1-2");
+            assertThat(skip.lineId()).isEqualTo("L1");
+            assertThat(skip.stationId()).isEqualTo("D");
+            assertThat(skip.simTime()).isBetween(before, engine.simTime());
+            assertThat(skip.latenessSeconds()).isGreaterThanOrEqualTo(SimulationEngine.SKIP_STOP_LATENESS_SECONDS);
+            assertThat(skip.passengersCarriedPast()).isPositive().isCloseTo(carriedPast, within(1e-9));
+        });
+        assertThat(engine.skippedStopsSince(before)).isEqualTo(engine.skippedStops());
+        assertThat(engine.skippedStopsSince(engine.simTime() + 1)).isEmpty();
+        // The log and the metric count the same skips.
+        engine.run(1800, 1);
+        assertThat(engine.skippedStops()).hasSize(engine.snapshot().metrics().stopsSkipped());
+    }
+
+    @Test
+    void copiesKeepTheSkippedStopLogSoFarButNotLaterSkips() {
+        SimulationEngine engine = delayed(HeadwayStrategy.SKIP_STOP);
+        SimulationEngine before = engine.copy();
+        engine.run(1800, 1);
+        SimulationEngine after = engine.copy();
+        assertThat(engine.skippedStops()).isNotEmpty();
+        assertThat(before.skippedStops()).isEmpty();
+        assertThat(after.skippedStops()).isEqualTo(engine.skippedStops());
     }
 
     @Test
