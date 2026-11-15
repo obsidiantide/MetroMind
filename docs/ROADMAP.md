@@ -47,7 +47,7 @@ Mark items `[x]` when merged.
 - [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
 
 ### Platform
-- [ ] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
+- [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
 - [ ] Redis-backed snapshot replay / time travel (store last N minutes)
 - [ ] PostGIS queries: nearest station to a point, stations within radius (`ST_DWithin`) exposed via API
 - [ ] OpenAPI (springdoc) documentation
