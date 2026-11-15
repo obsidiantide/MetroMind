@@ -14,14 +14,25 @@ import java.util.Map;
  * <p>For each scenario and strategy the benchmark measures the mean platform wait per boarding over the horizon:
  * passenger-seconds spent waiting at stations divided by the passengers who boarded a train. {@code meanWaitSeconds}
  * averages that over the scenarios and {@code p95WaitSeconds} is its 95th percentile (nearest rank), the
- * "bad day" a strategy has to live with. Rankings are by mean, then p95, then name, so ties are deterministic.
+ * "bad day" a strategy has to live with. With the default {@link RankingMetric#WAIT_PER_BOARDING} rankings are by
+ * that mean, then its p95, then name; with {@link RankingMetric#TRAVEL_TIME} they are by mean total passenger time
+ * (platform wait + on board), then its p95, then name. Either way ties are deterministic.
  *
  * @param seed       seed the scenarios were drawn with; the same seed and starting state give the same report
+ * @param metric     what the rankings are ordered by
  * @param scenarios  the incidents every strategy was run against
  * @param rankings   one entry per strategy, best first
  */
-public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> scenarios,
+public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
                               List<StrategyRanking> rankings) {
+
+    /** What strategies are ranked by. */
+    public enum RankingMetric {
+        /** Mean platform wait per boarding: how long the average passenger stood on a platform. */
+        WAIT_PER_BOARDING,
+        /** Total passenger time (platform wait + on board): also counts time lost to holding, detours and skips. */
+        TRAVEL_TIME
+    }
 
     public enum IncidentKind { DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE }
 
@@ -63,6 +74,7 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
     /**
      * @param waitSecondsPerScenario  mean wait per boarding in each scenario, in scenario order
      * @param meanTravelMinutes       mean over scenarios of total passenger time (platform wait + on board)
+     * @param p95TravelMinutes        95th percentile (nearest rank) of total passenger time over the scenarios
      * @param meanRecoverySeconds     mean headway recovery time (see {@link HeadwayRecovery}) over the scenarios the
      *                                strategy recovered from within the horizon; {@code null} if it recovered from none
      * @param unrecoveredScenarios    scenarios whose headways were still disrupted at the horizon
@@ -77,7 +89,8 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
      * @param stopsSkippedByStation   skipped stops over all scenarios by station, most first (ties by station id)
      */
     public record StrategyRanking(int rank, String strategy, double meanWaitSeconds, double p95WaitSeconds,
-                                  double meanTravelMinutes, Double meanRecoverySeconds, int unrecoveredScenarios,
+                                  double meanTravelMinutes, double p95TravelMinutes,
+                                  Double meanRecoverySeconds, int unrecoveredScenarios,
                                   double meanShortTurns, Map<String, Integer> shortTurnsByStation,
                                   double meanStopsSkipped, double meanPassengersCarriedPast,
                                   Map<String, Integer> stopsSkippedByStation,
@@ -86,7 +99,7 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
         /** The same ranking at position {@code newRank}. */
         public StrategyRanking withRank(int newRank) {
             return new StrategyRanking(newRank, strategy, meanWaitSeconds, p95WaitSeconds, meanTravelMinutes,
-                    meanRecoverySeconds, unrecoveredScenarios, meanShortTurns, shortTurnsByStation,
+                    p95TravelMinutes, meanRecoverySeconds, unrecoveredScenarios, meanShortTurns, shortTurnsByStation,
                     meanStopsSkipped, meanPassengersCarriedPast, stopsSkippedByStation, waitSecondsPerScenario);
         }
     }
