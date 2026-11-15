@@ -22,6 +22,8 @@ public final class DelayPropagationAnalyzer {
 
     static final double AFFECTED_THRESHOLD_SECONDS = 15;
     private static final double DT = 1.0;
+    /** Interval at which both runs' headway CV is sampled to measure recovery. */
+    static final double RECOVERY_SAMPLE_SECONDS = 30;
 
     public DelayImpactReport analyze(SimulationEngine live, String trainId, double delaySeconds,
                                      double horizonSeconds, List<HeadwayStrategy> strategies) {
@@ -48,8 +50,7 @@ public final class DelayPropagationAnalyzer {
         Map<String, Integer> startArrivals = new HashMap<>();
         live.trains().forEach(t -> startArrivals.put(t.id(), t.arrivals().size()));
         perturbed.injectDelay(trainId, delaySeconds);
-        baseline.run(horizon, DT);
-        perturbed.run(horizon, DT);
+        HeadwayRecovery.Result recovery = runSampled(baseline, perturbed, horizon);
 
         List<DelayImpactReport.TrainImpact> trainImpacts = new ArrayList<>();
         // Pair trains by id: a strategy that dispatches or withdraws trains can leave the two runs with different
@@ -88,7 +89,27 @@ public final class DelayPropagationAnalyzer {
         return new DelayImpactReport.StrategyOutcome(strategy.name(), affected, max, totalExtra, totalAbs,
                 extraRide, totalExtra + extraRide,
                 totalAbs + (perturbed.passengerRideSeconds() - live.passengerRideSeconds()) / 60.0,
-                perturbed.snapshot().metrics().headwayCoefficientOfVariation(), trainImpacts, stationImpacts);
+                perturbed.snapshot().metrics().headwayCoefficientOfVariation(), recovery.recoverySeconds(),
+                recovery.peakCvExcess(), trainImpacts, stationImpacts);
+    }
+
+    /**
+     * Runs both engines to the horizon, sampling their headway CV every {@link #RECOVERY_SAMPLE_SECONDS}. Running in
+     * chunks steps the engines exactly as one long run would, so sampling does not change the result.
+     */
+    static HeadwayRecovery.Result runSampled(SimulationEngine baseline, SimulationEngine incident, double horizon) {
+        List<Double> baseCv = new ArrayList<>(List.of(baseline.headwayCv()));
+        List<Double> incidentCv = new ArrayList<>(List.of(incident.headwayCv()));
+        double elapsed = 0;
+        while (elapsed < horizon - 1e-9) {
+            double chunk = Math.min(RECOVERY_SAMPLE_SECONDS, horizon - elapsed);
+            baseline.run(chunk, DT);
+            incident.run(chunk, DT);
+            elapsed += chunk;
+            baseCv.add(baseline.headwayCv());
+            incidentCv.add(incident.headwayCv());
+        }
+        return HeadwayRecovery.measure(baseCv, incidentCv, RECOVERY_SAMPLE_SECONDS);
     }
 
     /**
