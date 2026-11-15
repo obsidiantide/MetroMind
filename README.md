@@ -63,9 +63,10 @@ a late train catch up, so a four-minute delay leaves a gap that only layover sla
             │  SimulationEngine ──► SimulationService (@Scheduled tick)            │
  Next.js ◄──┤        │                      │                                     │
  (STOMP/WS) │  DelayPropagationAnalyzer     ├──► WebSocket  /topic/state          │
-            │  HeadwayStrategy              ├──► Kafka      metromind.train-positions, metromind.events
+            │  HeadwayStrategy              ├──► Kafka      metromind.train-positions, metromind.events,
+            │                               │               metromind.network-metrics ──► TelemetryKpiConsumer
  REST ─────►│  REST /api/*                  ├──► Redis      metromind:snapshot, metromind:station-waiting
-            │                               └──► PostGIS    station, line, incident │
+            │                               └──► PostGIS    station, line, incident, minute_kpi │
             └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -110,6 +111,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
+| GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
 WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/state`.
@@ -359,6 +361,23 @@ how trains react (`"detail": "R4-R5, TURN_BACK"`). Each delay what-if analysis i
 With persistence enabled they are stored in PostgreSQL (`incident` and `incident_analysis`, the report as
 JSONB) and survive restarts; in the `standalone` profile the last 500 incidents and 50 analyses are kept in
 memory.
+
+### Per-minute KPIs
+
+`TelemetryKpiConsumer` (consumer group `metromind-kpi`) reads the three telemetry topics and folds them into one
+row per minute of simulated time: trains reporting, mean and worst lateness, mean load factor, mean and peak
+passengers waiting, mean headway CV, delay alerts raised and incidents started. It only depends on the topics, so
+it can run in an instance of its own. Kafka spreads trains over partitions, so messages arrive slightly out of
+order: a minute stays open until the newest message is 30 s past its end, and anything later for it is dropped
+(and counted). Closed minutes go to the `minute_kpi` table; re-aggregating a minute overwrites it. Without Kafka
+(`standalone`) the simulator feeds the same aggregator directly and the last 24 hours are kept in memory.
+
+```json
+GET /api/kpis?limit=1
+[{ "minute": 485, "clock": "08:05", "trainsReporting": 18, "averageDelaySeconds": 12.4, "maxDelaySeconds": 96.0,
+   "averageLoadFactor": 0.41, "averageWaiting": 1310.5, "maxWaiting": 1342.0, "averageHeadwayCv": 0.08,
+   "delayAlerts": 0, "incidents": 0 }]
+```
 
 ## Project layout
 
