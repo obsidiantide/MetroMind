@@ -5,6 +5,7 @@ import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.DelayPropagationAnalyzer;
 import com.metromind.incident.IncidentHistory;
+import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.incident.StrategyBenchmark;
 import com.metromind.network.MetroNetwork;
@@ -122,6 +123,18 @@ public class SimulationService {
         DelayImpactReport report = analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all());
         history.recordAnalysis(fork.simTime(), report);
         return report;
+    }
+
+    /**
+     * What-if for any incident, such as a track-section or station closure, compared across every headway strategy
+     * from a copy of the live state. Unlike delay analyses these reports are not kept in the history.
+     */
+    public IncidentImpactReport analyzeIncident(BenchmarkReport.Scenario incident, double horizonSeconds) {
+        SimulationEngine fork;
+        synchronized (engine) {
+            fork = engine.copy();
+        }
+        return analyzer.analyze(fork, incident, horizonSeconds, HeadwayStrategy.all());
     }
 
     /**
