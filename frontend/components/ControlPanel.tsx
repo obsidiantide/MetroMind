@@ -14,6 +14,8 @@ const STRATEGY_HELP: Record<string, string> = {
     "Balanced holding; a train running 4+ min late with a follower close behind reverses early to recover its timetable.",
   DEMAND_HOLDING:
     "Forward holding against a target that shrinks as demand rises, so peak trains are held less and keep moving.",
+  SKIP_STOP:
+    "Balanced holding; a late train lagging between its neighbours runs through quiet stops, and its follower serves them.",
 };
 
 export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
