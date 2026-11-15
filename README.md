@@ -65,7 +65,8 @@ a late train catch up, so a four-minute delay leaves a gap that only layover sla
  (STOMP/WS) │  DelayPropagationAnalyzer     ├──► WebSocket  /topic/state          │
             │  HeadwayStrategy              ├──► Kafka      metromind.train-positions, metromind.events,
             │                               │               metromind.network-metrics ──► TelemetryKpiConsumer
- REST ─────►│  REST /api/*                  ├──► Redis      metromind:snapshot, metromind:station-waiting
+ REST ─────►│  REST /api/*                  ├──► Redis      metromind:snapshot, metromind:station-waiting,
+            │                               │               metromind:replay
             │                               └──► PostGIS    station, line, incident, minute_kpi │
             └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -112,6 +113,8 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
+| GET | `/api/replay/range` | Span of simulated time that can be replayed (`204` before the first snapshot) |
+| GET | `/api/replay?at=29000` | Snapshot as it was at a past simulated time |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
 WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/state`.
@@ -378,6 +381,17 @@ GET /api/kpis?limit=1
    "averageLoadFactor": 0.41, "averageWaiting": 1310.5, "maxWaiting": 1342.0, "averageHeadwayCv": 0.08,
    "delayAlerts": 0, "incidents": 0 }]
 ```
+
+### Replay and time travel
+
+The last `metromind.replay.retention-minutes` (30) of simulated time are kept as full snapshots, one every
+`metromind.replay.interval-seconds` (10) of simulated time; a paused clock stores nothing new. With Redis they
+live in the sorted set `metromind:replay`, scored by simulated time, so other services can replay them too; in
+`standalone` they stay in memory. A restarted simulator starts a new timeline and clears the set.
+
+`GET /api/replay/range` returns `{ "fromSimTime": 27000, "toSimTime": 28800, "snapshots": 181 }`, and
+`GET /api/replay?at=27950` returns the newest kept snapshot taken at or before that time, in the same shape as
+`/api/state` (`404` if it is older than the range).
 
 ## Project layout
 
