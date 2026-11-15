@@ -1151,7 +1151,7 @@ public final class SimulationEngine {
     }
 
     /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
-    double headwayCv() {
+    public double headwayCv() {
         List<Double> cvs = new ArrayList<>();
         for (Line line : lines.values()) {
             List<TrainState> lt = trains.stream().filter(t -> t.lineId.equals(line.id()))
