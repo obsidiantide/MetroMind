@@ -4,14 +4,19 @@ import com.metromind.network.Line;
 import com.metromind.network.Station;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.ShortTurn;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.TrainState;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Random;
 
@@ -63,10 +68,13 @@ public final class StrategyBenchmark {
                     RECOVERY_SAMPLE_SECONDS, DT);
             double recoverySum = 0;
             int recovered = 0;
+            Map<String, Integer> turnsByStation = new HashMap<>();
+            int turns = 0;
             for (BenchmarkReport.Scenario scenario : scenarios) {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
                 inject(run, scenario);
+                double injectedAt = run.simTime();
                 HeadwayRecovery.Result recovery = HeadwayRecovery.measure(baselineCv,
                         HeadwayRecovery.sampleHeadwayCv(run, horizonSeconds, RECOVERY_SAMPLE_SECONDS, DT),
                         RECOVERY_SAMPLE_SECONDS);
@@ -78,11 +86,16 @@ public final class StrategyBenchmark {
                 double waited = totalWaitSeconds(run) - startWait;
                 waits.add(boarded > 0 ? waited / boarded : 0);
                 travelMinutes += (waited + run.passengerRideSeconds() - startRide) / 60.0;
+                for (ShortTurn turn : run.shortTurnsSince(injectedAt)) {
+                    turnsByStation.merge(turn.stationId(), 1, Integer::sum);
+                    turns++;
+                }
             }
             double mean = waits.stream().mapToDouble(Double::doubleValue).average().orElse(0);
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
                     travelMinutes / scenarios.size(), recovered > 0 ? recoverySum / recovered : null,
-                    scenarios.size() - recovered, List.copyOf(waits)));
+                    scenarios.size() - recovered, (double) turns / scenarios.size(), mostFirst(turnsByStation),
+                    List.copyOf(waits)));
         }
         unranked.sort(Comparator.comparingDouble(BenchmarkReport.StrategyRanking::meanWaitSeconds)
                 .thenComparingDouble(BenchmarkReport.StrategyRanking::p95WaitSeconds)
@@ -92,7 +105,7 @@ public final class StrategyBenchmark {
             BenchmarkReport.StrategyRanking r = unranked.get(i);
             rankings.add(new BenchmarkReport.StrategyRanking(i + 1, r.strategy(), r.meanWaitSeconds(),
                     r.p95WaitSeconds(), r.meanTravelMinutes(), r.meanRecoverySeconds(), r.unrecoveredScenarios(),
-                    r.waitSecondsPerScenario()));
+                    r.meanShortTurns(), r.shortTurnsByStation(), r.waitSecondsPerScenario()));
         }
         return new BenchmarkReport(seed, horizonSeconds, scenarios, rankings);
     }
@@ -154,6 +167,15 @@ public final class StrategyBenchmark {
                     scenario.toStationId(), scenario.seconds(), scenario.response());
             case STATION_CLOSURE -> engine.closeStation(scenario.stationId(), scenario.seconds());
         }
+    }
+
+    /** Counts ordered from highest to lowest, ties by key, in an insertion-ordered map. */
+    static Map<String, Integer> mostFirst(Map<String, Integer> counts) {
+        Map<String, Integer> ordered = new LinkedHashMap<>();
+        counts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .forEach(e -> ordered.put(e.getKey(), e.getValue()));
+        return Collections.unmodifiableMap(ordered);
     }
 
     /** Passenger-seconds waited at all stations so far, on platforms or at entrances. */
