@@ -38,6 +38,8 @@ export interface Snapshot {
     averageDelaySeconds: number; maxDelaySeconds: number; totalWaiting: number; passengersServed: number;
     passengersDelivered: number; transfers: number; passengersLeftBehind: number; passengersHeldAtEntrance: number;
     headwayCoefficientOfVariation: number; trainsInService: number; trainsInDepot: number;
+    /** Stops run through under SKIP_STOP, and passengers who had to ride back to a skipped station. */
+    stopsSkipped: number; passengersCarriedPast: number;
   };
 }
 export interface StrategyOutcome {
