@@ -60,6 +60,31 @@ class DelayPropagationAnalyzerTest {
     }
 
     @Test
+    void skippedStopsDuringTheIncidentRunAreReportedPerStrategy() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLineWithQuietStop(), 8 * 3600,
+                HeadwayStrategy.NO_CONTROL);
+        live.run(900, 1);
+        double injectedAt = live.simTime();
+
+        DelayImpactReport report = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-2", 240, 1800, HeadwayStrategy.all());
+
+        assertThat(report.outcomes()).allSatisfy(o -> {
+            if (o.strategy().equals("SKIP_STOP")) {
+                assertThat(o.skippedStops()).isNotEmpty().allSatisfy(skip -> {
+                    assertThat(skip.trainId()).isEqualTo("L1-2");
+                    assertThat(skip.stationId()).isNotIn("A", "F");
+                    assertThat(skip.simTime()).isBetween(injectedAt, injectedAt + 1800);
+                    assertThat(skip.passengersCarriedPast()).isNotNegative();
+                });
+            } else {
+                assertThat(o.skippedStops()).as(o.strategy()).isEmpty();
+            }
+        });
+        assertThat(live.skippedStops()).isEmpty();
+    }
+
+    @Test
     void trainStuckBetweenStationsKeepsItsPassengersWaitingOnBoard() {
         SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
         live.run(900, 1);
