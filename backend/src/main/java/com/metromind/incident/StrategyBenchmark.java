@@ -102,10 +102,7 @@ public final class StrategyBenchmark {
                 .thenComparing(BenchmarkReport.StrategyRanking::strategy));
         List<BenchmarkReport.StrategyRanking> rankings = new ArrayList<>();
         for (int i = 0; i < unranked.size(); i++) {
-            BenchmarkReport.StrategyRanking r = unranked.get(i);
-            rankings.add(new BenchmarkReport.StrategyRanking(i + 1, r.strategy(), r.meanWaitSeconds(),
-                    r.p95WaitSeconds(), r.meanTravelMinutes(), r.meanRecoverySeconds(), r.unrecoveredScenarios(),
-                    r.meanShortTurns(), r.shortTurnsByStation(), r.waitSecondsPerScenario()));
+            rankings.add(unranked.get(i).withRank(i + 1));
         }
         return new BenchmarkReport(seed, horizonSeconds, scenarios, rankings);
     }

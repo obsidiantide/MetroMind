@@ -64,5 +64,12 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
                                   double meanTravelMinutes, Double meanRecoverySeconds, int unrecoveredScenarios,
                                   double meanShortTurns, Map<String, Integer> shortTurnsByStation,
                                   List<Double> waitSecondsPerScenario) {
+
+        /** The same ranking at position {@code newRank}. */
+        public StrategyRanking withRank(int newRank) {
+            return new StrategyRanking(newRank, strategy, meanWaitSeconds, p95WaitSeconds, meanTravelMinutes,
+                    meanRecoverySeconds, unrecoveredScenarios, meanShortTurns, shortTurnsByStation,
+                    waitSecondsPerScenario);
+        }
     }
 }
