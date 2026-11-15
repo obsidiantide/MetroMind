@@ -45,6 +45,8 @@ public final class SimulationEngine {
     private static final int MAX_EVENTS = 100;
     /** Short turns kept in {@link #shortTurns()}; older ones are only counted. */
     static final int MAX_SHORT_TURN_LOG = 1000;
+    /** Skipped stops kept in {@link #skippedStops()}; older ones are only counted. */
+    static final int MAX_SKIPPED_STOP_LOG = 1000;
     /** How often strategies that dispatch from the depot review each line's fleet, in simulated seconds. */
     static final double DISPATCH_INTERVAL_SECONDS = 60;
     /** Horizon of the overload forecast that triggers dispatching. */
@@ -104,6 +106,8 @@ public final class SimulationEngine {
     private int stopsSkipped;
     /** Most recent short turns, oldest first, at most {@link #MAX_SHORT_TURN_LOG}. */
     private final Deque<ShortTurn> shortTurnLog = new ArrayDeque<>();
+    /** Most recent skipped stops, oldest first, at most {@link #MAX_SKIPPED_STOP_LOG}. */
+    private final Deque<SkippedStop> skippedStopLog = new ArrayDeque<>();
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -189,6 +193,7 @@ public final class SimulationEngine {
         this.rideSeconds = other.rideSeconds;
         this.stopsSkipped = other.stopsSkipped;
         this.shortTurnLog.addAll(other.shortTurnLog);
+        this.skippedStopLog.addAll(other.skippedStopLog);
     }
 
     /** Deep copy, used for counterfactual ("what-if") runs. */
@@ -480,6 +485,11 @@ public final class SimulationEngine {
             t.holdDecided = true; // the point is to catch up, so no headway hold either
             t.skippedLastStop = true;
             stopsSkipped++;
+            skippedStopLog.addLast(new SkippedStop(t.id, line.id(), stationId, simTime, t.delaySeconds,
+                    alightingAt(t, line)));
+            while (skippedStopLog.size() > MAX_SKIPPED_STOP_LOG) {
+                skippedStopLog.removeFirst();
+            }
             emit(SimEvent.Type.TRAIN_SKIPPED_STOP, t.id, "Train %s, %.0f s late, ran through %s"
                     .formatted(t.id, t.delaySeconds, network.station(stationId).name()));
             return;
@@ -1282,6 +1292,14 @@ public final class SimulationEngine {
     /** Short turns made at or after simulated time {@code since}, oldest first. */
     public List<ShortTurn> shortTurnsSince(double since) {
         return shortTurnLog.stream().filter(s -> s.simTime() >= since).toList();
+    }
+
+    /** Recent skipped stops, oldest first (see {@link #MAX_SKIPPED_STOP_LOG}). */
+    public List<SkippedStop> skippedStops() { return List.copyOf(skippedStopLog); }
+
+    /** Stops skipped at or after simulated time {@code since}, oldest first. */
+    public List<SkippedStop> skippedStopsSince(double since) {
+        return skippedStopLog.stream().filter(s -> s.simTime() >= since).toList();
     }
 
     /** Passenger-seconds spent on board trains so far (running, dwelling, held or stuck). */
