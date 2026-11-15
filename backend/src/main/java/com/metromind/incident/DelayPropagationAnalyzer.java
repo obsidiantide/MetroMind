@@ -10,9 +10,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
- * Answers "train X is delayed by N seconds: how does it affect the rest of the network?".
+ * Answers "train X is delayed by N seconds: how does it affect the rest of the network?", and the same question
+ * for breakdowns and track-section or station closures.
  *
  * <p>For every headway strategy it forks the live engine twice (baseline / with incident), runs both for the
  * horizon and diffs train arrival times, passenger waiting and on-board time. The strategy with the smallest
@@ -30,16 +32,35 @@ public final class DelayPropagationAnalyzer {
         live.train(trainId); // validate early
         List<DelayImpactReport.StrategyOutcome> outcomes = new ArrayList<>();
         for (HeadwayStrategy strategy : strategies) {
-            outcomes.add(runCounterfactual(live, trainId, delaySeconds, horizonSeconds, strategy));
+            outcomes.add(runCounterfactual(live, e -> e.injectDelay(trainId, delaySeconds), horizonSeconds, strategy));
         }
-        String best = outcomes.stream()
-                .min(Comparator.comparingDouble(DelayImpactReport.StrategyOutcome::totalPassengerTravelMinutes))
-                .map(DelayImpactReport.StrategyOutcome::strategy).orElse(null);
-        return new DelayImpactReport(trainId, delaySeconds, horizonSeconds, outcomes, best);
+        return new DelayImpactReport(trainId, delaySeconds, horizonSeconds, outcomes, best(outcomes));
     }
 
-    private DelayImpactReport.StrategyOutcome runCounterfactual(SimulationEngine live, String trainId,
-                                                                double delaySeconds, double horizon,
+    /**
+     * Same comparison for any incident: closing a track section or a station, or delaying or breaking down a
+     * train. The incident is validated against {@code live} before any strategy runs.
+     */
+    public IncidentImpactReport analyze(SimulationEngine live, BenchmarkReport.Scenario incident,
+                                        double horizonSeconds, List<HeadwayStrategy> strategies) {
+        incident.applyTo(live.copy()); // validate early
+        List<DelayImpactReport.StrategyOutcome> outcomes = new ArrayList<>();
+        for (HeadwayStrategy strategy : strategies) {
+            outcomes.add(runCounterfactual(live, incident::applyTo, horizonSeconds, strategy));
+        }
+        return new IncidentImpactReport(incident, horizonSeconds, outcomes, best(outcomes));
+    }
+
+    /** Strategy with the smallest total passenger travel time; the first listed wins ties. */
+    private static String best(List<DelayImpactReport.StrategyOutcome> outcomes) {
+        return outcomes.stream()
+                .min(Comparator.comparingDouble(DelayImpactReport.StrategyOutcome::totalPassengerTravelMinutes))
+                .map(DelayImpactReport.StrategyOutcome::strategy).orElse(null);
+    }
+
+    /** Runs {@code strategy} with and without the incident that {@code inject} puts into an engine. */
+    private DelayImpactReport.StrategyOutcome runCounterfactual(SimulationEngine live,
+                                                                Consumer<SimulationEngine> inject, double horizon,
                                                                 HeadwayStrategy strategy) {
         SimulationEngine baseline = live.copy();
         SimulationEngine perturbed = live.copy();
@@ -49,7 +70,7 @@ public final class DelayPropagationAnalyzer {
         }
         Map<String, Integer> startArrivals = new HashMap<>();
         live.trains().forEach(t -> startArrivals.put(t.id(), t.arrivals().size()));
-        perturbed.injectDelay(trainId, delaySeconds);
+        inject.accept(perturbed);
         double injectedAt = perturbed.simTime();
         HeadwayRecovery.Result recovery = runSampled(baseline, perturbed, horizon);
 
