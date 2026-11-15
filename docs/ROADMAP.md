@@ -39,7 +39,7 @@ Mark items `[x]` when merged.
 - [x] Recovery-time metric: how long until headways return to normal after an incident
 - [x] Dynamic headway target that tracks predicted demand (`DEMAND_HOLDING`)
 - [x] Strategy: skip-stop (a late train runs through low-demand stations; their passengers ride on to the next stop)
-- [ ] Benchmark scenarios with track-section and station closures, not only train delays and breakdowns
+- [x] Benchmark scenarios with track-section and station closures, not only train delays and breakdowns
 - [ ] Short-turn report: count and location of short turns in what-if and benchmark results
 
 ### Platform
