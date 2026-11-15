@@ -147,4 +147,45 @@ class IncidentApiTest {
                 .andExpect(jsonPath("$[0].report.bestStrategy").isString())
                 .andExpect(jsonPath("$[0].report.outcomes.length()").value(HeadwayStrategy.all().size()));
     }
+
+    @Test
+    void whatIfForAStationClosureComparesStrategiesWithoutClosingIt() throws Exception {
+        mvc.perform(post("/api/analysis/station-closure-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stationId": "G2", "seconds": 300}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incident.kind").value("STATION_CLOSURE"))
+                .andExpect(jsonPath("$.incident.stationId").value("G2"))
+                .andExpect(jsonPath("$.incident.trainId").doesNotExist())
+                .andExpect(jsonPath("$.horizonSeconds").value(300.0))
+                .andExpect(jsonPath("$.outcomes.length()").value(HeadwayStrategy.all().size()))
+                .andExpect(jsonPath("$.outcomes[0].totalExtraTravelMinutes").isNumber())
+                .andExpect(jsonPath("$.bestStrategy").isString());
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.stations[?(@.id == 'G2')].closed", hasItem(false)));
+    }
+
+    @Test
+    void whatIfForATrackSectionClosureDefaultsToWaiting() throws Exception {
+        mvc.perform(post("/api/analysis/section-closure-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "RED", "fromStationId": "R3", "toStationId": "R4", "seconds": 300}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incident.kind").value("SECTION_CLOSURE"))
+                .andExpect(jsonPath("$.incident.response").value("WAIT"))
+                .andExpect(jsonPath("$.outcomes.length()").value(HeadwayStrategy.all().size()));
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.closedSections[*].fromStationId", not(hasItem("R3"))));
+    }
+
+    @Test
+    void whatIfRejectsSectionsThatAreNotAdjacent() throws Exception {
+        mvc.perform(post("/api/analysis/section-closure-impact").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "RED", "fromStationId": "R1", "toStationId": "R5", "seconds": 300}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("not adjacent")));
+    }
 }
