@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * Feeds telemetry into a {@link KpiAggregator} and saves every minute it closes. Fed from Kafka when it is
- * enabled ({@code TelemetryKpiConsumer}), otherwise straight from the simulator ({@code LocalKpiFeed}).
+ * enabled ({@code TelemetryKpiConsumer}), otherwise straight from the simulator ({@link LocalKpiFeed}).
  */
 @Component
 public class KpiRecorder {
