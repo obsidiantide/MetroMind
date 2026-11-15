@@ -1,6 +1,7 @@
 package com.metromind.incident;
 
 import com.metromind.sim.ShortTurn;
+import com.metromind.sim.SkippedStop;
 
 import java.util.List;
 
@@ -23,6 +24,8 @@ import java.util.List;
  *
  * <p>{@code shortTurns} lists the trains the strategy reversed early during the incident run (only strategies that
  * short-turn late trains make any), oldest first, so the report shows where service was cut back and when.
+ * {@code skippedStops} likewise lists the stations late trains ran through (only strategies that skip stops make
+ * any), with the passengers each skip carried past their stop.
  */
 public record DelayImpactReport(String trainId, double injectedDelaySeconds, double horizonSeconds,
                                 List<StrategyOutcome> outcomes, String bestStrategy) {
@@ -33,6 +36,7 @@ public record DelayImpactReport(String trainId, double injectedDelaySeconds, dou
                                   double totalPassengerTravelMinutes,
                                   double headwayCvAtHorizon, Double headwayRecoverySeconds,
                                   double peakHeadwayCvExcess, List<ShortTurn> shortTurns,
+                                  List<SkippedStop> skippedStops,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
     }
 
