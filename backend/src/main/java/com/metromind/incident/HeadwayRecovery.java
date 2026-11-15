@@ -1,5 +1,8 @@
 package com.metromind.incident;
 
+import com.metromind.sim.SimulationEngine;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -60,5 +63,23 @@ public final class HeadwayRecovery {
             return new Result(null, peak);
         }
         return new Result((lastDisrupted + 1) * sampleSeconds, peak);
+    }
+
+    /**
+     * Runs {@code engine} for {@code horizon} seconds and returns its headway CV now and after every
+     * {@code sampleSeconds}, ready for {@link #measure}. Running in chunks steps the engine exactly as one long run
+     * would, so sampling does not change the simulation.
+     */
+    public static List<Double> sampleHeadwayCv(SimulationEngine engine, double horizon, double sampleSeconds,
+                                               double dt) {
+        List<Double> samples = new ArrayList<>(List.of(engine.headwayCv()));
+        double elapsed = 0;
+        while (elapsed < horizon - 1e-9) {
+            double chunk = Math.min(sampleSeconds, horizon - elapsed);
+            engine.run(chunk, dt);
+            elapsed += chunk;
+            samples.add(engine.headwayCv());
+        }
+        return samples;
     }
 }
