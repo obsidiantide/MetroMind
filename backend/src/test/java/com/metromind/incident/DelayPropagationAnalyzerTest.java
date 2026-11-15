@@ -37,6 +37,29 @@ class DelayPropagationAnalyzerTest {
     }
 
     @Test
+    void shortTurnsDuringTheIncidentRunAreReportedPerStrategy() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(60, 1);
+        double injectedAt = live.simTime();
+
+        DelayImpactReport report = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-2", 420, 1800, HeadwayStrategy.all());
+
+        assertThat(report.outcomes()).allSatisfy(o -> {
+            if (o.strategy().equals("SHORT_TURN")) {
+                assertThat(o.shortTurns()).singleElement().satisfies(turn -> {
+                    assertThat(turn.trainId()).isEqualTo("L1-2");
+                    assertThat(turn.stationId()).isEqualTo("D");
+                    assertThat(turn.simTime()).isBetween(injectedAt, injectedAt + 1800);
+                });
+            } else {
+                assertThat(o.shortTurns()).as(o.strategy()).isEmpty();
+            }
+        });
+        assertThat(live.shortTurns()).isEmpty();
+    }
+
+    @Test
     void trainStuckBetweenStationsKeepsItsPassengersWaitingOnBoard() {
         SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
         live.run(900, 1);
