@@ -12,6 +12,8 @@ const STRATEGY_HELP: Record<string, string> = {
     "Balanced holding; spare trains leave the depot when a line is forecast to overload and return when demand eases.",
   SHORT_TURN:
     "Balanced holding; a train running 4+ min late with a follower close behind reverses early to recover its timetable.",
+  DEMAND_HOLDING:
+    "Forward holding against a target that shrinks as demand rises, so peak trains are held less and keep moving.",
 };
 
 export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
