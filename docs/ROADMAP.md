@@ -42,7 +42,7 @@ Mark items `[x]` when merged.
 - [x] Benchmark scenarios with track-section and station closures, not only train delays and breakdowns
 - [x] Short-turn report: count and location of short turns in what-if and benchmark results
 - [x] Skipped-stop report: stops skipped, where, and passengers carried past, in what-if and benchmark results
-- [ ] What-if analysis for track-section and station closures, not only train delays
+- [x] What-if analysis for track-section and station closures, not only train delays
 - [ ] Benchmark ranking metric selectable: platform wait per boarding or total passenger travel time
 - [ ] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
 
