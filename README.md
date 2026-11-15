@@ -100,6 +100,8 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | GET | `/api/network` | Stations and lines |
 | GET | `/api/state` | Latest simulation snapshot |
 | GET | `/api/stations/{id}/departures?horizonSeconds=1800` | Departure board: planned vs expected departures |
+| GET | `/api/stations/nearest?lat=40.375&lon=49.82&limit=3` | Stations closest to a point, nearest first |
+| GET | `/api/stations/within?lat=40.375&lon=49.82&radiusMeters=1500` | Stations within a radius, nearest first |
 | GET | `/api/strategies` | Available headway strategies |
 | PUT | `/api/strategy` | `{ "strategy": "BALANCED" }` |
 | POST | `/api/incidents/delay` | `{ "trainId": "RED-3", "seconds": 240 }` |
@@ -381,6 +383,15 @@ GET /api/kpis?limit=1
    "averageLoadFactor": 0.41, "averageWaiting": 1310.5, "maxWaiting": 1342.0, "averageHeadwayCv": 0.08,
    "delayAlerts": 0, "incidents": 0 }]
 ```
+
+### Spatial station search
+
+`/api/stations/nearest` and `/api/stations/within` answer "which station is closest to me" and "which stations
+are within walking distance". With persistence enabled they run in PostGIS on the `station.location` geography
+column: a KNN search (`ORDER BY location <-> point`) and `ST_DWithin`, both served by its GiST index, with
+distances on the WGS84 spheroid. In `standalone` the same queries use great-circle (haversine) distance, within
+about 0.5 % over a city. Each result is `{ "station": { "id": "R3", "name": "Central", ... }, "distanceMeters": 14.2 }`;
+ties are ordered by station id.
 
 ### Replay and time travel
 
