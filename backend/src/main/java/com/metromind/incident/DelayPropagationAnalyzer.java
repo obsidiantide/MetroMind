@@ -93,22 +93,10 @@ public final class DelayPropagationAnalyzer {
                 recovery.peakCvExcess(), trainImpacts, stationImpacts);
     }
 
-    /**
-     * Runs both engines to the horizon, sampling their headway CV every {@link #RECOVERY_SAMPLE_SECONDS}. Running in
-     * chunks steps the engines exactly as one long run would, so sampling does not change the result.
-     */
+    /** Runs both engines to the horizon, sampling their headway CV to measure how the incident run recovers. */
     static HeadwayRecovery.Result runSampled(SimulationEngine baseline, SimulationEngine incident, double horizon) {
-        List<Double> baseCv = new ArrayList<>(List.of(baseline.headwayCv()));
-        List<Double> incidentCv = new ArrayList<>(List.of(incident.headwayCv()));
-        double elapsed = 0;
-        while (elapsed < horizon - 1e-9) {
-            double chunk = Math.min(RECOVERY_SAMPLE_SECONDS, horizon - elapsed);
-            baseline.run(chunk, DT);
-            incident.run(chunk, DT);
-            elapsed += chunk;
-            baseCv.add(baseline.headwayCv());
-            incidentCv.add(incident.headwayCv());
-        }
+        List<Double> baseCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizon, RECOVERY_SAMPLE_SECONDS, DT);
+        List<Double> incidentCv = HeadwayRecovery.sampleHeadwayCv(incident, horizon, RECOVERY_SAMPLE_SECONDS, DT);
         return HeadwayRecovery.measure(baseCv, incidentCv, RECOVERY_SAMPLE_SECONDS);
     }
 
