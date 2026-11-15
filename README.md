@@ -105,7 +105,7 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
-| POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800` | Rank strategies over random incident scenarios |
+| POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
@@ -251,8 +251,10 @@ delay compared with `FORWARD_HOLDING`.
 
 One what-if run answers "which strategy handles *this* incident best"; the benchmark answers "which strategy
 copes best in general". `POST /api/analysis/benchmark` draws `scenarios` random incidents from `seed` (a train of
-the current fleet, delayed for 1–10 minutes or broken down for 5–20 minutes), runs every strategy against every
-scenario from the same copy of the live state for `horizonSeconds`, and measures the mean platform wait per
+the current fleet delayed for 1–10 minutes or broken down for 5–20 minutes, the track between two adjacent
+stations closed for 5–20 minutes with trains waiting or turning back, or a station closed for 5–20 minutes), runs
+every strategy against every scenario from the same copy of the live state for `horizonSeconds`, and measures
+the mean platform wait per
 boarding in each run. Strategies are ranked by the mean of that over the scenarios, then by its 95th percentile
 (the bad day), then by name:
 
@@ -266,8 +268,16 @@ boarding in each run. Strategies are ranked by the mean of that over the scenari
 strategy recovered from within the horizon, and `unrecoveredScenarios` counts the rest; recovery is reported
 alongside the ranking and does not change it.
 
-The same seed and starting state always give the same report, and the live simulation is never touched.
-Limits: 1–50 scenarios, a horizon of 5–60 minutes.
+Each scenario lists only what its kind needs:
+
+```json
+{ "kind": "SECTION_CLOSURE", "lineId": "RED", "fromStationId": "R4", "toStationId": "R5",
+  "response": "TURN_BACK", "seconds": 840.0 }
+```
+
+`kinds` narrows the draw, e.g. `?kinds=SECTION_CLOSURE,STATION_CLOSURE` to compare strategies on closures only;
+by default all four kinds are drawn. The same seed, kinds and starting state always give the same report, and
+the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5–60 minutes.
 
 ### Incident clearing timeline
 
