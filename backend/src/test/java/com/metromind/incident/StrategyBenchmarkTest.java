@@ -87,13 +87,19 @@ class StrategyBenchmarkTest {
         List<BenchmarkReport.Scenario> b = StrategyBenchmark.drawScenarios(live, 20, 2);
         assertThat(a).isNotEqualTo(b);
         assertThat(a).extracting(BenchmarkReport.Scenario::kind)
-                .contains(BenchmarkReport.IncidentKind.DELAY, BenchmarkReport.IncidentKind.BREAKDOWN);
+                .contains(BenchmarkReport.IncidentKind.values());
         assertThat(a).allSatisfy(s -> {
-            assertThat(s.trainId()).isIn("L1-1", "L1-2", "L1-3", "L1-4");
-            if (s.kind() == BenchmarkReport.IncidentKind.DELAY) {
-                assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_DELAY_SECONDS, StrategyBenchmark.MAX_DELAY_SECONDS);
-            } else {
-                assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_REPAIR_SECONDS, StrategyBenchmark.MAX_REPAIR_SECONDS);
+            switch (s.kind()) {
+                case DELAY -> {
+                    assertThat(s.trainId()).isIn("L1-1", "L1-2", "L1-3", "L1-4");
+                    assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_DELAY_SECONDS, StrategyBenchmark.MAX_DELAY_SECONDS);
+                }
+                case BREAKDOWN -> {
+                    assertThat(s.trainId()).isIn("L1-1", "L1-2", "L1-3", "L1-4");
+                    assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_REPAIR_SECONDS, StrategyBenchmark.MAX_REPAIR_SECONDS);
+                }
+                case SECTION_CLOSURE, STATION_CLOSURE -> assertThat(s.seconds())
+                        .isBetween(StrategyBenchmark.MIN_CLOSURE_SECONDS, StrategyBenchmark.MAX_CLOSURE_SECONDS);
             }
         });
     }
