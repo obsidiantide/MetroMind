@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.metromind.sim.ClosureResponse;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Result of benchmarking headway strategies against the same set of random incident scenarios, all started from
@@ -54,9 +55,14 @@ public record BenchmarkReport(long seed, double horizonSeconds, List<Scenario> s
      * @param meanRecoverySeconds     mean headway recovery time (see {@link HeadwayRecovery}) over the scenarios the
      *                                strategy recovered from within the horizon; {@code null} if it recovered from none
      * @param unrecoveredScenarios    scenarios whose headways were still disrupted at the horizon
+     * @param meanShortTurns          trains reversed early per scenario, on average (0 unless the strategy
+     *                                short-turns late trains)
+     * @param shortTurnsByStation     short turns over all scenarios by the station where they happened, most first
+     *                                (ties by station id)
      */
     public record StrategyRanking(int rank, String strategy, double meanWaitSeconds, double p95WaitSeconds,
                                   double meanTravelMinutes, Double meanRecoverySeconds, int unrecoveredScenarios,
+                                  double meanShortTurns, Map<String, Integer> shortTurnsByStation,
                                   List<Double> waitSecondsPerScenario) {
     }
 }
