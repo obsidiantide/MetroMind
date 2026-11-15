@@ -247,6 +247,18 @@ the next stop and queue there for a train back; they are reported as `passengers
 test line with a quiet stop, a train delayed by 4 minutes in the morning peak skips that stop and the line ends
 the half hour with lower worst and average lateness than balanced holding alone.
 
+The engine logs every skipped stop (train, line, station, time, lateness and the passengers carried past; the
+last 1000 are kept). Each what-if outcome lists the skips its strategy made during the incident run under
+`skippedStops`, and each benchmark ranking reports `meanStopsSkipped` and `meanPassengersCarriedPast` per
+scenario and `stopsSkippedByStation`, the count at each station over all scenarios, most first:
+
+```json
+{ "strategy": "SKIP_STOP", "meanStopsSkipped": 1.5, "meanPassengersCarriedPast": 42.0,
+  "stopsSkippedByStation": { "B3": 4, "B6": 2 } }
+```
+
+The dashboard's what-if table shows the count and passengers carried past per strategy.
+
 ### Demand-tracking headway target
 
 Every strategy receives a target headway; by default it is the line's even headway (loop time divided by trains
