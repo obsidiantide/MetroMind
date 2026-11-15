@@ -31,6 +31,7 @@ network, makes two copies per strategy, injects the delay into one, simulates bo
 - extra passenger-minutes of waiting per station, and peak queue growth;
 - extra passenger-minutes spent on board, and the total (wait + on board);
 - headway regularity (coefficient of variation) at the end of the horizon;
+- recovery time: how long until headways are back to the baseline's regularity for good (see below);
 - the strategy with the lowest total passenger travel time (platform wait + time on board).
 
 **Can a delay reduce waiting?** Platform waiting alone, yes, and that is why it is not the yardstick. When a
@@ -46,6 +47,14 @@ interchanges: real effects of an uncontrolled line, not measurement errors.
 POST /api/analysis/delay-impact?horizonSeconds=1800
 { "trainId": "RED-3", "seconds": 240 }
 ```
+
+**Recovery time.** Both runs' headway CV is sampled every 30 s. A sample is disrupted while the incident run's
+CV is more than 0.05 above the baseline's; `headwayRecoverySeconds` is the time from the incident to the first
+sample after the last disrupted one, `0` if the headways were never disrupted, and `null` if they still were at
+the horizon. `peakHeadwayCvExcess` is the worst bunching the incident caused. Comparing against the same
+strategy's baseline means bunching that would have happened anyway is not blamed on the incident. Expect long
+delays to stay unrecovered within short horizons: the timetable holds early trains at terminals but cannot make
+a late train catch up, so a four-minute delay leaves a gap that only layover slack absorbs.
 
 ## Architecture
 
@@ -225,8 +234,13 @@ boarding in each run. Strategies are ranked by the mean of that over the scenari
 
 ```json
 { "rank": 1, "strategy": "NO_CONTROL", "meanWaitSeconds": 336.7, "p95WaitSeconds": 535.7,
-  "meanTravelMinutes": 26480.0, "waitSecondsPerScenario": [263.4, 218.1, 329.6, 535.7] }
+  "meanTravelMinutes": 26480.0, "meanRecoverySeconds": 1260.0, "unrecoveredScenarios": 1,
+  "waitSecondsPerScenario": [263.4, 218.1, 329.6, 535.7] }
 ```
+
+`meanRecoverySeconds` averages the headway recovery time (as in the what-if analysis) over the scenarios the
+strategy recovered from within the horizon, and `unrecoveredScenarios` counts the rest; recovery is reported
+alongside the ranking and does not change it.
 
 The same seed and starting state always give the same report, and the live simulation is never touched.
 Limits: 1–50 scenarios, a horizon of 5–60 minutes.
