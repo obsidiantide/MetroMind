@@ -55,10 +55,36 @@ public final class StrategyBenchmark {
                 BenchmarkReport.RankingMetric.WAIT_PER_BOARDING);
     }
 
+    /**
+     * Notified after every simulated run: each strategy runs a baseline and then every scenario, so a benchmark makes
+     * {@code strategies × (scenarios + 1)} runs in total.
+     */
+    @FunctionalInterface
+    public interface ProgressListener {
+        ProgressListener NONE = (completedRuns, totalRuns) -> { };
+
+        void onProgress(int completedRuns, int totalRuns);
+    }
+
+    /** Simulated runs a benchmark of {@code scenarios} over {@code strategies} makes, baselines included. */
+    public static int totalRuns(int scenarios, int strategies) {
+        return strategies * (scenarios + 1);
+    }
+
     /** As {@link #run(SimulationEngine, int, long, double, List, Set)}, ranking strategies by {@code metric}. */
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
                                BenchmarkReport.RankingMetric metric) {
+        return run(live, scenarioCount, seed, horizonSeconds, strategies, kinds, metric, ProgressListener.NONE);
+    }
+
+    /**
+     * As {@link #run(SimulationEngine, int, long, double, List, Set, BenchmarkReport.RankingMetric)}, reporting
+     * progress to {@code progress} after every run.
+     */
+    public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
+                               List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
+                               BenchmarkReport.RankingMetric metric, ProgressListener progress) {
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
@@ -67,6 +93,8 @@ public final class StrategyBenchmark {
         double startBoarded = live.snapshot().metrics().passengersServed();
         double startWait = totalWaitSeconds(live);
         double startRide = live.passengerRideSeconds();
+        int totalRuns = totalRuns(scenarios.size(), strategies.size());
+        int completedRuns = 0;
         List<BenchmarkReport.StrategyRanking> unranked = new ArrayList<>();
         for (HeadwayStrategy strategy : strategies) {
             List<Double> waits = new ArrayList<>();
@@ -75,6 +103,7 @@ public final class StrategyBenchmark {
             baseline.setStrategy(strategy);
             List<Double> baselineCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizonSeconds,
                     RECOVERY_SAMPLE_SECONDS, DT);
+            progress.onProgress(++completedRuns, totalRuns);
             double recoverySum = 0;
             int recovered = 0;
             Map<String, Integer> turnsByStation = new HashMap<>();
@@ -107,6 +136,7 @@ public final class StrategyBenchmark {
                     skips++;
                     carriedPast += skip.passengersCarriedPast();
                 }
+                progress.onProgress(++completedRuns, totalRuns);
             }
             double mean = waits.stream().mapToDouble(Double::doubleValue).average().orElse(0);
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
