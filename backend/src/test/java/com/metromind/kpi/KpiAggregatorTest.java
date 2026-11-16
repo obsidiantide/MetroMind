@@ -78,6 +78,56 @@ class KpiAggregatorTest {
     }
 
     @Test
+    void aBacklogOnPositionsHoldsMinutesOpenInsteadOfDroppingSamples() {
+        KpiAggregator agg = new KpiAggregator(30);
+        List<MinuteKpi> closed = new ArrayList<>();
+        closed.addAll(agg.onPosition(T0 + 5, train("RED-1", 10, 0)));
+        // The metrics listener races four minutes ahead while positions are still catching up.
+        for (int t = 0; t <= 240; t += 5) {
+            closed.addAll(agg.onMetrics(T0 + t, metrics(100, 0)));
+        }
+        assertThat(closed).isEmpty();
+        assertThat(agg.openMinutes()).isEqualTo(5);
+
+        // The positions backlog drains: its samples for the first minute still count.
+        closed.addAll(agg.onPosition(T0 + 50, train("RED-2", 40, 0)));
+        closed.addAll(agg.onPosition(T0 + 95, train("RED-1", 0, 0)));
+        assertThat(closed).singleElement().satisfies(k -> {
+            assertThat(k.minute()).isEqualTo(480);
+            assertThat(k.trainsReporting()).isEqualTo(2);
+            assertThat(k.averageDelaySeconds()).isEqualTo(25.0);
+        });
+        assertThat(agg.lateSamples()).isZero();
+        assertThat(agg.watermarks()).containsEntry(KpiAggregator.Source.POSITIONS, T0 + 95)
+                .containsEntry(KpiAggregator.Source.METRICS, T0 + 240)
+                .doesNotContainKey(KpiAggregator.Source.EVENTS);
+    }
+
+    @Test
+    void sparseEventsDoNotHoldMinutesOpen() {
+        KpiAggregator agg = new KpiAggregator(0);
+        agg.onEvent(new SimEvent(T0 + 1, SimEvent.Type.INCIDENT, "RED-1", "breakdown"));
+        agg.onPosition(T0 + 2, train("RED-1", 0, 0));
+        agg.onMetrics(T0 + 2, metrics(0, 0));
+        agg.onPosition(T0 + 60, train("RED-1", 0, 0));
+        assertThat(agg.onMetrics(T0 + 60, metrics(0, 0))).singleElement()
+                .satisfies(k -> assertThat(k.incidents()).isEqualTo(1));
+    }
+
+    @Test
+    void closesTheOldestMinutesWhenAGatingSourceStalls() {
+        KpiAggregator agg = new KpiAggregator(0, 3);
+        agg.onPosition(T0, train("RED-1", 0, 0));
+        List<MinuteKpi> closed = new ArrayList<>();
+        // Positions stop at T0; metrics keep coming for five more minutes.
+        for (int m = 0; m <= 5; m++) {
+            closed.addAll(agg.onMetrics(T0 + m * 60, metrics(0, 0)));
+        }
+        assertThat(closed).extracting(MinuteKpi::minute).containsExactly(480L, 481L, 482L);
+        assertThat(agg.openMinutes()).isEqualTo(3);
+    }
+
+    @Test
     void closesSeveralMinutesInOrderAfterAGap() {
         KpiAggregator agg = new KpiAggregator(0);
         List<MinuteKpi> closed = new ArrayList<>();
@@ -117,6 +167,7 @@ class KpiAggregatorTest {
     @Test
     void rejectsNegativeGrace() {
         assertThatThrownBy(() -> new KpiAggregator(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new KpiAggregator(30, 0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static List<MinuteKpi> replay() {
