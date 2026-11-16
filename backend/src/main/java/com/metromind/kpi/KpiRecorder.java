@@ -50,6 +50,13 @@ public class KpiRecorder {
         return aggregator.lateSamples();
     }
 
+    /** Per-source watermarks, open minutes and dropped samples, read in one consistent step. */
+    public KpiPipelineStatus status() {
+        synchronized (aggregator) {
+            return new KpiPipelineStatus(aggregator.watermarks(), aggregator.openMinutes(), aggregator.lateSamples());
+        }
+    }
+
     /** Saves the minutes still open so a clean shutdown loses nothing. */
     @PreDestroy
     public void flush() {

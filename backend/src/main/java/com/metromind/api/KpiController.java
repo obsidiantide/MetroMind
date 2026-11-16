@@ -1,5 +1,6 @@
 package com.metromind.api;
 
+import com.metromind.kpi.KpiPipelineStatus;
 import com.metromind.kpi.KpiRecorder;
 import com.metromind.kpi.MinuteKpi;
 import jakarta.validation.constraints.Max;
@@ -29,5 +30,12 @@ public class KpiController {
     @GetMapping("/kpis")
     public List<MinuteKpi> kpis(@RequestParam(defaultValue = "60") @Min(1) @Max(1440) int limit) {
         return kpis.recent(limit);
+    }
+
+    /** Watermark per telemetry topic, minutes still open and samples dropped as late. */
+    @Operation(summary = "Aggregation progress per telemetry topic")
+    @GetMapping("/kpis/status")
+    public KpiPipelineStatus status() {
+        return kpis.status();
     }
 }
