@@ -131,7 +131,7 @@ class BenchmarkJobsTest {
         jobs.submit(1, progress -> REPORT);
 
         assertThatThrownBy(() -> jobs.submit(1, progress -> REPORT))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BenchmarkJobs.QueueFullException.class)
                 .hasMessageContaining("already queued or running");
 
         executor.runNext();

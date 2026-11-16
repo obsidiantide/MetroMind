@@ -1,6 +1,7 @@
 package com.metromind.sim;
 
 import com.metromind.incident.AnalysisRecord;
+import com.metromind.incident.BenchmarkJobs;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.DelayPropagationAnalyzer;
@@ -12,14 +13,19 @@ import com.metromind.network.MetroNetwork;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.ToDoubleFunction;
 
 /** Owns the live engine, advances it on a timer and fans snapshots out to listeners. */
@@ -34,6 +40,10 @@ public class SimulationService {
     private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
+    /** One benchmark job at a time: each already keeps a core busy, and jobs queue behind it. */
+    private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
+            .name("benchmark-job").daemon(true).factory());
+    private final BenchmarkJobs benchmarkJobs = new BenchmarkJobs(benchmarkExecutor, 20, Clock.systemUTC());
     private final Timer tickTimer;
     private final MeterRegistry meters;
     private volatile boolean paused;
@@ -193,6 +203,39 @@ public class SimulationService {
         }
         return analysisTimer("benchmark").record(
                 () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric));
+    }
+
+    /**
+     * Queues the same benchmark as {@link #benchmarkStrategies} as a background job and returns it at once. The live
+     * state is copied now, so the job ranks strategies from the moment it was submitted however long it queues.
+     *
+     * @throws BenchmarkJobs.QueueFullException if too many jobs are already queued or running
+     */
+    public BenchmarkJobs.Job submitBenchmark(int scenarios, long seed, double horizonSeconds,
+                                             Set<BenchmarkReport.IncidentKind> kinds,
+                                             BenchmarkReport.RankingMetric metric) {
+        SimulationEngine fork;
+        synchronized (engine) {
+            fork = engine.copy();
+        }
+        List<HeadwayStrategy> strategies = HeadwayStrategy.all();
+        return benchmarkJobs.submit(StrategyBenchmark.totalRuns(scenarios, strategies.size()),
+                progress -> analysisTimer("benchmark").record(() -> benchmark.run(fork, scenarios, seed,
+                        horizonSeconds, strategies, kinds, metric, progress)));
+    }
+
+    public Optional<BenchmarkJobs.Job> benchmarkJob(String id) {
+        return benchmarkJobs.get(id);
+    }
+
+    /** Benchmark jobs still kept, most recently submitted first. */
+    public List<BenchmarkJobs.Job> benchmarkJobs(int limit) {
+        return benchmarkJobs.recent(limit);
+    }
+
+    @PreDestroy
+    void stopBenchmarkJobs() {
+        benchmarkExecutor.shutdownNow();
     }
 
     /**
