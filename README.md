@@ -428,6 +428,10 @@ shows its lines, passengers waiting now and predicted in 15 minutes with the ove
 platform and its live departure board with lateness. A train shows where it is, what it is doing (running,
 dwelling, held, waiting at a signal), its lateness and load, and any incident and recent events concerning it.
 
+A what-if result is also drawn on the map: each station is ringed by the extra passenger-minutes of waiting the
+incident causes under the best strategy, red where waiting grows and blue where it falls, scaled to the worst
+station. Click another row of the what-if table to map that strategy instead, or hide the layer.
+
 ### Spatial station search
 
 `/api/stations/nearest` and `/api/stations/within` answer "which station is closest to me" and "which stations
