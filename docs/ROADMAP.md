@@ -57,7 +57,7 @@ Mark items `[x]` when merged.
 - [x] KPI aggregation robust to lag between topics: track a watermark per telemetry topic and close a minute only
       when every topic has passed it (today a backlog on positions lets metrics close minutes early and drops samples)
 - [x] Cancel a queued or running benchmark job (`DELETE /api/analysis/benchmark/jobs/{id}`)
-- [ ] Persist finished benchmark jobs in PostgreSQL so results survive restarts
+- [x] Persist finished benchmark jobs in PostgreSQL so results survive restarts
 
 ### Frontend
 - [x] Charts: delay and waiting over time
