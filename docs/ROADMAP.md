@@ -58,6 +58,6 @@ Mark items `[x]` when merged.
 ### Frontend
 - [x] Charts: delay and waiting over time
 - [x] Click a train or station for a detail drawer
-- [ ] Visualise what-if result on the map (heat of extra wait per station)
+- [x] Visualise what-if result on the map (heat of extra wait per station)
 - [ ] Strategy benchmark page
 - [ ] Load real city networks (Baku, Moscow-like) from GeoJSON
