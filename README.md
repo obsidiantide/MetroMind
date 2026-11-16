@@ -423,6 +423,11 @@ GET /api/kpis?limit=1
 The dashboard charts the last hour of these minutes, refreshed every 6 s: average and worst train delay, and
 average and peak passengers waiting network-wide. Hover a column to read every value for that minute.
 
+Click a station or train on the map (or focus it with Tab and press Enter) to open a detail drawer. A station
+shows its lines, passengers waiting now and predicted in 15 minutes with the overload risk, the queue on each
+platform and its live departure board with lateness. A train shows where it is, what it is doing (running,
+dwelling, held, waiting at a signal), its lateness and load, and any incident and recent events concerning it.
+
 ### Spatial station search
 
 `/api/stations/nearest` and `/api/stations/within` answer "which station is closest to me" and "which stations
