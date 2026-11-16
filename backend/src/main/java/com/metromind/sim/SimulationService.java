@@ -228,6 +228,11 @@ public class SimulationService {
         return benchmarkJobs.get(id);
     }
 
+    /** Cancels a queued or running benchmark job; see {@link BenchmarkJobs#cancel}. */
+    public Optional<BenchmarkJobs.Job> cancelBenchmarkJob(String id) {
+        return benchmarkJobs.cancel(id);
+    }
+
     /** Benchmark jobs still kept, most recently submitted first. */
     public List<BenchmarkJobs.Job> benchmarkJobs(int limit) {
         return benchmarkJobs.recent(limit);

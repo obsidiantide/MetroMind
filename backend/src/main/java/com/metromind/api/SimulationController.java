@@ -243,6 +243,23 @@ public class SimulationController {
         return ResponseEntity.of(simulation.benchmarkJob(id));
     }
 
+    /**
+     * Cancels a benchmark job. A queued job never starts; a running one stops after the simulated run in progress.
+     * Answers with the cancelled job, or {@code 409} with the job unchanged if it had already succeeded or failed.
+     */
+    @Tag(name = "Analysis")
+    @Operation(summary = "Cancel a queued or running benchmark job")
+    @ApiResponse(responseCode = "200", description = "The job, now cancelled")
+    @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
+    @ApiResponse(responseCode = "409", description = "The job had already finished; it is returned unchanged")
+    @DeleteMapping("/analysis/benchmark/jobs/{id}")
+    public ResponseEntity<BenchmarkJobs.Job> cancelBenchmarkJob(@PathVariable String id) {
+        return simulation.cancelBenchmarkJob(id)
+                .map(job -> ResponseEntity.status(job.status() == BenchmarkJobs.Status.CANCELLED
+                        ? HttpStatus.OK : HttpStatus.CONFLICT).body(job))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @Tag(name = "Analysis")
     @Operation(summary = "Benchmark jobs still kept, newest first")
     @GetMapping("/analysis/benchmark/jobs")
