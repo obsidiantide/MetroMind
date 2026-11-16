@@ -1,6 +1,7 @@
 package com.metromind.sim;
 
 import com.metromind.incident.AnalysisRecord;
+import com.metromind.incident.BenchmarkJobStore;
 import com.metromind.incident.BenchmarkJobs;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
@@ -16,6 +17,7 @@ import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -43,15 +45,18 @@ public class SimulationService {
     /** One benchmark job at a time: each already keeps a core busy, and jobs queue behind it. */
     private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
             .name("benchmark-job").daemon(true).factory());
-    private final BenchmarkJobs benchmarkJobs = new BenchmarkJobs(benchmarkExecutor, 20, Clock.systemUTC());
+    private final BenchmarkJobs benchmarkJobs;
     private final Timer tickTimer;
     private final MeterRegistry meters;
     private volatile boolean paused;
     private volatile SimulationSnapshot last;
 
     public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners,
-                             IncidentHistory history, MeterRegistry meters) {
+                             IncidentHistory history, MeterRegistry meters,
+                             ObjectProvider<BenchmarkJobStore> jobStore) {
         this.props = props;
+        this.benchmarkJobs = new BenchmarkJobs(benchmarkExecutor, 20, Clock.systemUTC(),
+                jobStore.getIfAvailable(() -> BenchmarkJobStore.NONE));
         this.listeners = listeners;
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
