@@ -40,7 +40,9 @@ class KpiAggregatorTest {
 
         // Still within 30 s of the minute's end: not closed yet.
         assertThat(agg.onPosition(T0 + 89, train("RED-1", 0, 0))).isEmpty();
-        List<MinuteKpi> closed = agg.onPosition(T0 + 90, train("RED-1", 0, 0));
+        // Positions are past the grace period, but metrics still lag behind at T0 + 40.
+        assertThat(agg.onPosition(T0 + 90, train("RED-1", 0, 0))).isEmpty();
+        List<MinuteKpi> closed = agg.onMetrics(T0 + 90, metrics(0, 0));
 
         assertThat(closed).hasSize(1);
         MinuteKpi kpi = closed.get(0);
