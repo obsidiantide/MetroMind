@@ -26,6 +26,10 @@ import java.util.function.UnaryOperator;
  * at its next progress report, i.e. after the simulated run in progress, and its thread is then free for the next
  * job.
  *
+ * <p>Every job that reaches a final state is handed to a {@link BenchmarkJobStore}. Lookups and listings fall back to
+ * the store, so finished jobs (and their reports) stay available after they have been forgotten here or after a
+ * restart. Jobs still queued or running when the process stops are lost.
+ *
  * <p>Jobs are queued, not refused, while others run: give the executor as many threads as benchmarks may run at
  * once. The benchmark itself stays deterministic; only job ids and timestamps vary between runs.
  */
@@ -68,15 +72,21 @@ public final class BenchmarkJobs {
     private final ExecutorService executor;
     private final int retained;
     private final Clock clock;
+    private final BenchmarkJobStore store;
     private final Map<String, Job> jobs = new LinkedHashMap<>();
 
     public BenchmarkJobs(ExecutorService executor, int retained, Clock clock) {
+        this(executor, retained, clock, BenchmarkJobStore.NONE);
+    }
+
+    public BenchmarkJobs(ExecutorService executor, int retained, Clock clock, BenchmarkJobStore store) {
         if (retained < 1) {
             throw new IllegalArgumentException("At least one benchmark job must be retained");
         }
         this.executor = executor;
         this.retained = retained;
         this.clock = clock;
+        this.store = store;
     }
 
     /**
@@ -108,9 +118,11 @@ public final class BenchmarkJobs {
     }
 
     public Optional<Job> get(String id) {
+        Job held;
         synchronized (jobs) {
-            return Optional.ofNullable(jobs.get(id));
+            held = jobs.get(id);
         }
+        return held != null ? Optional.of(held) : store.find(id);
     }
 
     /**
@@ -118,20 +130,36 @@ public final class BenchmarkJobs {
      * had already succeeded or failed. Cancelling a cancelled job again is harmless. Empty if there is no such job.
      */
     public Optional<Job> cancel(String id) {
+        Job before;
+        Job after;
         synchronized (jobs) {
-            return Optional.ofNullable(jobs.computeIfPresent(id, (key, job) -> job.finished() ? job
-                    : new Job(id, Status.CANCELLED, job.completedRuns(), job.totalRuns(), job.submittedAt(),
-                            job.startedAt(), clock.instant(), null, null)));
+            before = jobs.get(id);
+            if (before == null) {
+                return store.find(id);
+            }
+            after = before.finished() ? before
+                    : new Job(id, Status.CANCELLED, before.completedRuns(), before.totalRuns(), before.submittedAt(),
+                            before.startedAt(), clock.instant(), null, null);
+            jobs.put(id, after);
         }
+        if (after != before) {
+            store.save(after);
+        }
+        return Optional.of(after);
     }
 
     /** Up to {@code limit} jobs, most recently submitted first. */
     public List<Job> recent(int limit) {
+        Map<String, Job> all = new LinkedHashMap<>();
         synchronized (jobs) {
-            List<Job> all = new ArrayList<>(jobs.values());
-            all.sort(Comparator.comparing(Job::submittedAt).reversed());
-            return List.copyOf(all.subList(0, Math.min(limit, all.size())));
+            all.putAll(jobs);
         }
+        for (Job stored : store.recent(limit)) {
+            all.putIfAbsent(stored.id(), stored);
+        }
+        List<Job> sorted = new ArrayList<>(all.values());
+        sorted.sort(Comparator.comparing(Job::submittedAt).reversed());
+        return List.copyOf(sorted.subList(0, Math.min(limit, sorted.size())));
     }
 
     private void run(String id, Function<StrategyBenchmark.ProgressListener, BenchmarkReport> work) {
@@ -145,31 +173,43 @@ public final class BenchmarkJobs {
         }
         try {
             BenchmarkReport report = work.apply((done, total) -> {
-                if (!updateRunning(id, job -> new Job(id, Status.RUNNING, done, total, job.submittedAt(),
-                        job.startedAt(), null, null, null))) {
+                if (updateRunning(id, job -> new Job(id, Status.RUNNING, done, total, job.submittedAt(),
+                        job.startedAt(), null, null, null)) == null) {
                     throw new Cancelled();
                 }
             });
-            updateRunning(id, job -> new Job(id, Status.SUCCEEDED, job.totalRuns(), job.totalRuns(),
+            finish(id, job -> new Job(id, Status.SUCCEEDED, job.totalRuns(), job.totalRuns(),
                     job.submittedAt(), job.startedAt(), clock.instant(), report, null));
         } catch (Cancelled e) {
             // The job was already marked cancelled; stopping early is all that is left to do.
         } catch (RuntimeException e) {
-            updateRunning(id, job -> new Job(id, Status.FAILED, job.completedRuns(), job.totalRuns(),
+            finish(id, job -> new Job(id, Status.FAILED, job.completedRuns(), job.totalRuns(),
                     job.submittedAt(), job.startedAt(), clock.instant(), null,
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
         }
     }
 
-    /** Applies {@code change} if the job is still running; false if it was cancelled or forgotten meanwhile. */
-    private boolean updateRunning(String id, UnaryOperator<Job> change) {
+    /** Moves a running job to its final state and stores it, unless it was cancelled meanwhile. */
+    private void finish(String id, UnaryOperator<Job> change) {
+        Job finished = updateRunning(id, change);
+        if (finished != null) {
+            store.save(finished);
+        }
+    }
+
+    /**
+     * Applies {@code change} if the job is still running and returns the changed job; null if it was cancelled or
+     * forgotten meanwhile.
+     */
+    private Job updateRunning(String id, UnaryOperator<Job> change) {
         synchronized (jobs) {
             Job job = jobs.get(id);
             if (job == null || job.status() != Status.RUNNING) {
-                return false;
+                return null;
             }
-            jobs.put(id, change.apply(job));
-            return true;
+            Job changed = change.apply(job);
+            jobs.put(id, changed);
+            return changed;
         }
     }
 
