@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -14,14 +15,18 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+// Metric exporters are switched off in tests by default; the Prometheus test needs its registry.
+@AutoConfigureObservability(tracing = false)
 @ActiveProfiles("standalone")
 class MetricsApiTest {
 
@@ -82,5 +87,15 @@ class MetricsApiTest {
         mvc.perform(get("/actuator/metrics/metromind.incidents.injected").param("tag", "kind:breakdown"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.measurements[0].value", greaterThan(0.0)));
+    }
+
+    @Test
+    void exposesMetersForPrometheus() throws Exception {
+        simulation.tick();
+        mvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("metromind_sim_tick_seconds_count")))
+                .andExpect(content().string(containsString("metromind_passengers_waiting_passengers")))
+                .andExpect(content().string(containsString("metromind_sim_tick_seconds{quantile=\"0.95\"")));
     }
 }
