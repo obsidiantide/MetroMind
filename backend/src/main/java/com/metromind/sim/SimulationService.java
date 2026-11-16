@@ -9,6 +9,7 @@ import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.incident.StrategyBenchmark;
 import com.metromind.network.MetroNetwork;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 
 /** Owns the live engine, advances it on a timer and fans snapshots out to listeners. */
 @Service
@@ -49,6 +51,29 @@ public class SimulationService {
                 .description("Wall-clock time to advance the live engine by one tick and take its snapshot")
                 .publishPercentiles(0.5, 0.95, 0.99)
                 .register(meters);
+        gauge("metromind.sim.time", "Simulated seconds since midnight", "seconds", SimulationSnapshot::simTime);
+        gauge("metromind.passengers.waiting", "Passengers waiting at all stations", "passengers",
+                snap -> snap.metrics().totalWaiting());
+        gauge("metromind.trains.delay.average", "Average lateness of trains in service", "seconds",
+                snap -> snap.metrics().averageDelaySeconds());
+        gauge("metromind.trains.delay.max", "Lateness of the latest train in service", "seconds",
+                snap -> snap.metrics().maxDelaySeconds());
+        gauge("metromind.trains.in.service", "Trains running on the lines", "trains",
+                snap -> snap.metrics().trainsInService());
+        gauge("metromind.headway.cv", "Coefficient of variation of headways: 0 is perfectly regular", null,
+                snap -> snap.metrics().headwayCoefficientOfVariation());
+    }
+
+    /** A gauge read from the latest published snapshot, so scraping never takes the engine lock. */
+    private void gauge(String name, String description, String unit, ToDoubleFunction<SimulationSnapshot> value) {
+        Gauge.builder(name, this, service -> value.applyAsDouble(service.last))
+                .description(description)
+                .baseUnit(unit)
+                .register(meters);
+    }
+
+    private void countIncident(IncidentRecord.Kind kind) {
+        meters.counter("metromind.incidents.injected", "kind", kind.name().toLowerCase(Locale.ROOT)).increment();
     }
 
     @Scheduled(fixedRateString = "${metromind.sim.tick-millis:500}")
@@ -80,6 +105,7 @@ public class SimulationService {
         synchronized (engine) {
             engine.injectDelay(trainId, seconds);
             history.record(engine.simTime(), IncidentRecord.Kind.DELAY, trainId, seconds, "");
+            countIncident(IncidentRecord.Kind.DELAY);
         }
     }
 
@@ -87,6 +113,7 @@ public class SimulationService {
         synchronized (engine) {
             engine.injectBreakdown(trainId, repairSeconds);
             history.record(engine.simTime(), IncidentRecord.Kind.BREAKDOWN, trainId, repairSeconds, "");
+            countIncident(IncidentRecord.Kind.BREAKDOWN);
         }
     }
 
@@ -96,6 +123,7 @@ public class SimulationService {
             engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
             history.record(engine.simTime(), IncidentRecord.Kind.SECTION_CLOSURE, lineId, seconds,
                     "%s-%s, %s".formatted(fromStationId, toStationId, response));
+            countIncident(IncidentRecord.Kind.SECTION_CLOSURE);
         }
     }
 
@@ -103,6 +131,7 @@ public class SimulationService {
         synchronized (engine) {
             engine.closeStation(stationId, seconds);
             history.record(engine.simTime(), IncidentRecord.Kind.STATION_CLOSURE, stationId, seconds, "");
+            countIncident(IncidentRecord.Kind.STATION_CLOSURE);
         }
     }
 
