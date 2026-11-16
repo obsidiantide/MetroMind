@@ -11,9 +11,7 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootTest(properties = {
         "metromind.sim.tick-millis=1000000",
-        "metromind.sim.speed=0.005",
-        "metromind.kafka.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration"})
+        "metromind.sim.speed=0.005"})
 @Import(InfraContainers.class)
 public abstract class InfrastructureIT {
 }
