@@ -97,7 +97,8 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
       {snapshot?.trains.map((t) => {
         const fill = t.failed ? "#f85149" : t.delaySeconds > 120 ? "#d29922" : "#ffffff";
         return (
-          <g key={t.id} transform={`translate(${x(t.lon)},${y(t.lat)})`} style={{ transition: "transform 0.5s linear" }}>
+          <g key={t.id} transform={`translate(${x(t.lon)},${y(t.lat)})`} style={{ transition: "transform 0.5s linear" }}
+             {...selectable({ kind: "train", id: t.id }, selected, onSelect)}>
             <rect x={-7} y={-5} width={14} height={10} rx={3} fill={fill} stroke={lineColor.get(t.lineId)} strokeWidth={2.5}>
               <title>{`${t.id} · ${t.phase} · delay ${Math.round(t.delaySeconds)} s · load ${Math.round(t.load)}/${t.capacity}`}</title>
             </rect>
