@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import type { WaitHeat } from "@/components/MetroMap";
 import { api } from "@/lib/api";
 import type { ClosureResponse, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
 
@@ -37,7 +38,19 @@ function distinct(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null; network: MetroNetwork | null }) {
+/** The station heat of one strategy's outcome, for the map. */
+function heatOf(outcome: StrategyOutcome): WaitHeat {
+  return {
+    label: outcome.strategy,
+    extraWaitMinutes: Object.fromEntries(outcome.stations.map((s) => [s.stationId, s.extraWaitMinutes])),
+  };
+}
+
+export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
+  snapshot: Snapshot | null; network: MetroNetwork | null;
+  /** Called with the extra wait per station of the best strategy whenever a what-if result arrives. */
+  onHeat?: (heat: WaitHeat | null) => void;
+}) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
   const [seconds, setSeconds] = useState(240);
@@ -52,6 +65,10 @@ export function ControlPanel({ snapshot, network }: { snapshot: Snapshot | null;
   useEffect(() => {
     api.strategies().then(setStrategies).catch((e) => setError(String(e)));
   }, []);
+  useEffect(() => {
+    const best = report?.outcomes.find((o) => o.strategy === report.bestStrategy);
+    onHeat(best ? heatOf(best) : null);
+  }, [report, onHeat]);
   useEffect(() => {
     if (!trainId && snapshot?.trains.length) setTrainId(snapshot.trains[0].id);
   }, [snapshot, trainId]);
