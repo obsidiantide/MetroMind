@@ -119,6 +119,10 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | GET | `/api/replay?at=29000` | Snapshot as it was at a past simulated time |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
 
+The full OpenAPI 3.1 description is served at `http://localhost:8080/api-docs` (append `.yaml` for YAML) and can be
+browsed in Swagger UI at `http://localhost:8080/swagger-ui.html`, grouped by area: simulation, network, incidents,
+analysis, KPIs and replay.
+
 WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/state`.
 
 Each station in a snapshot carries `queues`: waiting passengers per line and direction, e.g.
