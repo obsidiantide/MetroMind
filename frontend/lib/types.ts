@@ -74,3 +74,14 @@ export interface IncidentScenario {
 export interface IncidentImpactReport {
   incident: IncidentScenario; horizonSeconds: number; outcomes: StrategyOutcome[]; bestStrategy: string;
 }
+/** KPIs for one closed minute of simulated time, as aggregated from the telemetry stream (`GET /api/kpis`). */
+export interface MinuteKpi {
+  /** floor(simTime / 60) */
+  minute: number;
+  /** Start of the minute on the simulated clock, HH:mm. */
+  clock: string;
+  trainsReporting: number; averageDelaySeconds: number; maxDelaySeconds: number; averageLoadFactor: number;
+  /** Passengers waiting on platforms network-wide: mean and peak over the minute. */
+  averageWaiting: number; maxWaiting: number;
+  averageHeadwayCv: number; delayAlerts: number; incidents: number;
+}
