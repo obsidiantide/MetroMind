@@ -67,7 +67,8 @@ a late train catch up, so a four-minute delay leaves a gap that only layover sla
             │                               │               metromind.network-metrics ──► TelemetryKpiConsumer
  REST ─────►│  REST /api/*                  ├──► Redis      metromind:snapshot, metromind:station-waiting,
             │                               │               metromind:replay
-            │                               └──► PostGIS    station, line, incident, minute_kpi │
+            │                               └──► PostGIS    station, line, incident, minute_kpi,
+            │                                               benchmark_job          │
             └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -384,6 +385,11 @@ or running a new submission gets `429 Too Many Requests`.
 starts; a running one stops once the simulated run in progress ends, keeping its `completedRuns` but no report, and
 the next queued job starts. A job that had already succeeded or failed is left alone and returned with
 `409 Conflict`.
+
+With persistence enabled, every job that succeeds, fails or is cancelled is also written to the `benchmark_job`
+table (the report as JSONB). Lookups and the job list fall back to it, so finished jobs and their reports stay
+available after they drop out of the 20 kept in memory and after a restart. Jobs still queued or running when the
+backend stops are lost. In the `standalone` profile jobs live in memory only.
 
 ### Incident clearing timeline
 
