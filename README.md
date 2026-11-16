@@ -432,6 +432,11 @@ A what-if result is also drawn on the map: each station is ringed by the extra p
 incident causes under the best strategy, red where waiting grows and blue where it falls, scaled to the worst
 station. Click another row of the what-if table to map that strategy instead, or hide the layer.
 
+The **Benchmark** page (`/benchmark`, linked from the dashboard header) runs the strategy benchmark as a
+background job: pick the number of scenarios, the seed, the horizon, the incident kinds and the ranking metric,
+watch the progress bar, then read the ranking and the scenarios that were drawn. Earlier jobs still kept by the
+backend are listed and can be reopened.
+
 ### Spatial station search
 
 `/api/stations/nearest` and `/api/stations/within` answer "which station is closest to me" and "which stations
