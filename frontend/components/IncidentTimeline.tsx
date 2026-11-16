@@ -1,4 +1,5 @@
 "use client";
+import { clock, duration } from "@/lib/format";
 import type { ActiveIncidentView, IncidentKind, Snapshot } from "@/lib/types";
 
 const KIND_COLOR: Record<IncidentKind, string> = {
@@ -13,17 +14,6 @@ const KIND_LABEL: Record<IncidentKind, string> = {
   SECTION_CLOSURE: "Track closed",
   STATION_CLOSURE: "Station closed",
 };
-
-/** Formats a time of day in simulated seconds since midnight as HH:MM. */
-function clock(simTime: number) {
-  const s = Math.floor(simTime) % 86400;
-  return `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}`;
-}
-
-function duration(seconds: number) {
-  const s = Math.max(0, Math.ceil(seconds));
-  return s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s` : `${s}s`;
-}
 
 /**
  * Gantt-style view of the incidents in force: each bar runs from when the incident began to when it clears on its

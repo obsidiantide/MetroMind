@@ -1,4 +1,6 @@
 "use client";
+import type { Selection } from "@/components/DetailDrawer";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { MetroNetwork, Snapshot } from "@/lib/types";
 
 const W = 900;
@@ -6,7 +8,24 @@ const H = 640;
 const PAD = 50;
 const RISK_COLOR = { LOW: "#3fb950", MEDIUM: "#d29922", HIGH: "#f85149" } as const;
 
-export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapshot: Snapshot | null }) {
+/** Keyboard and pointer props that make a map element pick `target` when activated. */
+function selectable(target: Selection, selected: Selection | null, onSelect: (s: Selection) => void) {
+  const isSelected = selected?.kind === target.kind && selected.id === target.id;
+  return {
+    className: isSelected ? "selectable selected" : "selectable",
+    role: "button",
+    tabIndex: 0,
+    "aria-pressed": isSelected,
+    onClick: () => onSelect(target),
+    onKeyDown: (e: ReactKeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(target); }
+    },
+  };
+}
+
+export function MetroMap({ network, snapshot, selected = null, onSelect = () => {} }: {
+  network: MetroNetwork; snapshot: Snapshot | null; selected?: Selection | null; onSelect?: (s: Selection) => void;
+}) {
   const lats = network.stations.map((s) => s.lat);
   const lons = network.stations.map((s) => s.lon);
   const [minLat, maxLat, minLon, maxLon] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
@@ -56,7 +75,7 @@ export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapsho
         if (st?.closed) {
           const [cx, cy, d] = [x(s.lon), y(s.lat), 5];
           return (
-            <g key={s.id} opacity={0.8}>
+            <g key={s.id} opacity={0.8} {...selectable({ kind: "station", id: s.id }, selected, onSelect)}>
               <circle cx={cx} cy={cy} r={8} fill="#0d1117" stroke="#8b949e" strokeWidth={3}>
                 <title>{`${s.name}: closed, trains run through; passengers use the neighbouring stations`}</title>
               </circle>
@@ -67,7 +86,7 @@ export function MetroMap({ network, snapshot }: { network: MetroNetwork; snapsho
           );
         }
         return (
-          <g key={s.id}>
+          <g key={s.id} {...selectable({ kind: "station", id: s.id }, selected, onSelect)}>
             <circle cx={x(s.lon)} cy={y(s.lat)} r={r} fill="#0d1117" stroke={RISK_COLOR[st?.overloadRisk ?? "LOW"]} strokeWidth={3}>
               <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting${capacity}${held}, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${leftBehind}${queues}`}</title>
             </circle>
