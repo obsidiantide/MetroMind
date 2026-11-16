@@ -48,13 +48,15 @@ function heatOf(outcome: StrategyOutcome): WaitHeat {
 
 export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
   snapshot: Snapshot | null; network: MetroNetwork | null;
-  /** Called with the extra wait per station of the best strategy whenever a what-if result arrives. */
+  /** Called with the extra wait per station of the strategy shown on the map (the best one by default). */
   onHeat?: (heat: WaitHeat | null) => void;
 }) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
   const [seconds, setSeconds] = useState(240);
   const [report, setReport] = useState<WhatIf | null>(null);
+  /** Strategy whose outcome the map shows: null for the best one, "" to hide the heat. */
+  const [mapStrategy, setMapStrategy] = useState<string | null>(null);
   const [section, setSection] = useState("");
   const [closureMinutes, setClosureMinutes] = useState(10);
   const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
@@ -65,10 +67,12 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
   useEffect(() => {
     api.strategies().then(setStrategies).catch((e) => setError(String(e)));
   }, []);
+  useEffect(() => setMapStrategy(null), [report]);
   useEffect(() => {
-    const best = report?.outcomes.find((o) => o.strategy === report.bestStrategy);
-    onHeat(best ? heatOf(best) : null);
-  }, [report, onHeat]);
+    const shown = report?.outcomes.find((o) => o.strategy === (mapStrategy ?? report.bestStrategy));
+    onHeat(shown ? heatOf(shown) : null);
+  }, [report, mapStrategy, onHeat]);
+  const onMap = mapStrategy ?? report?.bestStrategy;
   useEffect(() => {
     if (!trainId && snapshot?.trains.length) setTrainId(snapshot.trains[0].id);
   }, [snapshot, trainId]);
@@ -196,8 +200,11 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
             </thead>
             <tbody>
               {report.outcomes.map((o) => (
-                <tr key={o.strategy} className={o.strategy === report.bestStrategy ? "best" : ""}>
-                  <td>{o.strategy}</td>
+                <tr key={o.strategy}
+                    className={[o.strategy === report.bestStrategy ? "best" : "", o.strategy === onMap ? "on-map" : "",
+                      "pickable"].join(" ")}
+                    onClick={() => setMapStrategy(o.strategy)} title="Show this strategy's extra wait on the map">
+                  <td>{o.strategy}{o.strategy === onMap && <span className="muted"> · on map</span>}</td>
                   <td>{o.trainsAffected}</td>
                   <td>{Math.round(o.maxTrainDelaySeconds)} s</td>
                   <td>{Math.round(o.totalExtraPassengerWaitMinutes)} min</td>
@@ -234,7 +241,11 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
             </tbody>
           </table>
           <p className="muted">
-            Strategies are ranked by total travel time (platform wait + time on board) over the horizon.
+            Strategies are ranked by total travel time (platform wait + time on board) over the horizon. Click a row
+            to map its extra wait per station.{" "}
+            {onMap
+              ? <button onClick={() => setMapStrategy("")}>Hide from map</button>
+              : <button onClick={() => setMapStrategy(null)}>Show best on map</button>}
           </p>
           <p className="muted">
             Most affected trains ({report.outcomes[0].strategy}):{" "}
