@@ -408,6 +408,24 @@ live in the sorted set `metromind:replay`, scored by simulated time, so other se
 `GET /api/replay?at=27950` returns the newest kept snapshot taken at or before that time, in the same shape as
 `/api/state` (`404` if it is older than the range).
 
+### Operational metrics
+
+The backend publishes Micrometer meters at `/actuator/metrics` and in Prometheus format at `/actuator/prometheus`:
+
+| Meter | Type | What it measures |
+|---|---|---|
+| `metromind.sim.tick` | timer (p50, p95, p99) | Wall-clock time to advance the live engine by one tick and snapshot it |
+| `metromind.analysis.duration` | timer, tag `kind` | Wall-clock time of what-if work: `delay`, `section_closure`, `station_closure`, `benchmark` |
+| `metromind.incidents.injected` | counter, tag `kind` | Incidents injected into the live simulation |
+| `metromind.sim.time` | gauge | Simulated seconds since midnight |
+| `metromind.passengers.waiting` | gauge | Passengers waiting at all stations |
+| `metromind.trains.delay.average`, `.max` | gauges | Lateness of trains in service, in seconds |
+| `metromind.trains.in.service` | gauge | Trains running on the lines |
+| `metromind.headway.cv` | gauge | Headway coefficient of variation (0 is perfectly regular) |
+
+Gauges read the latest published snapshot, so a scrape never waits for the engine lock. A tick that takes longer
+than `metromind.sim.tick-millis` means the simulation is falling behind its configured speed.
+
 ## Project layout
 
 ```
