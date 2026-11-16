@@ -1,4 +1,6 @@
-import type { ClosureResponse, DelayImpactReport, IncidentImpactReport, MetroNetwork, MinuteKpi } from "./types";
+import type {
+  ClosureResponse, DelayImpactReport, Departure, IncidentImpactReport, MetroNetwork, MinuteKpi,
+} from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? API_URL.replace(/^http/, "ws") + "/ws";
@@ -17,6 +19,9 @@ export const api = {
   strategies: () => call<string[]>("/api/strategies"),
   /** The last `limit` closed minutes of KPIs, oldest first. */
   kpis: (limit = 60) => call<MinuteKpi[]>(`/api/kpis?limit=${limit}`),
+  /** Trains leaving the station within `horizonSeconds` of simulated time, soonest first. */
+  departures: (stationId: string, horizonSeconds = 1800) =>
+    call<Departure[]>(`/api/stations/${encodeURIComponent(stationId)}/departures?horizonSeconds=${horizonSeconds}`),
   setStrategy: (strategy: string) => call<void>("/api/strategy", { method: "PUT", body: JSON.stringify({ strategy }) }),
   delay: (trainId: string, seconds: number) =>
     call<void>("/api/incidents/delay", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),

@@ -85,3 +85,12 @@ export interface MinuteKpi {
   averageWaiting: number; maxWaiting: number;
   averageHeadwayCv: number; delayAlerts: number; incidents: number;
 }
+/** One row of a station departure board (`GET /api/stations/{id}/departures`); times in simulated seconds. */
+export interface Departure {
+  trainId: string; lineId: string;
+  /** Terminal the train is heading for after this departure. */
+  towardsStationId: string;
+  plannedTime: number; plannedClock: string; expectedTime: number;
+  /** expectedTime - plannedTime; negative when running early. */
+  delaySeconds: number;
+}
