@@ -56,7 +56,7 @@ Mark items `[x]` when merged.
 - [x] Run benchmarks as background jobs (`202 Accepted` + job id, poll for progress) so large runs do not hold a request
 
 ### Frontend
-- [ ] Charts: delay and waiting over time
+- [x] Charts: delay and waiting over time
 - [ ] Click a train or station for a detail drawer
 - [ ] Visualise what-if result on the map (heat of extra wait per station)
 - [ ] Strategy benchmark page
