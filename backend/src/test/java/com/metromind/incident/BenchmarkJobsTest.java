@@ -139,6 +139,74 @@ class BenchmarkJobsTest {
     }
 
     @Test
+    void aCancelledQueuedJobNeverStarts() {
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        AtomicReference<Boolean> started = new AtomicReference<>(false);
+        String id = jobs.submit(2, progress -> {
+            started.set(true);
+            return REPORT;
+        }).id();
+
+        BenchmarkJobs.Job cancelled = jobs.cancel(id).orElseThrow();
+        assertThat(cancelled.status()).isEqualTo(BenchmarkJobs.Status.CANCELLED);
+        assertThat(cancelled.finishedAt()).isEqualTo(clock.instant());
+        assertThat(cancelled.startedAt()).isNull();
+
+        executor.runNext();
+        assertThat(started.get()).isFalse();
+        assertThat(jobs.get(id)).contains(cancelled);
+    }
+
+    @Test
+    void aCancelledRunningJobStopsAtItsNextProgressReport() {
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        AtomicReference<String> id = new AtomicReference<>();
+        AtomicReference<Integer> lastRun = new AtomicReference<>(0);
+        id.set(jobs.submit(4, progress -> {
+            for (int run = 1; run <= 4; run++) {
+                lastRun.set(run);
+                progress.onProgress(run, 4);
+                if (run == 2) {
+                    jobs.cancel(id.get());
+                }
+            }
+            return REPORT;
+        }).id());
+
+        executor.runNext();
+
+        // Cancelled after the second run: the third run is the last one started, and its report is rejected.
+        assertThat(lastRun.get()).isEqualTo(3);
+        BenchmarkJobs.Job job = jobs.get(id.get()).orElseThrow();
+        assertThat(job.status()).isEqualTo(BenchmarkJobs.Status.CANCELLED);
+        assertThat(job.completedRuns()).isEqualTo(2);
+        assertThat(job.report()).isNull();
+        assertThat(job.finished()).isTrue();
+    }
+
+    @Test
+    void cancellingAFinishedJobLeavesItAsItWas() {
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        String id = jobs.submit(1, progress -> REPORT).id();
+        executor.runNext();
+
+        assertThat(jobs.cancel(id)).hasValueSatisfying(job -> {
+            assertThat(job.status()).isEqualTo(BenchmarkJobs.Status.SUCCEEDED);
+            assertThat(job.report()).isEqualTo(REPORT);
+        });
+        assertThat(jobs.cancel("missing")).isEmpty();
+    }
+
+    @Test
+    void aCancelledJobFreesItsPlaceForANewOne() {
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 1, clock);
+        String id = jobs.submit(1, progress -> REPORT).id();
+        jobs.cancel(id);
+        assertThat(jobs.submit(1, progress -> REPORT).status()).isEqualTo(BenchmarkJobs.Status.QUEUED);
+        assertThat(jobs.get(id)).isEmpty();
+    }
+
+    @Test
     void anUnknownJobIsEmpty() {
         assertThat(new BenchmarkJobs(executor, 1, clock).get("missing")).isEmpty();
     }
