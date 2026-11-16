@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ControlPanel } from "@/components/ControlPanel";
+import { DetailDrawer, type Selection } from "@/components/DetailDrawer";
 import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { KpiCharts } from "@/components/KpiCharts";
 import { MetroMap } from "@/components/MetroMap";
@@ -12,6 +13,8 @@ export default function Home() {
   const [network, setNetwork] = useState<MetroNetwork | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { snapshot, connected } = useSimulation();
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const closeDrawer = useCallback(() => setSelection(null), []);
 
   useEffect(() => {
     api.network().then(setNetwork).catch((e) => setError(String(e)));
@@ -55,10 +58,15 @@ export default function Home() {
         <KpiCharts />
         <section className="panel">
           {error && <p style={{ color: "var(--bad)" }}>Backend unreachable: {error}</p>}
-          {network && <MetroMap network={network} snapshot={snapshot} />}
+          {network && (
+            <MetroMap network={network} snapshot={snapshot} selected={selection} onSelect={setSelection} />
+          )}
         </section>
       </div>
       <ControlPanel snapshot={snapshot} network={network} />
+      {selection && network && (
+        <DetailDrawer selection={selection} network={network} snapshot={snapshot} onClose={closeDrawer} />
+      )}
     </main>
   );
 }

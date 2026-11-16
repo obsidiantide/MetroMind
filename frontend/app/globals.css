@@ -49,3 +49,14 @@ svg text { fill: var(--muted); font-size: 10px; }
 .chart-hover { fill: transparent; }
 .chart-hover:hover { fill: rgba(139, 148, 158, .12); }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.drawer { position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(380px, calc(100vw - 32px)); overflow: auto; z-index: 10; box-shadow: 0 8px 32px rgba(0, 0, 0, .5); }
+.drawer h2 { margin-top: 14px; }
+.drawer-title { font-size: 18px; margin: 0 0 6px; }
+.drawer-close { position: absolute; top: 8px; right: 8px; padding: 2px 9px; font-size: 16px; }
+.chip { border: 1px solid var(--border); border-radius: 10px; padding: 1px 8px; font-size: 12px; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 10px 0 0; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.selectable { cursor: pointer; }
+.selectable:focus { outline: none; }
+.selectable:focus-visible > :first-child, .selected > :first-child { stroke: #ffffff; }
