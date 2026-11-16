@@ -60,4 +60,13 @@ export const api = {
   },
   benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),
   benchmarkJobs: () => call<BenchmarkJob[]>("/api/analysis/benchmark/jobs"),
+  /**
+   * Cancels a queued or running benchmark job and returns it as it now stands. A job that had already finished is
+   * returned unchanged (the server answers 409 with it), so the caller can simply show whatever comes back.
+   */
+  cancelBenchmarkJob: async (id: string): Promise<BenchmarkJob> => {
+    const res = await fetch(`${API_URL}/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 409) throw new Error(`${res.status} ${await res.text()}`);
+    return (await res.json()) as BenchmarkJob;
+  },
 };

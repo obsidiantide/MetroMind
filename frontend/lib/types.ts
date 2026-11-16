@@ -109,8 +109,11 @@ export interface BenchmarkReport {
   seed: number; horizonSeconds: number; metric: RankingMetric; scenarios: IncidentScenario[];
   rankings: StrategyRanking[];
 }
-export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
-/** A background benchmark run; `report` is set once SUCCEEDED, `error` once FAILED. Times are ISO-8601. */
+export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+/**
+ * A background benchmark run; `report` is set once SUCCEEDED, `error` once FAILED. A CANCELLED job keeps the runs it
+ * completed but no report. Times are ISO-8601.
+ */
 export interface BenchmarkJob {
   id: string; status: BenchmarkJobStatus; completedRuns: number; totalRuns: number; progress: number;
   submittedAt: string; startedAt: string | null; finishedAt: string | null;
