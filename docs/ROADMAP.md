@@ -54,6 +54,10 @@ Mark items `[x]` when merged.
 - [x] Integration tests with Testcontainers (PostGIS, Kafka, Redis)
 - [x] Micrometer metrics for simulation tick time and analysis duration
 - [x] Run benchmarks as background jobs (`202 Accepted` + job id, poll for progress) so large runs do not hold a request
+- [ ] KPI aggregation robust to lag between topics: track a watermark per telemetry topic and close a minute only
+      when every topic has passed it (today a backlog on positions lets metrics close minutes early and drops samples)
+- [ ] Cancel a queued or running benchmark job (`DELETE /api/analysis/benchmark/jobs/{id}`)
+- [ ] Persist finished benchmark jobs in PostgreSQL so results survive restarts
 
 ### Frontend
 - [x] Charts: delay and waiting over time
@@ -61,3 +65,6 @@ Mark items `[x]` when merged.
 - [x] Visualise what-if result on the map (heat of extra wait per station)
 - [x] Strategy benchmark page
 - [ ] Load real city networks (Baku, Moscow-like) from GeoJSON
+- [ ] Component tests (Vitest + Testing Library) for the charts, detail drawer and benchmark page
+- [ ] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
+- [ ] Export a benchmark report as CSV
