@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ControlPanel } from "@/components/ControlPanel";
 import { DetailDrawer, type Selection } from "@/components/DetailDrawer";
@@ -28,7 +29,7 @@ export default function Home() {
         <header className="panel row" style={{ justifyContent: "space-between" }}>
           <h1>MetroMind · {network?.city ?? "…"}</h1>
           <span className="muted">
-            {snapshot?.clock ?? "--:--:--"} · {connected ? "live" : "connecting…"}
+            {snapshot?.clock ?? "--:--:--"} · {connected ? "live" : "connecting…"} · <Link href="/benchmark">Benchmark</Link>
           </span>
         </header>
         {m && (
