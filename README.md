@@ -420,6 +420,9 @@ GET /api/kpis?limit=1
    "delayAlerts": 0, "incidents": 0 }]
 ```
 
+The dashboard charts the last hour of these minutes, refreshed every 6 s: average and worst train delay, and
+average and peak passengers waiting network-wide. Hover a column to read every value for that minute.
+
 ### Spatial station search
 
 `/api/stations/nearest` and `/api/stations/within` answer "which station is closest to me" and "which stations
