@@ -94,3 +94,28 @@ export interface Departure {
   /** expectedTime - plannedTime; negative when running early. */
   delaySeconds: number;
 }
+export type RankingMetric = "WAIT_PER_BOARDING" | "TRAVEL_TIME";
+/** One strategy's result over all benchmark scenarios; `rank` 1 is best by the report's metric. */
+export interface StrategyRanking {
+  rank: number; strategy: string; meanWaitSeconds: number; p95WaitSeconds: number;
+  meanTravelMinutes: number; p95TravelMinutes: number;
+  /** Mean headway recovery over the scenarios recovered from; null if none recovered within the horizon. */
+  meanRecoverySeconds: number | null; unrecoveredScenarios: number;
+  meanShortTurns: number; shortTurnsByStation: Record<string, number>;
+  meanStopsSkipped: number; meanPassengersCarriedPast: number; stopsSkippedByStation: Record<string, number>;
+  waitSecondsPerScenario: number[];
+}
+export interface BenchmarkReport {
+  seed: number; horizonSeconds: number; metric: RankingMetric; scenarios: IncidentScenario[];
+  rankings: StrategyRanking[];
+}
+export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+/** A background benchmark run; `report` is set once SUCCEEDED, `error` once FAILED. Times are ISO-8601. */
+export interface BenchmarkJob {
+  id: string; status: BenchmarkJobStatus; completedRuns: number; totalRuns: number; progress: number;
+  submittedAt: string; startedAt: string | null; finishedAt: string | null;
+  report: BenchmarkReport | null; error: string | null;
+}
+export interface BenchmarkRequest {
+  scenarios: number; seed: number; horizonSeconds: number; kinds: ScenarioKind[]; metric: RankingMetric;
+}

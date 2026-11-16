@@ -1,5 +1,6 @@
 import type {
-  ClosureResponse, DelayImpactReport, Departure, IncidentImpactReport, MetroNetwork, MinuteKpi,
+  BenchmarkJob, BenchmarkRequest, ClosureResponse, DelayImpactReport, Departure, IncidentImpactReport, MetroNetwork,
+  MinuteKpi,
 } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
@@ -11,7 +12,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-  return res.status === 204 || res.status === 202 ? (undefined as T) : res.json();
+  // 202 Accepted may or may not carry a body (incidents do not, queued benchmark jobs do).
+  const body = await res.text();
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 
 export const api = {
@@ -47,4 +50,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ stationId, seconds }),
     }),
+  /** Queues a strategy benchmark; poll `benchmarkJob` with the returned id until it has finished. */
+  submitBenchmark: (r: BenchmarkRequest) => {
+    const q = new URLSearchParams({
+      scenarios: String(r.scenarios), seed: String(r.seed), horizonSeconds: String(r.horizonSeconds), metric: r.metric,
+    });
+    if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
+    return call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${q}`, { method: "POST" });
+  },
+  benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),
+  benchmarkJobs: () => call<BenchmarkJob[]>("/api/analysis/benchmark/jobs"),
 };
