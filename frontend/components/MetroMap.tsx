@@ -8,6 +8,22 @@ const H = 640;
 const PAD = 50;
 const RISK_COLOR = { LOW: "#3fb950", MEDIUM: "#d29922", HIGH: "#f85149" } as const;
 
+/** Extra passenger-minutes of waiting per station from one strategy's what-if outcome, drawn as a heat layer. */
+export interface WaitHeat {
+  label: string;
+  extraWaitMinutes: Record<string, number>;
+}
+
+/** Halo colour and size for a station's extra wait relative to the worst one: red for more, blue for less. */
+function heatStyle(extra: number, worst: number) {
+  const share = worst > 0 ? Math.min(1, Math.abs(extra) / worst) : 0;
+  return {
+    fill: extra >= 0 ? "#f85149" : "#58a6ff",
+    opacity: 0.15 + 0.55 * share,
+    grow: 4 + 16 * share,
+  };
+}
+
 /** Keyboard and pointer props that make a map element pick `target` when activated. */
 function selectable(target: Selection, selected: Selection | null, onSelect: (s: Selection) => void) {
   const isSelected = selected?.kind === target.kind && selected.id === target.id;
@@ -23,8 +39,9 @@ function selectable(target: Selection, selected: Selection | null, onSelect: (s:
   };
 }
 
-export function MetroMap({ network, snapshot, selected = null, onSelect = () => {} }: {
+export function MetroMap({ network, snapshot, selected = null, onSelect = () => {}, heat = null }: {
   network: MetroNetwork; snapshot: Snapshot | null; selected?: Selection | null; onSelect?: (s: Selection) => void;
+  heat?: WaitHeat | null;
 }) {
   const lats = network.stations.map((s) => s.lat);
   const lons = network.stations.map((s) => s.lon);
@@ -36,6 +53,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
   const stationState = new Map(snapshot?.stations.map((s) => [s.id, s]) ?? []);
   const lineColor = new Map(network.lines.map((l) => [l.id, l.color]));
   const lineName = new Map(network.lines.map((l) => [l.id, l.name]));
+  const worstHeat = heat ? Math.max(0, ...Object.values(heat.extraWaitMinutes).map(Math.abs)) : 0;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Metro network map">
@@ -63,6 +81,15 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
           </line>
         );
       })}
+      {heat && network.stations.map((s) => {
+        const extra = heat.extraWaitMinutes[s.id] ?? 0;
+        if (Math.abs(extra) < 0.5) return null;
+        const h = heatStyle(extra, worstHeat);
+        return (
+          <circle key={`heat-${s.id}`} cx={x(s.lon)} cy={y(s.lat)} r={6 + h.grow} fill={h.fill} opacity={h.opacity}
+                  pointerEvents="none" />
+        );
+      })}
       {network.stations.map((s) => {
         const st = stationState.get(s.id);
         const r = 6 + Math.min(14, (st?.waiting ?? 0) / 40);
@@ -72,6 +99,8 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
         const queues = (st?.queues ?? [])
           .map((q) => `\n  ${lineName.get(q.lineId) ?? q.lineId} → ${station(q.towardsStationId).name}: ${Math.round(q.waiting)}`)
           .join("");
+        const extra = heat?.extraWaitMinutes[s.id];
+        const heatNote = extra === undefined ? "" : `\n  what-if (${heat!.label}): ${extra >= 0 ? "+" : ""}${Math.round(extra)} passenger-min waiting`;
         if (st?.closed) {
           const [cx, cy, d] = [x(s.lon), y(s.lat), 5];
           return (
@@ -88,7 +117,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
         return (
           <g key={s.id} {...selectable({ kind: "station", id: s.id }, selected, onSelect)}>
             <circle cx={x(s.lon)} cy={y(s.lat)} r={r} fill="#0d1117" stroke={RISK_COLOR[st?.overloadRisk ?? "LOW"]} strokeWidth={3}>
-              <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting${capacity}${held}, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${leftBehind}${queues}`}</title>
+              <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting${capacity}${held}, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${leftBehind}${queues}${heatNote}`}</title>
             </circle>
             <text x={x(s.lon) + 12} y={y(s.lat) - 10}>{s.name}</text>
           </g>
@@ -105,6 +134,15 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
           </g>
         );
       })}
+      {heat && (
+        <g transform={`translate(${PAD - 30},${H - 24})`} aria-label="What-if heat legend">
+          <circle cx={6} cy={-4} r={6} fill="#f85149" opacity={0.6} />
+          <text x={16} y={0}>more waiting</text>
+          <circle cx={106} cy={-4} r={6} fill="#58a6ff" opacity={0.6} />
+          <text x={116} y={0}>less waiting</text>
+          <text x={196} y={0}>{`what-if: ${heat.label}, worst ${Math.round(worstHeat)} passenger-min`}</text>
+        </g>
+      )}
     </svg>
   );
 }
