@@ -1,5 +1,7 @@
 package com.metromind.incident;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,12 +37,20 @@ public final class BenchmarkJobs {
                       Instant startedAt, Instant finishedAt, BenchmarkReport report, String error) {
 
         /** Share of the simulated runs done, from 0 to 1. */
+        @JsonProperty("progress")
         public double progress() {
             return totalRuns == 0 ? 0 : (double) completedRuns / totalRuns;
         }
 
         public boolean finished() {
             return status == Status.SUCCEEDED || status == Status.FAILED;
+        }
+    }
+
+    /** Thrown by {@link #submit} when no more jobs can be taken for now. */
+    public static final class QueueFullException extends IllegalStateException {
+        QueueFullException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
@@ -62,7 +72,7 @@ public final class BenchmarkJobs {
      * Queues {@code work}, which runs the benchmark and reports progress through the listener it is given, and
      * returns the job as queued. {@code totalRuns} is the number of runs the progress counts up to.
      *
-     * @throws IllegalStateException if the retained jobs are all still queued or running
+     * @throws QueueFullException if the retained jobs are all still queued or running, or the executor refuses
      */
     public Job submit(int totalRuns, Function<StrategyBenchmark.ProgressListener, BenchmarkReport> work) {
         String id = UUID.randomUUID().toString();
@@ -70,8 +80,8 @@ public final class BenchmarkJobs {
         synchronized (jobs) {
             evictFinished();
             if (jobs.size() >= retained) {
-                throw new IllegalStateException(
-                        "%d benchmark jobs are already queued or running; try again later".formatted(jobs.size()));
+                throw new QueueFullException(
+                        "%d benchmark jobs are already queued or running; try again later".formatted(jobs.size()), null);
             }
             jobs.put(id, queued);
         }
@@ -81,7 +91,7 @@ public final class BenchmarkJobs {
             synchronized (jobs) {
                 jobs.remove(id);
             }
-            throw new IllegalStateException("Benchmark jobs are not being accepted: " + e.getMessage(), e);
+            throw new QueueFullException("Benchmark jobs are not being accepted: " + e.getMessage(), e);
         }
         return queued;
     }

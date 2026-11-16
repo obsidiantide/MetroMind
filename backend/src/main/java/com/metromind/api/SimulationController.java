@@ -1,6 +1,7 @@
 package com.metromind.api;
 
 import com.metromind.incident.AnalysisRecord;
+import com.metromind.incident.BenchmarkJobs;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.IncidentImpactReport;
@@ -18,8 +19,10 @@ import jakarta.validation.constraints.NotBlank;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -204,9 +207,58 @@ public class SimulationController {
                                      @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
                                      @RequestParam(defaultValue = "WAIT_PER_BOARDING")
                                      BenchmarkReport.RankingMetric metric) {
-        Set<BenchmarkReport.IncidentKind> drawn = kinds == null || kinds.isEmpty()
+        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric);
+    }
+
+    /**
+     * The same benchmark as {@code POST /analysis/benchmark}, run as a background job: answers {@code 202 Accepted}
+     * at once with the queued job and its URL in {@code Location}; poll that URL until the job has
+     * {@code SUCCEEDED} (its {@code report} is then set) or {@code FAILED}. Answers {@code 429} while too many jobs
+     * are already queued or running.
+     */
+    @Tag(name = "Analysis")
+    @Operation(summary = "Queue a strategy benchmark as a background job")
+    @ApiResponse(responseCode = "202", description = "Job queued; poll the Location header")
+    @ApiResponse(responseCode = "429", description = "Too many benchmark jobs queued or running")
+    @PostMapping("/analysis/benchmark/jobs")
+    public ResponseEntity<BenchmarkJobs.Job> submitBenchmark(
+            @RequestParam(defaultValue = "10") @Min(1) @Max(200) int scenarios,
+            @RequestParam(defaultValue = "1") long seed,
+            @RequestParam(defaultValue = "1800") @Min(300) @Max(7200) double horizonSeconds,
+            @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
+            @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric) {
+        BenchmarkJobs.Job job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric);
+        return ResponseEntity.accepted()
+                .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
+                        .toUri())
+                .body(job);
+    }
+
+    @Tag(name = "Analysis")
+    @Operation(summary = "A benchmark job: status, progress and, once done, its report")
+    @ApiResponse(responseCode = "200", description = "The job")
+    @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
+    @GetMapping("/analysis/benchmark/jobs/{id}")
+    public ResponseEntity<BenchmarkJobs.Job> benchmarkJob(@PathVariable String id) {
+        return ResponseEntity.of(simulation.benchmarkJob(id));
+    }
+
+    @Tag(name = "Analysis")
+    @Operation(summary = "Benchmark jobs still kept, newest first")
+    @GetMapping("/analysis/benchmark/jobs")
+    public List<BenchmarkJobs.Job> benchmarkJobs(@RequestParam(defaultValue = "20") @Min(1) @Max(20) int limit) {
+        return simulation.benchmarkJobs(limit);
+    }
+
+    /** The incident kinds to draw: all of them when none are named. */
+    private static Set<BenchmarkReport.IncidentKind> drawn(Set<BenchmarkReport.IncidentKind> kinds) {
+        return kinds == null || kinds.isEmpty()
                 ? EnumSet.allOf(BenchmarkReport.IncidentKind.class) : EnumSet.copyOf(kinds);
-        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn, metric);
+    }
+
+    @ExceptionHandler(BenchmarkJobs.QueueFullException.class)
+    public ResponseEntity<Map<String, String>> tooManyJobs(BenchmarkJobs.QueueFullException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error", e.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
