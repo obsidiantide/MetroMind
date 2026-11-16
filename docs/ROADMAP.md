@@ -53,7 +53,7 @@ Mark items `[x]` when merged.
 - [x] OpenAPI (springdoc) documentation
 - [ ] Integration tests with Testcontainers (PostGIS, Kafka, Redis)
 - [x] Micrometer metrics for simulation tick time and analysis duration
-- [ ] Run benchmarks as background jobs (`202 Accepted` + job id, poll for progress) so large runs do not hold a request
+- [x] Run benchmarks as background jobs (`202 Accepted` + job id, poll for progress) so large runs do not hold a request
 
 ### Frontend
 - [ ] Charts: delay and waiting over time
