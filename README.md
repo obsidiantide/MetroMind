@@ -93,6 +93,20 @@ cd frontend && npm install && npm run dev
 Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafka`, then run
 `MetroMindApplication` with the default profile.
 
+### Tests
+
+```bash
+cd backend && mvn verify            # unit + API tests, then integration tests (needs Docker)
+cd backend && mvn verify -DskipITs  # without Docker
+```
+
+Unit and API tests run on the `standalone` profile with no infrastructure. The `*IT` classes in
+`backend/src/test/java/com/metromind/it` start the application against the same images as `docker-compose.yml`
+(PostGIS, Redis, Kafka) via Testcontainers and check the adapters for real: Flyway migrations, incident and
+what-if history in JSONB, the KPI upsert, PostGIS station search against the haversine reference, the Redis
+snapshot cache and replay window, and telemetry flowing through Kafka into stored per-minute KPIs. The containers
+are started once and shared by every integration test.
+
 ## API
 
 | Method | Path | Purpose |
