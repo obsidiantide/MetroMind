@@ -65,3 +65,8 @@ svg text { fill: var(--muted); font-size: 10px; }
 tr.pickable { cursor: pointer; }
 tr.pickable:hover td { background: rgba(139, 148, 158, .08); }
 tr.on-map td:first-child { box-shadow: inset 3px 0 0 #f85149; }
+.page { max-width: 1100px; margin: 0 auto; padding: 16px; }
+a { color: #58a6ff; }
+.table-scroll { overflow-x: auto; }
+td.sorted { font-weight: 600; }
+.scenarios { margin: 0; padding-left: 22px; font-size: 12px; columns: 2 280px; }
