@@ -128,6 +128,7 @@ are started once and shared by every integration test.
 | POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
 | POST | `/api/analysis/benchmark/jobs` | Same benchmark as a background job: `202 Accepted`, poll `Location` |
 | GET | `/api/analysis/benchmark/jobs/{id}` | Job status, progress and, once done, its report |
+| DELETE | `/api/analysis/benchmark/jobs/{id}` | Cancel a queued or running job (`409` if it had already finished) |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
@@ -379,6 +380,11 @@ A run is one strategy simulated once (a baseline, then each scenario), so a job 
 The 20 most recent jobs are kept (`GET /api/analysis/benchmark/jobs` lists them); while all 20 are still queued
 or running a new submission gets `429 Too Many Requests`.
 
+`DELETE /api/analysis/benchmark/jobs/{id}` cancels a job and answers with it as `CANCELLED`. A queued job never
+starts; a running one stops once the simulated run in progress ends, keeping its `completedRuns` but no report, and
+the next queued job starts. A job that had already succeeded or failed is left alone and returned with
+`409 Conflict`.
+
 ### Incident clearing timeline
 
 Every incident clears on its own: a delayed or broken-down train moves again when its stoppage runs out, and a
@@ -445,8 +451,8 @@ station. Click another row of the what-if table to map that strategy instead, or
 
 The **Benchmark** page (`/benchmark`, linked from the dashboard header) runs the strategy benchmark as a
 background job: pick the number of scenarios, the seed, the horizon, the incident kinds and the ranking metric,
-watch the progress bar, then read the ranking and the scenarios that were drawn. Earlier jobs still kept by the
-backend are listed and can be reopened.
+watch the progress bar (or cancel the run from it), then read the ranking and the scenarios that were drawn.
+Earlier jobs still kept by the backend are listed and can be reopened.
 
 ### Spatial station search
 
