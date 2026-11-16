@@ -9,6 +9,8 @@ import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.incident.StrategyBenchmark;
 import com.metromind.network.MetroNetwork;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,26 +31,33 @@ public class SimulationService {
     private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
+    private final Timer tickTimer;
     private volatile boolean paused;
     private volatile SimulationSnapshot last;
 
     public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners,
-                             IncidentHistory history) {
+                             IncidentHistory history, MeterRegistry meters) {
         this.props = props;
         this.listeners = listeners;
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
         this.last = engine.snapshot();
+        this.tickTimer = Timer.builder("metromind.sim.tick")
+                .description("Wall-clock time to advance the live engine by one tick and take its snapshot")
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .register(meters);
     }
 
     @Scheduled(fixedRateString = "${metromind.sim.tick-millis:500}")
     public void tick() {
         SimulationSnapshot snap;
         synchronized (engine) {
+            Timer.Sample sample = Timer.start();
             if (!paused) {
                 engine.run(props.speed() * props.tickMillis() / 1000.0, 1.0);
             }
             snap = engine.snapshot();
+            sample.stop(tickTimer);
         }
         last = snap;
         for (SnapshotListener l : listeners) {
