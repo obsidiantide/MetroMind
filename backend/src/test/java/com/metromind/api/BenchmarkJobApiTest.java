@@ -16,6 +16,7 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -78,8 +79,41 @@ class BenchmarkJobApiTest {
     }
 
     @Test
+    void cancelsALargeJobBeforeItFinishes() throws Exception {
+        String id = json.readTree(mvc.perform(post("/api/analysis/benchmark/jobs").param("scenarios", "200")
+                        .param("horizonSeconds", "7200"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(delete("/api/analysis/benchmark/jobs/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.finishedAt").isString());
+
+        JsonNode job = awaitFinished(id);
+        assertThat(job.get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(job.get("report").isNull()).isTrue();
+        assertThat(job.get("completedRuns").asInt()).isLessThan(job.get("totalRuns").asInt());
+        // Cancelling again is harmless.
+        mvc.perform(delete("/api/analysis/benchmark/jobs/" + id)).andExpect(status().isOk());
+    }
+
+    @Test
+    void cancellingAFinishedJobIsAConflict() throws Exception {
+        String id = json.readTree(mvc.perform(post("/api/analysis/benchmark/jobs").param("scenarios", "1")
+                        .param("horizonSeconds", "300"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString()).get("id").asText();
+        assertThat(awaitFinished(id).get("status").asText()).isEqualTo("SUCCEEDED");
+
+        mvc.perform(delete("/api/analysis/benchmark/jobs/" + id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.report").isMap());
+    }
+
+    @Test
     void anUnknownJobIsNotFound() throws Exception {
         mvc.perform(get("/api/analysis/benchmark/jobs/no-such-job")).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/analysis/benchmark/jobs/no-such-job")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -96,7 +130,7 @@ class BenchmarkJobApiTest {
             JsonNode job = json.readTree(mvc.perform(get("/api/analysis/benchmark/jobs/" + id))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             String status = job.get("status").asText();
-            if (status.equals("SUCCEEDED") || status.equals("FAILED")) {
+            if (status.equals("SUCCEEDED") || status.equals("FAILED") || status.equals("CANCELLED")) {
                 return job;
             }
             Thread.sleep(50);
