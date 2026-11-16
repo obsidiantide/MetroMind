@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ControlPanel } from "@/components/ControlPanel";
 import { IncidentTimeline } from "@/components/IncidentTimeline";
+import { KpiCharts } from "@/components/KpiCharts";
 import { MetroMap } from "@/components/MetroMap";
 import { api } from "@/lib/api";
 import type { MetroNetwork } from "@/lib/types";
@@ -51,6 +52,7 @@ export default function Home() {
           </section>
         )}
         {snapshot && <IncidentTimeline snapshot={snapshot} />}
+        <KpiCharts />
         <section className="panel">
           {error && <p style={{ color: "var(--bad)" }}>Backend unreachable: {error}</p>}
           {network && <MetroMap network={network} snapshot={snapshot} />}
