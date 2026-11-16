@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /** Owns the live engine, advances it on a timer and fans snapshots out to listeners. */
@@ -32,6 +33,7 @@ public class SimulationService {
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
     private final Timer tickTimer;
+    private final MeterRegistry meters;
     private volatile boolean paused;
     private volatile SimulationSnapshot last;
 
@@ -42,6 +44,7 @@ public class SimulationService {
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
         this.last = engine.snapshot();
+        this.meters = meters;
         this.tickTimer = Timer.builder("metromind.sim.tick")
                 .description("Wall-clock time to advance the live engine by one tick and take its snapshot")
                 .publishPercentiles(0.5, 0.95, 0.99)
@@ -129,7 +132,8 @@ public class SimulationService {
         synchronized (engine) {
             fork = engine.copy();
         }
-        DelayImpactReport report = analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all());
+        DelayImpactReport report = analysisTimer("delay").record(
+                () -> analyzer.analyze(fork, trainId, seconds, horizonSeconds, HeadwayStrategy.all()));
         history.recordAnalysis(fork.simTime(), report);
         return report;
     }
@@ -143,7 +147,8 @@ public class SimulationService {
         synchronized (engine) {
             fork = engine.copy();
         }
-        return analyzer.analyze(fork, incident, horizonSeconds, HeadwayStrategy.all());
+        return analysisTimer(incident.kind().name().toLowerCase(Locale.ROOT)).record(
+                () -> analyzer.analyze(fork, incident, horizonSeconds, HeadwayStrategy.all()));
     }
 
     /**
@@ -157,7 +162,20 @@ public class SimulationService {
         synchronized (engine) {
             fork = engine.copy();
         }
-        return benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric);
+        return analysisTimer("benchmark").record(
+                () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric));
+    }
+
+    /**
+     * Wall-clock duration of what-if work, tagged by what was analysed: {@code delay}, an incident kind such as
+     * {@code station_closure}, or {@code benchmark}. Analyses run on forked engines, so this is the time a request
+     * spends simulating, not time the live clock loses.
+     */
+    private Timer analysisTimer(String kind) {
+        return Timer.builder("metromind.analysis.duration")
+                .description("Wall-clock time of what-if analyses and strategy benchmarks")
+                .tag("kind", kind)
+                .register(meters);
     }
 
     /** What-if analyses run so far, most recent first. */
