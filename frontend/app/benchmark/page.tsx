@@ -56,7 +56,7 @@ export default function BenchmarkPage() {
     if (!running) return;
     const timer = setInterval(() => {
       api.benchmarkJob(job.id)
-        .then((j) => { setJob(j); if (j.status === "SUCCEEDED" || j.status === "FAILED") refreshHistory(); })
+        .then((j) => { setJob(j); if (j.status !== "QUEUED" && j.status !== "RUNNING") refreshHistory(); })
         .catch((e) => setError(String(e)));
     }, POLL_MS);
     return () => clearInterval(timer);
@@ -66,6 +66,16 @@ export default function BenchmarkPage() {
     setError(null);
     try {
       setJob(await api.submitBenchmark({ scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric }));
+      refreshHistory();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+  const cancel = async () => {
+    if (!job) return;
+    setError(null);
+    try {
+      setJob(await api.cancelBenchmarkJob(job.id));
       refreshHistory();
     } catch (e) {
       setError(String(e));
@@ -113,8 +123,14 @@ export default function BenchmarkPage() {
         {job && running && (
           <div style={{ marginTop: 10 }}>
             <div className="meter"><div style={{ width: `${job.progress * 100}%`, background: "var(--ok)" }} /></div>
-            <p className="muted">{job.status === "QUEUED" ? "Queued" : "Running"}: {job.completedRuns} of {job.totalRuns} runs</p>
+            <div className="row">
+              <p className="muted">{job.status === "QUEUED" ? "Queued" : "Running"}: {job.completedRuns} of {job.totalRuns} runs</p>
+              <button onClick={cancel}>Cancel</button>
+            </div>
           </div>
+        )}
+        {job?.status === "CANCELLED" && (
+          <p className="muted">Benchmark cancelled after {job.completedRuns} of {job.totalRuns} runs.</p>
         )}
         {job?.status === "FAILED" && <p style={{ color: "var(--bad)" }}>Benchmark failed: {job.error}</p>}
       </section>
