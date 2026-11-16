@@ -1,13 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { lateness } from "@/lib/format";
-import type { Departure, MetroNetwork, Snapshot } from "@/lib/types";
+import { duration, lateness } from "@/lib/format";
+import type { Departure, MetroNetwork, Snapshot, TrainPhase } from "@/lib/types";
 
 export type Selection = { kind: "station"; id: string } | { kind: "train"; id: string };
 
 const RISK_COLOR = { LOW: "var(--ok)", MEDIUM: "var(--warn)", HIGH: "var(--bad)" } as const;
 const DEPARTURES_REFRESH_MS = 5000;
+const PHASE_LABEL: Record<TrainPhase, string> = {
+  DWELLING: "Dwelling at the platform",
+  HELD: "Held by the headway strategy",
+  WAITING_SIGNAL: "Waiting at a red signal",
+  RUNNING: "Running",
+};
 
 /** Side drawer with the live details of the station or train picked on the map. Escape closes it. */
 export function DetailDrawer({ selection, network, snapshot, onClose }: {
@@ -25,6 +31,7 @@ export function DetailDrawer({ selection, network, snapshot, onClose }: {
       {selection.kind === "station" && (
         <StationDetail key={selection.id} stationId={selection.id} network={network} snapshot={snapshot} />
       )}
+      {selection.kind === "train" && <TrainDetail trainId={selection.id} network={network} snapshot={snapshot} />}
     </aside>
   );
 }
@@ -103,6 +110,72 @@ function StationDetail({ stationId, network, snapshot }: {
             ))}
           </tbody>
         </table>
+      )}
+    </>
+  );
+}
+
+function TrainDetail({ trainId, network, snapshot }: {
+  trainId: string; network: MetroNetwork; snapshot: Snapshot | null;
+}) {
+  const train = snapshot?.trains.find((t) => t.id === trainId);
+  if (!train) {
+    return (
+      <>
+        <h2>Train</h2>
+        <h3 className="drawer-title">{trainId}</h3>
+        <p className="muted">Not in service: the train is in the depot or was withdrawn.</p>
+      </>
+    );
+  }
+  const name = (id: string) => network.stations.find((s) => s.id === id)?.name ?? id;
+  const line = network.lines.find((l) => l.id === train.lineId);
+  const loadShare = train.capacity > 0 ? train.load / train.capacity : 0;
+  const incidents = snapshot?.activeIncidents.filter((i) => i.subjectId === trainId) ?? [];
+  const events = snapshot?.recentEvents.filter((e) => e.subjectId === trainId).slice(-6).reverse() ?? [];
+  const where = train.fromStationId === train.toStationId || train.phase === "DWELLING"
+    ? `At ${name(train.fromStationId)}`
+    : `${name(train.fromStationId)} → ${name(train.toStationId)} (${Math.round(train.progress * 100)} %)`;
+
+  return (
+    <>
+      <h2>Train</h2>
+      <h3 className="drawer-title">{train.id}</h3>
+      <div className="row drawer-lines">
+        {line && <span className="chip" style={{ borderColor: line.color }}>{line.name}</span>}
+        {train.failed && <span className="chip" style={{ borderColor: "var(--bad)" }}>broken down</span>}
+      </div>
+      <dl className="facts">
+        <dt>Where</dt><dd>{where}</dd>
+        <dt>Doing</dt><dd>{PHASE_LABEL[train.phase]}</dd>
+        <dt>Lateness</dt>
+        <dd style={{ color: train.delaySeconds > 120 ? "var(--warn)" : undefined }}>{lateness(train.delaySeconds)}</dd>
+        <dt>Load</dt>
+        <dd>
+          {Math.round(train.load)} / {train.capacity}
+          <div className="meter" aria-hidden>
+            <div style={{
+              width: `${Math.min(100, loadShare * 100)}%`,
+              background: loadShare > 0.9 ? "var(--bad)" : loadShare > 0.7 ? "var(--warn)" : "var(--ok)",
+            }} />
+          </div>
+        </dd>
+      </dl>
+      {incidents.length > 0 && (
+        <>
+          <h2>Incidents</h2>
+          {incidents.map((i) => (
+            <p key={`${i.kind}-${i.startedAt}`}>{i.description} · clears in {duration(i.remainingSeconds)}</p>
+          ))}
+        </>
+      )}
+      {events.length > 0 && (
+        <>
+          <h2>Recent events</h2>
+          <div className="events">
+            {events.map((e, i) => <div key={i}>{e.message}</div>)}
+          </div>
+        </>
       )}
     </>
   );

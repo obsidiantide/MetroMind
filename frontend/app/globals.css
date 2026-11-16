@@ -60,3 +60,5 @@ svg text { fill: var(--muted); font-size: 10px; }
 .selectable { cursor: pointer; }
 .selectable:focus { outline: none; }
 .selectable:focus-visible > :first-child, .selected > :first-child { stroke: #ffffff; }
+.meter { height: 6px; margin-top: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.meter div { height: 100%; }
