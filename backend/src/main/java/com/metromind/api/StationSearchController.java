@@ -3,6 +3,8 @@ package com.metromind.api;
 import com.metromind.network.StationLocator;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +17,7 @@ import java.util.Map;
 
 /** Spatial station search: PostGIS when persistence is on, great-circle distance in memory otherwise. */
 @RestController
+@Tag(name = "Network")
 @RequestMapping("/api/stations")
 public class StationSearchController {
 
@@ -25,6 +28,7 @@ public class StationSearchController {
     }
 
     /** The {@code limit} stations closest to a WGS84 point, nearest first, with their distance in metres. */
+    @Operation(summary = "Stations closest to a point, nearest first")
     @GetMapping("/nearest")
     public List<StationLocator.StationDistance> nearest(@RequestParam double lat, @RequestParam double lon,
                                                         @RequestParam(defaultValue = "1") @Min(1) @Max(50)
@@ -33,6 +37,7 @@ public class StationSearchController {
     }
 
     /** Every station within {@code radiusMeters} of a WGS84 point, nearest first. */
+    @Operation(summary = "Stations within a radius of a point, nearest first")
     @GetMapping("/within")
     public List<StationLocator.StationDistance> within(@RequestParam double lat, @RequestParam double lon,
                                                        @RequestParam @Min(1) @Max(50_000) double radiusMeters) {
