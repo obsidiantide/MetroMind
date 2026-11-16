@@ -51,7 +51,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
 
 ---
 # Run without any infrastructure: mvn spring-boot:run -Dspring-boot.run.profiles=standalone
