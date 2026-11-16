@@ -48,3 +48,4 @@ svg text { fill: var(--muted); font-size: 10px; }
 .chart-legend b { color: var(--text); font-weight: 600; }
 .chart-hover { fill: transparent; }
 .chart-hover:hover { fill: rgba(139, 148, 158, .12); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
