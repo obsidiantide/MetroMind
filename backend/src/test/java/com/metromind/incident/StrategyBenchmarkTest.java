@@ -311,4 +311,20 @@ class StrategyBenchmarkTest {
         assertThatThrownBy(() -> new StrategyBenchmark().run(live(), 0, 1, 600, HeadwayStrategy.all()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void reportsProgressAfterEveryRunUpToTheTotal() {
+        List<HeadwayStrategy> strategies = List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED);
+        List<int[]> calls = new ArrayList<>();
+        BenchmarkReport withProgress = new StrategyBenchmark().run(live(), 3, 5, 600, strategies,
+                EnumSet.allOf(BenchmarkReport.IncidentKind.class), BenchmarkReport.RankingMetric.WAIT_PER_BOARDING,
+                (done, total) -> calls.add(new int[]{done, total}));
+
+        int total = StrategyBenchmark.totalRuns(3, strategies.size());
+        assertThat(total).isEqualTo(8);
+        assertThat(calls).extracting(c -> c[0]).containsExactlyElementsOf(IntStream.rangeClosed(1, total).boxed().toList());
+        assertThat(calls).extracting(c -> c[1]).containsOnly(total);
+        // Listening must not change the outcome.
+        assertThat(withProgress).isEqualTo(new StrategyBenchmark().run(live(), 3, 5, 600, strategies));
+    }
 }
