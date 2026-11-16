@@ -3,11 +3,16 @@ package com.metromind.incident;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -204,6 +209,81 @@ class BenchmarkJobsTest {
         jobs.cancel(id);
         assertThat(jobs.submit(1, progress -> REPORT).status()).isEqualTo(BenchmarkJobs.Status.QUEUED);
         assertThat(jobs.get(id)).isEmpty();
+    }
+
+    /** A store backed by a map, standing in for PostgreSQL. */
+    private static final class MapStore implements BenchmarkJobStore {
+        final Map<String, BenchmarkJobs.Job> saved = new LinkedHashMap<>();
+
+        @Override
+        public void save(BenchmarkJobs.Job job) {
+            saved.put(job.id(), job);
+        }
+
+        @Override
+        public Optional<BenchmarkJobs.Job> find(String id) {
+            return Optional.ofNullable(saved.get(id));
+        }
+
+        @Override
+        public List<BenchmarkJobs.Job> recent(int limit) {
+            return saved.values().stream().sorted(Comparator.comparing(BenchmarkJobs.Job::submittedAt).reversed())
+                    .limit(limit).toList();
+        }
+    }
+
+    @Test
+    void storesOnlyJobsThatReachAFinalState() {
+        MapStore store = new MapStore();
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock, store);
+        String ok = jobs.submit(1, progress -> REPORT).id();
+        String failed = jobs.submit(1, progress -> {
+            throw new IllegalStateException("boom");
+        }).id();
+        String cancelled = jobs.submit(1, progress -> REPORT).id();
+        String queued = jobs.submit(1, progress -> REPORT).id();
+        assertThat(store.saved).isEmpty();
+
+        executor.runNext();
+        executor.runNext();
+        jobs.cancel(cancelled);
+
+        assertThat(store.saved).containsOnlyKeys(ok, failed, cancelled);
+        assertThat(store.saved.get(ok).report()).isEqualTo(REPORT);
+        assertThat(store.saved.get(failed).status()).isEqualTo(BenchmarkJobs.Status.FAILED);
+        assertThat(store.saved.get(cancelled).status()).isEqualTo(BenchmarkJobs.Status.CANCELLED);
+        assertThat(store.saved).doesNotContainKey(queued);
+    }
+
+    @Test
+    void finishedJobsOutliveARestartThroughTheStore() {
+        MapStore store = new MapStore();
+        BenchmarkJobs before = new BenchmarkJobs(executor, 5, clock, store);
+        String id = before.submit(2, progress -> REPORT).id();
+        executor.runNext();
+
+        BenchmarkJobs after = new BenchmarkJobs(new ManualExecutor(), 5, clock, store);
+        assertThat(after.get(id)).hasValueSatisfying(job -> assertThat(job.report()).isEqualTo(REPORT));
+        assertThat(after.recent(10)).extracting(BenchmarkJobs.Job::id).containsExactly(id);
+        // Cancelling a stored job that has finished leaves it as it was.
+        assertThat(after.cancel(id)).hasValueSatisfying(job ->
+                assertThat(job.status()).isEqualTo(BenchmarkJobs.Status.SUCCEEDED));
+    }
+
+    @Test
+    void listingsMergeHeldAndStoredJobsWithoutDuplicates() {
+        MapStore store = new MapStore();
+        Clock later = Clock.offset(clock, Duration.ofMinutes(5));
+        BenchmarkJobs jobs = new BenchmarkJobs(executor, 1, clock, store);
+        String old = jobs.submit(1, progress -> REPORT).id();
+        executor.runNext();
+        BenchmarkJobs restarted = new BenchmarkJobs(executor, 1, later, store);
+        String fresh = restarted.submit(1, progress -> REPORT).id();
+        executor.runNext();
+
+        // Both held and stored now; the newer appears once, first.
+        assertThat(restarted.recent(10)).extracting(BenchmarkJobs.Job::id).containsExactly(fresh, old);
+        assertThat(restarted.recent(1)).extracting(BenchmarkJobs.Job::id).containsExactly(fresh);
     }
 
     @Test
