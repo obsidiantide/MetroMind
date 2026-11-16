@@ -112,6 +112,8 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 | POST | `/api/analysis/section-closure-impact` | What-if for a track-section closure (same body as `/api/incidents/section-closure`) |
 | POST | `/api/analysis/station-closure-impact` | What-if for a station closure (same body as `/api/incidents/station-closure`) |
 | POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
+| POST | `/api/analysis/benchmark/jobs` | Same benchmark as a background job: `202 Accepted`, poll `Location` |
+| GET | `/api/analysis/benchmark/jobs/{id}` | Job status, progress and, once done, its report |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
@@ -345,6 +347,22 @@ Each scenario lists only what its kind needs:
 `kinds` narrows the draw, e.g. `?kinds=SECTION_CLOSURE,STATION_CLOSURE` to compare strategies on closures only;
 by default all four kinds are drawn. The same seed, kinds and starting state always give the same report, and
 the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5–60 minutes.
+
+**Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
+state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
+`GET /api/analysis/benchmark/jobs/{id}` until `status` is `SUCCEEDED` (the job then carries the `report`) or
+`FAILED` (with an `error`):
+
+```json
+{ "id": "6f1c…", "status": "RUNNING", "completedRuns": 37, "totalRuns": 99, "progress": 0.37,
+  "submittedAt": "2026-11-16T08:00:00Z", "startedAt": "2026-11-16T08:00:00Z", "finishedAt": null,
+  "report": null, "error": null }
+```
+
+A run is one strategy simulated once (a baseline, then each scenario), so a job makes
+`strategies × (scenarios + 1)` runs. Jobs run one at a time and allow up to 200 scenarios and a two-hour horizon.
+The 20 most recent jobs are kept (`GET /api/analysis/benchmark/jobs` lists them); while all 20 are still queued
+or running a new submission gets `429 Too Many Requests`.
 
 ### Incident clearing timeline
 
