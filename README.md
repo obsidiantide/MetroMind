@@ -131,6 +131,7 @@ are started once and shared by every integration test.
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
+| GET | `/api/kpis/status` | KPI aggregation watermark per telemetry topic, open minutes, late samples |
 | GET | `/api/replay/range` | Span of simulated time that can be replayed (`204` before the first snapshot) |
 | GET | `/api/replay?at=29000` | Snapshot as it was at a past simulated time |
 | POST | `/api/simulation/pause` / `resume` | Pause or resume the clock |
@@ -409,9 +410,19 @@ memory.
 row per minute of simulated time: trains reporting, mean and worst lateness, mean load factor, mean and peak
 passengers waiting, mean headway CV, delay alerts raised and incidents started. It only depends on the topics, so
 it can run in an instance of its own. Kafka spreads trains over partitions, so messages arrive slightly out of
-order: a minute stays open until the newest message is 30 s past its end, and anything later for it is dropped
-(and counted). Closed minutes go to the `minute_kpi` table; re-aggregating a minute overwrites it. Without Kafka
-(`standalone`) the simulator feeds the same aggregator directly and the last 24 hours are kept in memory.
+order, and each topic has its own listener, so one topic can fall minutes behind another. The aggregator keeps a
+watermark per topic: a minute stays open until both per-tick topics (positions and network metrics) are 30 s past
+its end, so a backlog on positions holds minutes open instead of losing their samples. Events are sparse and never
+hold a minute open. Anything that still arrives after its minute closed is dropped (and counted); if a topic stalls,
+at most 60 minutes are kept open and the oldest is closed first. Closed minutes go to the `minute_kpi` table;
+re-aggregating a minute overwrites it. Without Kafka (`standalone`) the simulator feeds the same aggregator directly
+and the last 24 hours are kept in memory.
+
+`GET /api/kpis/status` shows how far aggregation has got, which makes a lagging topic easy to spot:
+
+```json
+{ "watermarks": { "POSITIONS": 29105.0, "METRICS": 29240.0, "EVENTS": 28870.0 }, "openMinutes": 3, "lateSamples": 0 }
+```
 
 ```json
 GET /api/kpis?limit=1
