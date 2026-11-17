@@ -25,6 +25,8 @@ Mark items `[x]` when merged.
 - [x] Investigate why a delay can *reduce* total waiting under NO_CONTROL in some runs; fix or document
 - [x] Platform capacity limits and "passengers left behind" metric
 - [x] Scheduled timetable (planned departures) and lateness vs timetable instead of vs nominal run times
+- [ ] Circular lines (trains run round a ring without reversing), so Moscow-like networks with a ring can be loaded
+- [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil)
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -64,7 +66,7 @@ Mark items `[x]` when merged.
 - [x] Click a train or station for a detail drawer
 - [x] Visualise what-if result on the map (heat of extra wait per station)
 - [x] Strategy benchmark page
-- [ ] Load real city networks (Baku, Moscow-like) from GeoJSON
+- [x] Load real city networks from GeoJSON (Baku bundled; a Moscow-like network needs ring lines, tracked below)
 - [ ] Component tests (Vitest + Testing Library) for the charts, detail drawer and benchmark page
 - [ ] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
 - [ ] Export a benchmark report as CSV
