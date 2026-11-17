@@ -343,8 +343,8 @@ public final class SimulationEngine {
     }
 
     /**
-     * Applies the headway strategy and, at terminals, the timetable: a train that turns round early waits for its
-     * planned departure (the layover gives recovery time), so earliness never carries over into the next trip.
+     * Applies the headway strategy and, at timing points, the timetable: a train that turns round early waits for
+     * its planned departure (the layover gives recovery time), so earliness never carries over into the next trip.
      */
     private void decideHoldOrDepart(TrainState t) {
         Line line = lines.get(t.lineId);
@@ -370,7 +370,7 @@ public final class SimulationEngine {
             double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
                     strategy.targetHeadway(target, demand));
-            if (line.isTerminalStop(t.stop)) {
+            if (isTimingPoint(line, t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
             if (hold > 0.5) {
@@ -389,6 +389,7 @@ public final class SimulationEngine {
      */
     private boolean shouldShortTurn(TrainState t, Line line, double targetHeadway) {
         return strategy.shortTurnsLateTrains()
+                && !line.ring()
                 && !line.isTerminalStop(t.stop)
                 && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS
                 && !closedStations.containsKey(line.stationAtStop(t.stop))
@@ -402,12 +403,14 @@ public final class SimulationEngine {
      * that is not an interchange (skipping it would strand transfers), the train did not skip its previous stop,
      * it is lagging between its neighbours (see {@link #SKIP_STOP_FOLLOWER_FRACTION}), and fewer than
      * {@link #SKIP_STOP_MAX_PASSENGERS} passengers would board or alight here. Under a strategy that also
-     * short-turns, a train late enough to be short-turned never skips: it calls so it can turn back here.
+     * short-turns, a train late enough to be short-turned never skips: it calls so it can turn back here (except
+     * on a ring, where nothing turns back).
      */
     private boolean shouldSkipStop(TrainState t, Line line, StationState st) {
         if (!strategy.skipsStopsForLateTrains()
                 || t.delaySeconds < SKIP_STOP_LATENESS_SECONDS
-                || (strategy.shortTurnsLateTrains() && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS)
+                || (strategy.shortTurnsLateTrains() && !line.ring()
+                    && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS)
                 || t.skippedLastStop
                 || line.isTerminalStop(t.stop)
                 || linesByStation.get(st.id).size() > 1
@@ -432,6 +435,14 @@ public final class SimulationEngine {
             }
         }
         return alighting;
+    }
+
+    /**
+     * Whether trains keep to the timetable at loop stop {@code stop}, waiting there when early: the terminals of
+     * an ordinary line, and the first station of a ring, which has no terminal to lay over at.
+     */
+    private static boolean isTimingPoint(Line line, int stop) {
+        return line.isTerminalStop(stop) || (line.ring() && stop == 0);
     }
 
     /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell. */
@@ -669,10 +680,11 @@ public final class SimulationEngine {
     /**
      * Turns a train round at its current platform: it moves to the stop serving the same station in the opposite
      * direction, everyone on board gets off to wait for the original direction, and passengers for the new
-     * direction board. Not possible at a terminal or while the opposite platform (or the track into it) is taken.
+     * direction board. Not possible at a terminal, on a ring (its trains only run one way) or while the opposite
+     * platform (or the track into it) is taken.
      */
     private boolean tryTurnBack(TrainState t, Line line) {
-        if (line.isTerminalStop(t.stop)) {
+        if (line.ring() || line.isTerminalStop(t.stop)) {
             return false;
         }
         int mirror = line.loopLength() - t.stop;
@@ -1125,7 +1137,7 @@ public final class SimulationEngine {
     /** Seconds before a train standing at a platform is free to leave (ignoring signals). */
     private double remainingAtPlatform(TrainState t) {
         double remaining = t.phase == TrainPhase.WAITING_SIGNAL ? 0 : Math.max(0, t.phaseRemaining);
-        if (!t.holdDecided && lines.get(t.lineId).isTerminalStop(t.stop)) {
+        if (!t.holdDecided && isTimingPoint(lines.get(t.lineId), t.stop)) {
             remaining = Math.max(remaining, plannedDeparture(t) - simTime);
         }
         return remaining;

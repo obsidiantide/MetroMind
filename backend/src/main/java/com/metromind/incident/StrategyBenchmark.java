@@ -195,10 +195,10 @@ public final class StrategyBenchmark {
                         between(random, MIN_REPAIR_SECONDS, MAX_REPAIR_SECONDS));
                 case SECTION_CLOSURE -> {
                     Line line = lines.get(random.nextInt(lines.size()));
-                    int from = random.nextInt(line.stationIds().size() - 1);
+                    int from = random.nextInt(line.sectionCount());
                     ClosureResponse response = ClosureResponse.values()[random.nextInt(ClosureResponse.values().length)];
                     yield BenchmarkReport.Scenario.sectionClosure(line.id(), line.stationIds().get(from),
-                            line.stationIds().get(from + 1), response,
+                            line.stationIds().get(line.sectionEnd(from)), response,
                             between(random, MIN_CLOSURE_SECONDS, MAX_CLOSURE_SECONDS));
                 }
                 case STATION_CLOSURE -> BenchmarkReport.Scenario.stationClosure(
