@@ -370,7 +370,7 @@ public final class SimulationEngine {
             double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
                     strategy.targetHeadway(target, demand));
-            if (isTimingPoint(line, t.stop)) {
+            if (line.isTimingStop(t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
             if (hold > 0.5) {
@@ -435,14 +435,6 @@ public final class SimulationEngine {
             }
         }
         return alighting;
-    }
-
-    /**
-     * Whether trains keep to the timetable at loop stop {@code stop}, waiting there when early: the terminals of
-     * an ordinary line, and the first station of a ring, which has no terminal to lay over at.
-     */
-    private static boolean isTimingPoint(Line line, int stop) {
-        return line.isTerminalStop(stop) || (line.ring() && stop == 0);
     }
 
     /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell. */
@@ -1137,7 +1129,7 @@ public final class SimulationEngine {
     /** Seconds before a train standing at a platform is free to leave (ignoring signals). */
     private double remainingAtPlatform(TrainState t) {
         double remaining = t.phase == TrainPhase.WAITING_SIGNAL ? 0 : Math.max(0, t.phaseRemaining);
-        if (!t.holdDecided && isTimingPoint(lines.get(t.lineId), t.stop)) {
+        if (!t.holdDecided && lines.get(t.lineId).isTimingStop(t.stop)) {
             remaining = Math.max(remaining, plannedDeparture(t) - simTime);
         }
         return remaining;
