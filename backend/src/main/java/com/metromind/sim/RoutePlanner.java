@@ -74,9 +74,9 @@ final class RoutePlanner {
             stay[li] = new boolean[line.loopLength()][stationCount];
             transfer[li] = new StationState.QueueKey[line.loopLength()][stationCount];
             for (int k = 0; k < line.loopLength(); k++) {
-                int pos = position(line, k);
+                int pos = line.positionAtStop(k);
                 int s = stationIndex.get(line.stationAtStop(k));
-                boolean terminal = pos == 0 || pos == line.stationIds().size() - 1;
+                boolean terminal = line.isTerminalStop(k);
                 int dir = line.directionAtStop(k);
                 for (int d = 0; d < stationCount; d++) {
                     if (d == s) {
@@ -91,11 +91,6 @@ final class RoutePlanner {
                 }
             }
         }
-    }
-
-    private static int position(Line line, int loopStop) {
-        int n = line.stationIds().size();
-        return loopStop < n ? loopStop : line.loopLength() - loopStop;
     }
 
     private int positionOf(Line line, int station) {
@@ -153,11 +148,11 @@ final class RoutePlanner {
     /** Cost of riding line {@code li} one segment from position {@code pos} in {@code dir}, then onwards to d. */
     private double rideCost(int d, int li, int pos, int dir, double dwell) {
         Line line = lines.get(li);
-        int next = pos + dir;
-        if (next < 0 || next >= line.stationIds().size()) {
+        int next = line.nextPosition(pos, dir);
+        if (next < 0) {
             return INF;
         }
-        double run = line.runSeconds().get(Math.min(pos, next));
+        double run = line.runSeconds().get(dir > 0 ? pos : next);
         return run + dwell + cost[d][li][next];
     }
 
