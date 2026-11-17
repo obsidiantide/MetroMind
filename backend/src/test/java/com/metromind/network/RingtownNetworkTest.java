@@ -48,6 +48,15 @@ class RingtownNetworkTest {
     }
 
     @Test
+    void theTwoRingDirectionsShareIslandPlatforms() throws Exception {
+        MetroNetwork n = ringtown();
+        for (String station : n.line("RING-CW").stationIds()) {
+            assertThat(n.isCrossPlatform("RING-CW", "RING-CCW", station)).as(station).isTrue();
+        }
+        assertThat(n.isCrossPlatform("NS", "RING-CW", "K1")).isFalse();
+    }
+
+    @Test
     void simulatesDeterministicallyWithTransfersOntoTheRing() throws Exception {
         SimulationEngine a = new SimulationEngine(ringtown(), MORNING, HeadwayStrategy.BALANCED);
         SimulationEngine b = new SimulationEngine(ringtown(), MORNING, HeadwayStrategy.BALANCED);
