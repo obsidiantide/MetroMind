@@ -24,6 +24,24 @@ function heatStyle(extra: number, worst: number) {
   };
 }
 
+/**
+ * Maps WGS84 coordinates onto the SVG, to scale and centred. A degree of longitude is shorter than a degree of
+ * latitude by cos(latitude), so longitudes are scaled by it; otherwise a city at 40°N would look 30 % too wide.
+ */
+export function projection(network: MetroNetwork) {
+  const lats = network.stations.map((s) => s.lat);
+  const lons = network.stations.map((s) => s.lon);
+  const [minLat, maxLat, minLon, maxLon] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
+  const k = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
+  const [spanX, spanY] = [(maxLon - minLon) * k, maxLat - minLat];
+  const scale = Math.min((W - 2 * PAD) / (spanX || 1), (H - 2 * PAD) / (spanY || 1));
+  const [offX, offY] = [(W - 2 * PAD - spanX * scale) / 2, (H - 2 * PAD - spanY * scale) / 2];
+  return {
+    x: (lon: number) => PAD + offX + (lon - minLon) * k * scale,
+    y: (lat: number) => H - PAD - offY - (lat - minLat) * scale,
+  };
+}
+
 /** Keyboard and pointer props that make a map element pick `target` when activated. */
 function selectable(target: Selection, selected: Selection | null, onSelect: (s: Selection) => void) {
   const isSelected = selected?.kind === target.kind && selected.id === target.id;
@@ -43,12 +61,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
   network: MetroNetwork; snapshot: Snapshot | null; selected?: Selection | null; onSelect?: (s: Selection) => void;
   heat?: WaitHeat | null;
 }) {
-  const lats = network.stations.map((s) => s.lat);
-  const lons = network.stations.map((s) => s.lon);
-  const [minLat, maxLat, minLon, maxLon] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
-  const scale = Math.min((W - 2 * PAD) / (maxLon - minLon || 1), (H - 2 * PAD) / (maxLat - minLat || 1));
-  const x = (lon: number) => PAD + (lon - minLon) * scale;
-  const y = (lat: number) => H - PAD - (lat - minLat) * scale;
+  const { x, y } = projection(network);
   const station = (id: string) => network.stations.find((s) => s.id === id)!;
   const stationState = new Map(snapshot?.stations.map((s) => [s.id, s]) ?? []);
   const lineColor = new Map(network.lines.map((l) => [l.id, l.color]));
