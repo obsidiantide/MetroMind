@@ -15,7 +15,8 @@ import java.util.Map;
  *
  * <p>Passengers follow the route with the lowest expected travel time, where riding a segment costs its nominal
  * run time plus one dwell, boarding a line costs half its nominal headway (the expected wait) and changing lines
- * additionally costs {@link #TRANSFER_WALK_SECONDS}. Costs are computed once per destination with a deterministic
+ * additionally costs {@link #TRANSFER_WALK_SECONDS}, unless the two lines meet at a cross-platform interchange
+ * where passengers just step across the island. Costs are computed once per destination with a deterministic
  * Bellman–Ford relaxation, so every decision a passenger makes along the way is consistent with the route they
  * chose at the origin (a sub-path of a cheapest route is itself cheapest).
  *
@@ -32,6 +33,8 @@ final class RoutePlanner {
     private final double dwell;
     private final Map<String, Integer> stationIndex = new HashMap<>();
     private final int stationCount;
+    /** crossPlatform[from][to][station]: whether changing between the two lines there costs no walk. */
+    private final boolean[][][] crossPlatform;
     /** Expected wait for a train of each line: half its nominal headway. */
     private final double[] boardPenalty;
     /** cost[d][line][pos]: seconds to reach destination d from a platform of line at position pos. */
@@ -51,6 +54,15 @@ final class RoutePlanner {
         for (int i = 0; i < stations.size(); i++) {
             stationIndex.put(stations.get(i).id(), i);
         }
+        crossPlatform = new boolean[lines.size()][lines.size()][stationCount];
+        for (int li = 0; li < lines.size(); li++) {
+            for (int lj = 0; lj < lines.size(); lj++) {
+                for (int st = 0; st < stationCount; st++) {
+                    crossPlatform[li][lj][st] = network.isCrossPlatform(lines.get(li).id(), lines.get(lj).id(),
+                            stations.get(st).id());
+                }
+            }
+        }
         boardPenalty = new double[lines.size()];
         for (int li = 0; li < lines.size(); li++) {
             Line line = lines.get(li);
@@ -64,7 +76,7 @@ final class RoutePlanner {
         entry = new StationState.QueueKey[stationCount][stationCount];
         for (int o = 0; o < stationCount; o++) {
             for (int d = 0; d < stationCount; d++) {
-                entry[o][d] = o == d ? null : bestQueue(o, d, -1, nominalDwell, 0);
+                entry[o][d] = o == d ? null : bestQueue(o, d, -1, nominalDwell);
             }
         }
         stay = new boolean[lines.size()][][];
@@ -85,7 +97,7 @@ final class RoutePlanner {
                     double ride = rideCost(d, li, pos, dir, nominalDwell);
                     stay[li][k][d] = !terminal && ride < INF && ride <= cost[d][li][pos] + EPS;
                     if (!stay[li][k][d]) {
-                        StationState.QueueKey q = bestQueue(s, d, li, nominalDwell, TRANSFER_WALK_SECONDS);
+                        StationState.QueueKey q = bestQueue(s, d, li, nominalDwell);
                         transfer[li][k][d] = q != null ? q : entry[s][d];
                     }
                 }
@@ -129,7 +141,7 @@ final class RoutePlanner {
                         int q = lj == li ? -1 : positionOf(lines.get(lj), s);
                         if (q >= 0) {
                             double ride = Math.min(rideCost(d, lj, q, 1, dwell), rideCost(d, lj, q, -1, dwell));
-                            best = Math.min(best, TRANSFER_WALK_SECONDS + boardPenalty[lj] + ride);
+                            best = Math.min(best, walkSeconds(li, lj, s) + boardPenalty[lj] + ride);
                         }
                     }
                     if (best < c[li][p] - EPS) {
@@ -145,6 +157,11 @@ final class RoutePlanner {
         return c;
     }
 
+    /** Walk between the platforms of line {@code from} and line {@code to} at station {@code s}. */
+    private double walkSeconds(int from, int to, int s) {
+        return crossPlatform[from][to][s] ? 0 : TRANSFER_WALK_SECONDS;
+    }
+
     /** Cost of riding line {@code li} one segment from position {@code pos} in {@code dir}, then onwards to d. */
     private double rideCost(int d, int li, int pos, int dir, double dwell) {
         Line line = lines.get(li);
@@ -157,17 +174,19 @@ final class RoutePlanner {
     }
 
     /**
-     * Cheapest platform queue at station {@code s} for destination {@code d}, ignoring line {@code excludeLine}.
-     * Ties are broken by line order, then outbound before inbound.
+     * Cheapest platform queue at station {@code s} for destination {@code d}. A passenger entering the station
+     * passes {@code fromLine = -1}; one changing off line {@code fromLine} cannot rejoin it and pays the walk to
+     * the other platform. Ties are broken by line order, then outbound before inbound.
      */
-    private StationState.QueueKey bestQueue(int s, int d, int excludeLine, double dwell, double extra) {
+    private StationState.QueueKey bestQueue(int s, int d, int fromLine, double dwell) {
         StationState.QueueKey best = null;
         double bestCost = INF;
         for (int lj = 0; lj < lines.size(); lj++) {
-            int q = lj == excludeLine ? -1 : positionOf(lines.get(lj), s);
+            int q = lj == fromLine ? -1 : positionOf(lines.get(lj), s);
             if (q < 0) {
                 continue;
             }
+            double extra = fromLine < 0 ? 0 : walkSeconds(fromLine, lj, s);
             for (int dir : new int[] {1, -1}) {
                 double c = extra + boardPenalty[lj] + rideCost(d, lj, q, dir, dwell);
                 if (c < bestCost - EPS) {
