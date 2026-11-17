@@ -148,7 +148,7 @@ cd frontend && npm test             # component tests (Vitest + Testing Library,
 
 Frontend component tests sit next to the components (`*.test.tsx`) and run against a mocked `api`, with shared
 network and snapshot fixtures in `frontend/test/`. They cover the KPI charts, the station and train drawer, the
-map's projection and selection, and the benchmark page's submit, poll, cancel and ranking flow.
+map's projection and selection, and the benchmark page's submit, poll, cancel, ranking and CSV export flow.
 
 Unit and API tests run on the `standalone` profile with no infrastructure. The `*IT` classes in
 `backend/src/test/java/com/metromind/it` start the application against the same images as `docker-compose.yml`
@@ -460,6 +460,12 @@ With persistence enabled, every job that succeeds, fails or is cancelled is also
 table (the report as JSONB). Lookups and the job list fall back to it, so finished jobs and their reports stay
 available after they drop out of the 20 kept in memory and after a restart. Jobs still queued or running when the
 backend stops are lost. In the `standalone` profile jobs live in memory only.
+
+The dashboard's benchmark page (`/benchmark`) runs these jobs and shows their ranking; **Export CSV** saves the
+ranking with one row per strategy in rank order and raw numbers (`mean_wait_s`, `p95_wait_s`, `mean_travel_min`,
+`p95_travel_min`, `mean_recovery_s`, empty when the strategy never recovered, `unrecovered_scenarios`,
+`mean_short_turns`, `mean_stops_skipped`, `mean_passengers_carried_past`), named after the seed and ranking metric,
+for comparing runs in a spreadsheet.
 
 ### Incident clearing timeline
 
