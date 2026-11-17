@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
 When a line gives no `runSeconds`, each is derived from the distance between its stations *along the track*
@@ -230,6 +230,15 @@ Trains start evenly spaced around each line's loop, and that start defines their
 advance by the nominal run time plus a 25 s dwell. Delay alerts compare each arrival with this timetable. A train
 that reaches a terminal early (short dwells off-peak) waits there for its planned departure, so earliness does not
 carry into the next trip; late trains leave as soon as they can.
+
+Terminals (and a ring's first station) are the default timing points. A line can name its own with
+`timingStationIds` (in the JSON or GeoJSON line), for example a busy interchange half-way along a long line so
+early trains are evened out before the crowds; the list then replaces the default, and trains hold there in both
+directions:
+
+```json
+{ "id": "RED", "stationIds": ["R1", "R2", "R3", "R4", "R5"], "timingStationIds": ["R3"], ... }
+```
 
 `GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
 
