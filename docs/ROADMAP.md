@@ -27,7 +27,7 @@ Mark items `[x]` when merged.
 - [x] Scheduled timetable (planned departures) and lateness vs timetable instead of vs nominal run times
 - [x] Circular lines (trains run round a ring without reversing), so Moscow-like networks with a ring can be loaded
 - [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil)
-- [ ] Cross-platform interchange: changing between the two directions of a ring (or lines sharing an island
+- [x] Cross-platform interchange: changing between the two directions of a ring (or lines sharing an island
       platform) costs no walk, unlike the default 120 s transfer
 - [ ] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
 
