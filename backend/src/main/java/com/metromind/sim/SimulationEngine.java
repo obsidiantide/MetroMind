@@ -137,9 +137,7 @@ public final class SimulationEngine {
             List<String> adjacent = new ArrayList<>();
             for (Station other : network.stations()) {
                 boolean next = network.lines().stream().anyMatch(l -> {
-                    int a = l.stationIds().indexOf(s.id());
-                    int b = l.stationIds().indexOf(other.id());
-                    return a >= 0 && b >= 0 && Math.abs(a - b) == 1;
+                    return l.sectionBetween(l.stationIds().indexOf(s.id()), l.stationIds().indexOf(other.id())) >= 0;
                 });
                 if (next) {
                     adjacent.add(other.id());
@@ -157,10 +155,10 @@ public final class SimulationEngine {
             for (String lid : linesByStation.getOrDefault(s.id(), List.of())) {
                 Line line = lines.get(lid);
                 int pos = line.stationIds().indexOf(s.id());
-                if (pos < line.stationIds().size() - 1) {
+                if (line.nextPosition(pos, 1) >= 0) {
                     st.waiting.put(new StationState.QueueKey(lid, 1), new double[n]);
                 }
-                if (pos > 0) {
+                if (line.nextPosition(pos, -1) >= 0) {
                     st.waiting.put(new StationState.QueueKey(lid, -1), new double[n]);
                 }
             }
@@ -350,7 +348,7 @@ public final class SimulationEngine {
      */
     private void decideHoldOrDepart(TrainState t) {
         Line line = lines.get(t.lineId);
-        if (!isTerminalStop(line, t.stop) && closedStations.containsKey(line.stationAtStop(t.stop))) {
+        if (!line.isTerminalStop(t.stop) && closedStations.containsKey(line.stationAtStop(t.stop))) {
             t.holdDecided = true; // never hold a train at a closed station it is running through
         }
         if (!t.holdDecided) {
@@ -372,7 +370,7 @@ public final class SimulationEngine {
             double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
                     strategy.targetHeadway(target, demand));
-            if (isTerminalStop(line, t.stop)) {
+            if (line.isTerminalStop(t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
             if (hold > 0.5) {
@@ -391,7 +389,7 @@ public final class SimulationEngine {
      */
     private boolean shouldShortTurn(TrainState t, Line line, double targetHeadway) {
         return strategy.shortTurnsLateTrains()
-                && !isTerminalStop(line, t.stop)
+                && !line.isTerminalStop(t.stop)
                 && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS
                 && !closedStations.containsKey(line.stationAtStop(t.stop))
                 && trainsInService(line.id()) > 1
@@ -411,7 +409,7 @@ public final class SimulationEngine {
                 || t.delaySeconds < SKIP_STOP_LATENESS_SECONDS
                 || (strategy.shortTurnsLateTrains() && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS)
                 || t.skippedLastStop
-                || isTerminalStop(line, t.stop)
+                || line.isTerminalStop(t.stop)
                 || linesByStation.get(st.id).size() > 1
                 || trainsInService(line.id()) < 2) {
             return false;
@@ -434,10 +432,6 @@ public final class SimulationEngine {
             }
         }
         return alighting;
-    }
-
-    private static boolean isTerminalStop(Line line, int stop) {
-        return stop == 0 || stop == line.stationIds().size() - 1;
     }
 
     /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell. */
@@ -678,7 +672,7 @@ public final class SimulationEngine {
      * direction board. Not possible at a terminal or while the opposite platform (or the track into it) is taken.
      */
     private boolean tryTurnBack(TrainState t, Line line) {
-        if (isTerminalStop(line, t.stop)) {
+        if (line.isTerminalStop(t.stop)) {
             return false;
         }
         int mirror = line.loopLength() - t.stop;
@@ -739,16 +733,15 @@ public final class SimulationEngine {
         if (line == null) {
             throw new IllegalArgumentException("Unknown line " + lineId);
         }
-        int a = line.stationIds().indexOf(fromStationId);
-        int b = line.stationIds().indexOf(toStationId);
-        if (a < 0 || b < 0 || Math.abs(a - b) != 1) {
+        int lower = line.sectionBetween(line.stationIds().indexOf(fromStationId),
+                line.stationIds().indexOf(toStationId));
+        if (lower < 0) {
             throw new IllegalArgumentException(
                     "Stations %s and %s are not adjacent on line %s".formatted(fromStationId, toStationId, lineId));
         }
         if (seconds <= 0) {
             throw new IllegalArgumentException("Closure duration must be positive");
         }
-        int lower = Math.min(a, b);
         SectionClosure existing = closures.stream()
                 .filter(c -> c.lineId.equals(lineId) && c.lowerPosition == lower).findFirst().orElse(null);
         if (existing != null) {
@@ -758,7 +751,7 @@ public final class SimulationEngine {
             closures.add(new SectionClosure(lineId, lower, response, seconds, simTime));
         }
         emit(SimEvent.Type.INCIDENT, lineId, "Track %s–%s on line %s closed for %.0f s".formatted(
-                sectionName(line, lower), sectionName(line, lower + 1), lineId, seconds));
+                sectionName(line, lower), sectionName(line, line.sectionEnd(lower)), lineId, seconds));
     }
 
     private String sectionName(Line line, int position) {
@@ -775,9 +768,7 @@ public final class SimulationEngine {
         if (closures.isEmpty()) {
             return null;
         }
-        int n = line.stationIds().size();
-        int pos = stop < n ? stop : line.loopLength() - stop;
-        int lower = line.directionAtStop(stop) > 0 ? pos : pos - 1;
+        int lower = line.sectionFromStop(stop);
         for (SectionClosure c : closures) {
             if (c.lineId.equals(line.id()) && c.lowerPosition == lower) {
                 return c;
@@ -794,7 +785,7 @@ public final class SimulationEngine {
                 it.remove();
                 Line line = lines.get(c.lineId);
                 emit(SimEvent.Type.INCIDENT_CLEARED, c.lineId, "Track %s–%s on line %s reopened".formatted(
-                        sectionName(line, c.lowerPosition), sectionName(line, c.lowerPosition + 1), c.lineId));
+                        sectionName(line, c.lowerPosition), sectionName(line, line.sectionEnd(c.lowerPosition)), c.lineId));
             }
         }
         for (var it = closedStations.entrySet().iterator(); it.hasNext(); ) {
@@ -1124,8 +1115,7 @@ public final class SimulationEngine {
             if (expected - simTime > horizon) {
                 continue;
             }
-            List<String> ids = line.stationIds();
-            String towards = line.directionAtStop(best) > 0 ? ids.get(ids.size() - 1) : ids.get(0);
+            String towards = line.towardsStationId(line.positionAtStop(best), line.directionAtStop(best));
             board.add(new Departure(t.id, line.id(), towards, planned, clock(planned), expected, expected - planned));
         }
         board.sort(Comparator.comparingDouble(Departure::expectedTime));
@@ -1135,7 +1125,7 @@ public final class SimulationEngine {
     /** Seconds before a train standing at a platform is free to leave (ignoring signals). */
     private double remainingAtPlatform(TrainState t) {
         double remaining = t.phase == TrainPhase.WAITING_SIGNAL ? 0 : Math.max(0, t.phaseRemaining);
-        if (!t.holdDecided && isTerminalStop(lines.get(t.lineId), t.stop)) {
+        if (!t.holdDecided && lines.get(t.lineId).isTerminalStop(t.stop)) {
             remaining = Math.max(remaining, plannedDeparture(t) - simTime);
         }
         return remaining;
@@ -1183,8 +1173,8 @@ public final class SimulationEngine {
             double predicted = predictWaiting(st.id, 900);
             List<SimulationSnapshot.QueueView> queues = new ArrayList<>();
             st.waiting.forEach((key, waiting) -> {
-                List<String> ids = lines.get(key.lineId()).stationIds();
-                String towards = key.direction() > 0 ? ids.get(ids.size() - 1) : ids.get(0);
+                Line line = lines.get(key.lineId());
+                String towards = line.towardsStationId(line.stationIds().indexOf(st.id), key.direction());
                 queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,
@@ -1213,7 +1203,7 @@ public final class SimulationEngine {
             Line line = lines.get(c.lineId);
             views.add(incidentView(SimulationSnapshot.IncidentKind.SECTION_CLOSURE, c.lineId,
                     "Track %s–%s on line %s closed".formatted(sectionName(line, c.lowerPosition),
-                            sectionName(line, c.lowerPosition + 1), c.lineId),
+                            sectionName(line, line.sectionEnd(c.lowerPosition)), c.lineId),
                     c.startedAt, c.remainingSeconds));
         }
         closedStations.forEach((id, remaining) -> views.add(incidentView(
@@ -1233,9 +1223,9 @@ public final class SimulationEngine {
     private List<SimulationSnapshot.ClosedSectionView> closedSections() {
         List<SimulationSnapshot.ClosedSectionView> views = new ArrayList<>();
         for (SectionClosure c : closures) {
-            List<String> ids = lines.get(c.lineId).stationIds();
-            views.add(new SimulationSnapshot.ClosedSectionView(c.lineId, ids.get(c.lowerPosition),
-                    ids.get(c.lowerPosition + 1), c.response, c.remainingSeconds));
+            Line line = lines.get(c.lineId);
+            views.add(new SimulationSnapshot.ClosedSectionView(c.lineId, line.stationIds().get(c.lowerPosition),
+                    line.stationIds().get(line.sectionEnd(c.lowerPosition)), c.response, c.remainingSeconds));
         }
         return views;
     }
