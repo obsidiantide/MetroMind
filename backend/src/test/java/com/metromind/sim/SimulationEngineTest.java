@@ -1,6 +1,7 @@
 package com.metromind.sim;
 
 import com.metromind.network.Line;
+import com.metromind.network.MetroNetwork;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -127,6 +128,32 @@ class SimulationEngineTest {
         }
         assertThat(heldAtTerminal).isTrue();
         assertThat(leftIntermediateEarly).isTrue();
+    }
+
+    @Test
+    void earlyTrainsWaitOnlyAtTheLinesConfiguredTimingPoints() {
+        Line base = TestNetworks.singleLine().line("L1");
+        Line timedAtC = new Line(base.id(), base.name(), base.color(), base.stationIds(), base.runSeconds(),
+                base.trainCount(), base.trainCapacity(), 0, List.of(), false, List.of("C"));
+        SimulationEngine engine = new SimulationEngine(new MetroNetwork("Test", TestNetworks.singleLine().stations(),
+                List.of(timedAtC)), 3 * 3600, HeadwayStrategy.NO_CONTROL);
+        java.util.Set<String> heldAt = new java.util.TreeSet<>();
+        for (int i = 0; i < 2 * 3600; i++) {
+            List<TrainState> before = engine.trains().stream().map(TrainState::copy).toList();
+            engine.step(1);
+            for (TrainState was : before) {
+                TrainState now = engine.train(was.id());
+                if (now.phase() == TrainPhase.HELD) {
+                    heldAt.add(timedAtC.stationAtStop(now.stop()));
+                }
+                if (was.phase() != TrainPhase.RUNNING && now.phase() == TrainPhase.RUNNING
+                        && timedAtC.stationAtStop(now.stop()).equals("C")) {
+                    assertThat(engine.simTime()).isGreaterThanOrEqualTo(engine.plannedDeparture(now) - 1e-9);
+                }
+            }
+        }
+        // Held at C in both directions, and no longer at the terminals A and F.
+        assertThat(heldAt).containsExactly("C");
     }
 
     @Test
