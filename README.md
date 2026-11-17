@@ -114,7 +114,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
 | Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, and optionally `runSeconds` or `averageSpeedKmh` |
-| Collection | (its own `properties`) | `city`, optional `odWeights` as in the JSON format |
+| Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
 When a line gives no `runSeconds`, each is derived from the distance between its stations *along the track*
 divided by the line's average start-to-stop speed (32.4 km/h unless set), so a curving section takes longer than
@@ -212,6 +212,17 @@ Passengers take the fastest route: each segment costs its nominal run time plus 
 half its headway and a change of line adds a 120 s walk. They leave the train at their destination, or at an
 interchange where they join the queue for their next line. Snapshot `metrics` report `passengersServed`
 (boardings, one per line ridden), `passengersDelivered` (completed journeys) and `transfers` (line changes).
+
+Some changes need no walk: the two directions of a ring, or two lines sharing an island platform, face each other
+across the platform. List them as cross-platform interchanges, at given stations or (with `stationIds` left out)
+wherever the lines meet; changing between them then costs only the wait for the next train:
+
+```json
+"crossPlatform": [ { "lineIds": ["RING-CW", "RING-CCW"] }, { "lineIds": ["NS", "EW"], "stationIds": ["C0"] } ]
+```
+
+A GeoJSON network puts the same list in the collection's `properties`. Ringtown's ring directions are listed this
+way, so a passenger carried past a skipped ring stop steps across to the other direction to ride back.
 
 ### Timetable and departure boards
 
