@@ -26,7 +26,16 @@ Mark items `[x]` when merged.
 - [x] Platform capacity limits and "passengers left behind" metric
 - [x] Scheduled timetable (planned departures) and lateness vs timetable instead of vs nominal run times
 - [x] Circular lines (trains run round a ring without reversing), so Moscow-like networks with a ring can be loaded
-- [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil)
+- [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil). The
+      engine keys platforms, signalling blocks and route tables by one line's loop of stops, so this lands in steps:
+  - [ ] Service patterns: a line's trains may each follow one of several station sequences sharing the trunk
+        (loop stops, run times and the timetable per pattern; existing lines are a single pattern)
+  - [ ] Shared trunk signalling: blocks keyed by track section rather than by loop stop, so trains of different
+        patterns cannot occupy the same section or platform
+  - [ ] Trunk platforms shared by patterns: passengers for a trunk station board any train, passengers for a
+        branch only trains of that branch (route planner aware of patterns)
+  - [ ] Network files: `branches` on a line (junction station, branch stations, share of trains), JSON and GeoJSON
+  - [ ] Bundle the Bakmil branch on the Baku network and draw branches on the map
 - [x] Cross-platform interchange: changing between the two directions of a ring (or lines sharing an island
       platform) costs no walk, unlike the default 120 s transfer
 - [x] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
