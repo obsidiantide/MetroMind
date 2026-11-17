@@ -1,0 +1,28 @@
+import { describe, expect, it } from "vitest";
+import { benchmarkCsv, benchmarkCsvName } from "@/lib/benchmarkCsv";
+import { ranking, report } from "@/test/benchmark";
+
+describe("benchmarkCsv", () => {
+  it("writes one row per strategy in rank order under a header", () => {
+    const lines = benchmarkCsv(report).split("\r\n");
+
+    expect(lines[0]).toBe("rank,strategy,mean_wait_s,p95_wait_s,mean_travel_min,p95_travel_min,mean_recovery_s,"
+      + "unrecovered_scenarios,mean_short_turns,mean_stops_skipped,mean_passengers_carried_past");
+    expect(lines[1]).toBe("1,BALANCED,101,151,9001,9501,600,0,0,0,0");
+    expect(lines[2]).toBe("2,SHORT_TURN,102,152,9002,9502,,2,1.5,0,0");
+    expect(lines[3]).toBe("3,SKIP_STOP,103,153,9003,9503,600,0,0,2.5,41.6");
+    expect(lines).toHaveLength(5);
+    expect(lines[4]).toBe("");
+  });
+
+  it("rounds to three decimals and quotes fields that need it", () => {
+    const csv = benchmarkCsv({ ...report, rankings: [ranking(1, 'ODD, "QUOTED"', { meanWaitSeconds: 12.34567 })] });
+
+    expect(csv.split("\r\n")[1]).toMatch(/^1,"ODD, ""QUOTED""",12\.346,/);
+  });
+
+  it("names the file after the seed and ranking metric", () => {
+    expect(benchmarkCsvName(report)).toBe("benchmark-seed7-wait-per-boarding.csv");
+    expect(benchmarkCsvName({ ...report, seed: 3, metric: "TRAVEL_TIME" })).toBe("benchmark-seed3-travel-time.csv");
+  });
+});
