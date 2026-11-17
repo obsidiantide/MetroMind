@@ -19,9 +19,18 @@ import java.util.List;
  *                       spatial queries; empty when only the stations are known (the track is then the straight
  *                       segments between them); a ring's path runs from its first station round to the first again
  * @param ring           whether trains circulate round the stations instead of reversing at terminals
+ * @param timingStationIds stations where trains keep to the timetable, waiting there when early; empty for the
+ *                       default: the terminals, or a ring's first station (a ring has no terminal to lay over at)
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
-                   int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring) {
+                   int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                   List<String> timingStationIds) {
+
+    /** Line with the default timing points. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring, List.of());
+    }
 
     /** Ordinary (non-ring) line with a track alignment. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -75,6 +84,12 @@ public record Line(String id, String name, String color, List<String> stationIds
             }
         }
         path = path.stream().map(List::copyOf).toList();
+        timingStationIds = timingStationIds == null ? List.of() : List.copyOf(timingStationIds);
+        for (String sid : timingStationIds) {
+            if (!stationIds.contains(sid)) {
+                throw new IllegalArgumentException("Line " + id + ": timing point " + sid + " is not on the line");
+            }
+        }
     }
 
     /** Whether the network file gave the real track alignment rather than just the stations. */
@@ -112,6 +127,17 @@ public record Line(String id, String name, String color, List<String> stationIds
     /** Whether loop stop {@code k} is a terminal, where trains reverse. A ring has none. */
     public boolean isTerminalStop(int k) {
         return !ring && (k == 0 || k == stationIds.size() - 1);
+    }
+
+    /**
+     * Whether trains keep to the timetable at loop stop {@code k}: one of the line's {@link #timingStationIds()},
+     * or by default a terminal, or the first station of a ring.
+     */
+    public boolean isTimingStop(int k) {
+        if (!timingStationIds.isEmpty()) {
+            return timingStationIds.contains(stationAtStop(k));
+        }
+        return isTerminalStop(k) || (ring && k == 0);
     }
 
     /**

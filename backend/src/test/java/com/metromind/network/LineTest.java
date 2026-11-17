@@ -120,4 +120,34 @@ class LineTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("twice");
     }
+
+    @Test
+    void timingPointsDefaultToTerminalsOrTheRingsFirstStation() {
+        Line linear = new Line("L", "L", "#000", List.of("A", "B", "C"), List.of(90, 90), 2, 800);
+        // Loop stops: 0 A, 1 B, 2 C, 3 B.
+        assertThat(List.of(0, 1, 2, 3)).map(linear::isTimingStop).containsExactly(true, false, true, false);
+
+        Line ring = new Line("R", "R", "#000", List.of("A", "B", "C"), List.of(90, 90, 90), 2, 800, 0,
+                List.of(), true);
+        assertThat(List.of(0, 1, 2)).map(ring::isTimingStop).containsExactly(true, false, false);
+    }
+
+    @Test
+    void configuredTimingPointsReplaceTheDefaultInBothDirections() throws Exception {
+        Line line = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B", "C"], "runSeconds": [90, 90],
+                 "trainCount": 2, "trainCapacity": 800, "timingStationIds": ["B"]}
+                """, Line.class);
+
+        assertThat(line.timingStationIds()).containsExactly("B");
+        assertThat(List.of(0, 1, 2, 3)).map(line::isTimingStop).containsExactly(false, true, false, true);
+    }
+
+    @Test
+    void rejectsTimingPointsOffTheLine() {
+        assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0,
+                List.of(), false, List.of("Z")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("timing point Z");
+    }
 }
