@@ -1,0 +1,201 @@
+{
+  "city": "Ringtown",
+  "stations": [
+    {
+      "id": "K1",
+      "name": "North Gate",
+      "lat": 50.02,
+      "lon": 20.0,
+      "baseArrivalsPerMinute": 9
+    },
+    {
+      "id": "K2",
+      "name": "Observatory",
+      "lat": 50.01414,
+      "lon": 20.022,
+      "baseArrivalsPerMinute": 6
+    },
+    {
+      "id": "K3",
+      "name": "East Market",
+      "lat": 50.0,
+      "lon": 20.03111,
+      "baseArrivalsPerMinute": 10,
+      "platformCapacity": 500
+    },
+    {
+      "id": "K4",
+      "name": "Foundry",
+      "lat": 49.98586,
+      "lon": 20.022,
+      "baseArrivalsPerMinute": 5
+    },
+    {
+      "id": "K5",
+      "name": "South Gate",
+      "lat": 49.98,
+      "lon": 20.0,
+      "baseArrivalsPerMinute": 9
+    },
+    {
+      "id": "K6",
+      "name": "Riverbank",
+      "lat": 49.98586,
+      "lon": 19.978,
+      "baseArrivalsPerMinute": 7
+    },
+    {
+      "id": "K7",
+      "name": "West Gate",
+      "lat": 50.0,
+      "lon": 19.96889,
+      "baseArrivalsPerMinute": 10,
+      "platformCapacity": 500
+    },
+    {
+      "id": "K8",
+      "name": "Academy",
+      "lat": 50.01414,
+      "lon": 19.978,
+      "baseArrivalsPerMinute": 6
+    },
+    {
+      "id": "C0",
+      "name": "Cathedral Square",
+      "lat": 50.0,
+      "lon": 20.0,
+      "baseArrivalsPerMinute": 14,
+      "platformCapacity": 600
+    },
+    {
+      "id": "N1",
+      "name": "Northern Heights",
+      "lat": 50.045,
+      "lon": 20.0,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "S1",
+      "name": "Southern Docks",
+      "lat": 49.955,
+      "lon": 20.0,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "E1",
+      "name": "Airport Road",
+      "lat": 50.0,
+      "lon": 20.07001,
+      "baseArrivalsPerMinute": 4
+    },
+    {
+      "id": "W1",
+      "name": "Forest Park",
+      "lat": 50.0,
+      "lon": 19.92999,
+      "baseArrivalsPerMinute": 4
+    }
+  ],
+  "lines": [
+    {
+      "id": "NS",
+      "name": "North–South Line",
+      "color": "#e53935",
+      "stationIds": [
+        "N1",
+        "K1",
+        "C0",
+        "K5",
+        "S1"
+      ],
+      "runSeconds": [
+        268,
+        236,
+        236,
+        268
+      ],
+      "trainCount": 6,
+      "spareTrains": 2,
+      "trainCapacity": 900
+    },
+    {
+      "id": "EW",
+      "name": "East–West Line",
+      "color": "#1e88e5",
+      "stationIds": [
+        "W1",
+        "K7",
+        "C0",
+        "K3",
+        "E1"
+      ],
+      "runSeconds": [
+        262,
+        232,
+        232,
+        262
+      ],
+      "trainCount": 6,
+      "spareTrains": 1,
+      "trainCapacity": 900
+    },
+    {
+      "id": "RING-CW",
+      "name": "Ring (clockwise)",
+      "color": "#8d6e63",
+      "stationIds": [
+        "K1",
+        "K2",
+        "K3",
+        "K4",
+        "K5",
+        "K6",
+        "K7",
+        "K8"
+      ],
+      "runSeconds": [
+        188,
+        192,
+        190,
+        186,
+        188,
+        192,
+        190,
+        186
+      ],
+      "trainCount": 5,
+      "spareTrains": 1,
+      "trainCapacity": 900,
+      "ring": true
+    },
+    {
+      "id": "RING-CCW",
+      "name": "Ring (anticlockwise)",
+      "color": "#a1887f",
+      "stationIds": [
+        "K1",
+        "K8",
+        "K7",
+        "K6",
+        "K5",
+        "K4",
+        "K3",
+        "K2"
+      ],
+      "runSeconds": [
+        186,
+        190,
+        192,
+        188,
+        186,
+        190,
+        192,
+        188
+      ],
+      "trainCount": 5,
+      "spareTrains": 1,
+      "trainCapacity": 900,
+      "ring": true
+    }
+  ]
+}
