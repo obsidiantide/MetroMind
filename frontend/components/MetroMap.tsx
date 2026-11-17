@@ -1,7 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { MetroNetwork, Snapshot } from "@/lib/types";
+import type { Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
 const H = 640;
@@ -43,6 +43,16 @@ export function projection(network: MetroNetwork) {
   };
 }
 
+/**
+ * A line's track as [lon, lat] pairs: its alignment when the network has one, otherwise straight segments between
+ * its stations, which on a ring come back round to the first station.
+ */
+export function trackPoints(line: Line, station: (id: string) => Station): [number, number][] {
+  if (line.path?.length) return line.path;
+  const stops = line.ring ? [...line.stationIds, line.stationIds[0]] : line.stationIds;
+  return stops.map((id) => [station(id).lon, station(id).lat]);
+}
+
 /** Keyboard and pointer props that make a map element pick `target` when activated. */
 function selectable(target: Selection, selected: Selection | null, onSelect: (s: Selection) => void) {
   const isSelected = selected?.kind === target.kind && selected.id === target.id;
@@ -74,8 +84,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
       {network.lines.map((line) => (
         <polyline
           key={line.id}
-          points={(line.path?.length ? line.path : line.stationIds.map((id) => [station(id).lon, station(id).lat]))
-            .map(([lon, lat]) => `${x(lon)},${y(lat)}`).join(" ")}
+          points={trackPoints(line, station).map(([lon, lat]) => `${x(lon)},${y(lat)}`).join(" ")}
           fill="none"
           stroke={line.color}
           strokeWidth={6}

@@ -30,6 +30,16 @@ describe("projection", () => {
 });
 
 describe("MetroMap", () => {
+  it("closes a ring drawn from its stations back to the first one", () => {
+    const ring: MetroNetwork = { ...network, lines: [{ ...network.lines[0], ring: true, runSeconds: [180, 180, 180] }] };
+    const { container } = render(<MetroMap network={ring} snapshot={null} />);
+    const points = container.querySelector("polyline")?.getAttribute("points")?.split(" ") ?? [];
+
+    expect(points).toHaveLength(4);
+    expect(points[3]).toBe(points[0]);
+  });
+
+
   it("draws a line along its track when it has one", () => {
     const curved: MetroNetwork = { ...network, lines: [{ ...network.lines[0],
       path: [[49.8, 40.0], [49.81, 40.01], [49.82, 40.0], [49.84, 40.0]] }, network.lines[1]] };

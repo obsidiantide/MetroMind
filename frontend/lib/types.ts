@@ -6,6 +6,8 @@ export interface Line {
   trainCount: number; trainCapacity: number; spareTrains: number;
   /** Track alignment as [lon, lat] pairs from the first station to the last; empty when only stations are known. */
   path?: [number, number][];
+  /** Trains circulate round the stations in order instead of reversing; runSeconds then also closes the ring. */
+  ring?: boolean;
 }
 export interface MetroNetwork {
   city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
