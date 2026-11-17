@@ -24,6 +24,14 @@ public class NetworkPersister {
         this.network = network;
     }
 
+    /** The line's real alignment when the network file gives one, otherwise straight segments between stations. */
+    String trackWkt(Line line) {
+        var points = line.hasPath()
+                ? line.path().stream().map(p -> p.get(0) + " " + p.get(1))
+                : line.stationIds().stream().map(network::station).map(s -> s.lon() + " " + s.lat());
+        return points.collect(Collectors.joining(", ", "LINESTRING(", ")"));
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public void persist() {
         for (Station s : network.stations()) {
@@ -36,8 +44,7 @@ public class NetworkPersister {
                     """, s.id(), s.name(), s.lon(), s.lat(), s.baseArrivalsPerMinute(), s.platformCapacity());
         }
         for (Line l : network.lines()) {
-            String wkt = l.stationIds().stream().map(network::station)
-                    .map(s -> s.lon() + " " + s.lat()).collect(Collectors.joining(", ", "LINESTRING(", ")"));
+            String wkt = trackWkt(l);
             jdbc.update("""
                     INSERT INTO line (id, name, color, path, train_count)
                     VALUES (?, ?, ?, ST_GeomFromText(?, 4326), ?)
