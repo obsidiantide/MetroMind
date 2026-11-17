@@ -79,6 +79,16 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsTimingPointsAndDefaultsToTheTerminals() throws Exception {
+        Line timed = read(network(", \"timingStationIds\": [\"B\"]", "49.84")).line("L1");
+        Line plain = read(network("", "49.84")).line("L1");
+
+        assertThat(timed.timingStationIds()).containsExactly("B");
+        assertThat(plain.timingStationIds()).isEmpty();
+        assertThat(plain.isTimingStop(0)).isTrue();
+    }
+
+    @Test
     void derivesRunTimesFromTrackLengthNotStraightLineDistance() throws Exception {
         Line line = read(network("", "49.84")).line("L1");
 
