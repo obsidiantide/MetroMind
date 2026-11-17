@@ -131,7 +131,12 @@ and fleet sizes are illustrative.
 ```bash
 cd backend && mvn verify            # unit + API tests, then integration tests (needs Docker)
 cd backend && mvn verify -DskipITs  # without Docker
+cd frontend && npm test             # component tests (Vitest + Testing Library, jsdom)
 ```
+
+Frontend component tests sit next to the components (`*.test.tsx`) and run against a mocked `api`, with shared
+network and snapshot fixtures in `frontend/test/`. They cover the KPI charts, the station and train drawer, the
+map's projection and selection, and the benchmark page's submit, poll, cancel and ranking flow.
 
 Unit and API tests run on the `standalone` profile with no infrastructure. The `*IT` classes in
 `backend/src/test/java/com/metromind/it` start the application against the same images as `docker-compose.yml`
