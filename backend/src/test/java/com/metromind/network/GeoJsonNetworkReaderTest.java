@@ -61,6 +61,24 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsCrossPlatformInterchangesFromTheCollectionProperties() throws Exception {
+        String json = network("", "49.84")
+                .replace("\"odWeights\"", "\"crossPlatform\": [{\"lineIds\": [\"L1\", \"L2\"], \"stationIds\": [\"B\"]}], \"odWeights\"")
+                .replaceFirst("\\s*]}\\s*$", """
+                  ,{"type": "Feature", "geometry": {"type": "LineString",
+                     "coordinates": [[49.84, 40.00], [49.83, 40.01], [49.82, 40.00]]},
+                   "properties": {"id": "L2", "stationIds": ["C", "B"], "trainCount": 2, "trainCapacity": 600}}
+                 ]}""");
+
+        MetroNetwork n = read(json);
+
+        assertThat(n.crossPlatform()).hasSize(1);
+        assertThat(n.isCrossPlatform("L2", "L1", "B")).isTrue();
+        assertThat(n.isCrossPlatform("L2", "L1", "C")).isFalse();
+        assertThat(read(network("", "49.84")).crossPlatform()).isEmpty();
+    }
+
+    @Test
     void derivesRunTimesFromTrackLengthNotStraightLineDistance() throws Exception {
         Line line = read(network("", "49.84")).line("L1");
 
