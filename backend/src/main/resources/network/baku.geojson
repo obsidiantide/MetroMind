@@ -1,0 +1,376 @@
+{
+ "type": "FeatureCollection",
+ "properties": {
+  "city": "Baku",
+  "source": "Approximate public station locations of the Baku Metro; track simplified to straight runs between stations. Demand and fleet figures are illustrative."
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "id": "icherisheher",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8317, 40.3658]
+   },
+   "properties": {
+    "name": "İçərişəhər",
+    "baseArrivalsPerMinute": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "sahil",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8443, 40.3717]
+   },
+   "properties": {
+    "name": "Sahil",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "28may",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8486, 40.3797]
+   },
+   "properties": {
+    "name": "28 May",
+    "baseArrivalsPerMinute": 14,
+    "platformCapacity": 650
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ganjlik",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8519, 40.4006]
+   },
+   "properties": {
+    "name": "Gənclik",
+    "baseArrivalsPerMinute": 9
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "narimanov",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8705, 40.4028]
+   },
+   "properties": {
+    "name": "Nəriman Nərimanov",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ulduz",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8913, 40.4147]
+   },
+   "properties": {
+    "name": "Ulduz",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "koroglu",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9183, 40.4209]
+   },
+   "properties": {
+    "name": "Koroğlu",
+    "baseArrivalsPerMinute": 10,
+    "platformCapacity": 450
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "garayev",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9338, 40.417]
+   },
+   "properties": {
+    "name": "Qara Qarayev",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "neftchilar",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9433, 40.4106]
+   },
+   "properties": {
+    "name": "Neftçilər",
+    "baseArrivalsPerMinute": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "khalglar",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9523, 40.3976]
+   },
+   "properties": {
+    "name": "Xalqlar Dostluğu",
+    "baseArrivalsPerMinute": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ahmadli",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9541, 40.385]
+   },
+   "properties": {
+    "name": "Əhmədli",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "aslanov",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.9536, 40.3727]
+   },
+   "properties": {
+    "name": "Həzi Aslanov",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "darnagul",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8616, 40.425]
+   },
+   "properties": {
+    "name": "Dərnəgül",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "azadlig",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8429, 40.4258]
+   },
+   "properties": {
+    "name": "Azadlıq prospekti",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "nasimi",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8255, 40.4243]
+   },
+   "properties": {
+    "name": "Nəsimi",
+    "baseArrivalsPerMinute": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "ajami",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8143, 40.4113]
+   },
+   "properties": {
+    "name": "Memar Əcəmi",
+    "baseArrivalsPerMinute": 9,
+    "platformCapacity": 450
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "20yanvar",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8085, 40.4041]
+   },
+   "properties": {
+    "name": "20 Yanvar",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "inshaatchilar",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.803, 40.3916]
+   },
+   "properties": {
+    "name": "İnşaatçılar",
+    "baseArrivalsPerMinute": 7
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "elmlar",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.816, 40.3753]
+   },
+   "properties": {
+    "name": "Elmlər Akademiyası",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "nizami",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8302, 40.3792]
+   },
+   "properties": {
+    "name": "Nizami",
+    "baseArrivalsPerMinute": 8
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "khatai",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8717, 40.3829]
+   },
+   "properties": {
+    "name": "Xətai",
+    "baseArrivalsPerMinute": 6
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "khojasan",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.779, 40.4216]
+   },
+   "properties": {
+    "name": "Xocəsən",
+    "baseArrivalsPerMinute": 3
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "avtovaghzal",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.7959, 40.4205]
+   },
+   "properties": {
+    "name": "Avtovağzal",
+    "baseArrivalsPerMinute": 5
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "8noyabr",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8205, 40.4027]
+   },
+   "properties": {
+    "name": "8 Noyabr",
+    "baseArrivalsPerMinute": 5
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "M1",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [49.8317, 40.3658],
+     [49.8443, 40.3717],
+     [49.8486, 40.3797],
+     [49.8519, 40.4006],
+     [49.8705, 40.4028],
+     [49.8913, 40.4147],
+     [49.9183, 40.4209],
+     [49.9338, 40.417],
+     [49.9433, 40.4106],
+     [49.9523, 40.3976],
+     [49.9541, 40.385],
+     [49.9536, 40.3727]
+    ]
+   },
+   "properties": {
+    "name": "Red Line",
+    "color": "#e53935",
+    "stationIds": ["icherisheher", "sahil", "28may", "ganjlik", "narimanov", "ulduz", "koroglu", "garayev", "neftchilar", "khalglar", "ahmadli", "aslanov"],
+    "trainCount": 10,
+    "trainCapacity": 1000,
+    "spareTrains": 2
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "M2",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [49.8616, 40.425],
+     [49.8429, 40.4258],
+     [49.8255, 40.4243],
+     [49.8143, 40.4113],
+     [49.8085, 40.4041],
+     [49.803, 40.3916],
+     [49.816, 40.3753],
+     [49.8302, 40.3792],
+     [49.8486, 40.3797],
+     [49.8717, 40.3829]
+    ]
+   },
+   "properties": {
+    "name": "Green Line",
+    "color": "#43a047",
+    "stationIds": ["darnagul", "azadlig", "nasimi", "ajami", "20yanvar", "inshaatchilar", "elmlar", "nizami", "28may", "khatai"],
+    "trainCount": 7,
+    "trainCapacity": 1000,
+    "spareTrains": 1
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "M3",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [49.779, 40.4216],
+     [49.7959, 40.4205],
+     [49.8143, 40.4113],
+     [49.8205, 40.4027]
+    ]
+   },
+   "properties": {
+    "name": "Purple Line",
+    "color": "#8e24aa",
+    "stationIds": ["khojasan", "avtovaghzal", "ajami", "8noyabr"],
+    "trainCount": 3,
+    "trainCapacity": 800
+   }
+  }
+ ]
+}
