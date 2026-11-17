@@ -23,7 +23,8 @@ import java.util.Map;
  *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains}, and optionally either
  *       {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
- *   <li>The collection's own {@code properties} may hold {@code city} and {@code odWeights}.</li>
+ *   <li>The collection's own {@code properties} may hold {@code city}, {@code odWeights} and
+ *       {@code crossPlatform} (as in the native format).</li>
  * </ul>
  *
  * <p>When a line has no {@code runSeconds}, each one is the track length between the two stations divided by the
@@ -80,7 +81,10 @@ public class GeoJsonNetworkReader {
         Map<String, Map<String, Double>> od = meta.has("odWeights")
                 ? mapper.convertValue(meta.get("odWeights"), new TypeReference<>() { })
                 : Map.of();
-        return new MetroNetwork(city, stations, lines, od);
+        List<CrossPlatformInterchange> crossPlatform = meta.has("crossPlatform")
+                ? mapper.convertValue(meta.get("crossPlatform"), new TypeReference<>() { })
+                : List.of();
+        return new MetroNetwork(city, stations, lines, od, crossPlatform);
     }
 
     private Station station(JsonNode feature) {
