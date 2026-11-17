@@ -197,5 +197,13 @@
       "trainCapacity": 900,
       "ring": true
     }
+  ],
+  "crossPlatform": [
+    {
+      "lineIds": [
+        "RING-CW",
+        "RING-CCW"
+      ]
+    }
   ]
 }
