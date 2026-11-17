@@ -75,4 +75,22 @@ public final class TrackGeometry {
         }
         return best;
     }
+
+    /**
+     * The track point {@code chainageMeters} along it, as {@code [lon, lat]}; chainages outside the track are
+     * clamped to its ends.
+     */
+    public double[] pointAt(double chainageMeters) {
+        double c = Math.max(0, Math.min(lengthMeters(), chainageMeters));
+        for (int i = 1; i < cumulative.length; i++) {
+            if (c <= cumulative[i] || i == cumulative.length - 1) {
+                double span = cumulative[i] - cumulative[i - 1];
+                double t = span == 0 ? 0 : (c - cumulative[i - 1]) / span;
+                double[] a = lonLat.get(i - 1);
+                double[] b = lonLat.get(i);
+                return new double[]{a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])};
+            }
+        }
+        throw new IllegalStateException("unreachable");
+    }
 }
