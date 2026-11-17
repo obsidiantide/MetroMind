@@ -33,4 +33,28 @@ class LineTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("spareTrains");
     }
+
+    @Test
+    void pathIsOptionalAndDefaultsToEmpty() throws Exception {
+        Line line = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "path": [[49.80, 40.00], [49.81, 40.005], [49.82, 40.00]]}
+                """, Line.class);
+        assertThat(line.hasPath()).isTrue();
+        assertThat(line.path()).hasSize(3).first().isEqualTo(List.of(49.80, 40.00));
+
+        assertThat(new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800).hasPath()).isFalse();
+    }
+
+    @Test
+    void rejectsMalformedPaths() {
+        assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0,
+                List.of(List.of(49.8, 40.0))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("two points");
+        assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0,
+                List.of(List.of(49.8, 40.0), List.of(49.9))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[lon, lat]");
+    }
 }

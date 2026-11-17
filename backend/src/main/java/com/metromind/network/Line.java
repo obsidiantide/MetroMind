@@ -12,9 +12,18 @@ import java.util.List;
  * @param trainCapacity  passengers per train
  * @param spareTrains    extra trains kept in a depot next to the first terminal; strategies that dispatch from the
  *                       depot may bring them into service (0 if the network file leaves it out)
+ * @param path           track alignment as {@code [lon, lat]} pairs from terminal A to terminal B, for drawing and
+ *                       spatial queries; empty when only the stations are known (the track is then the straight
+ *                       segments between them)
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
-                   int trainCount, int trainCapacity, int spareTrains) {
+                   int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path) {
+
+    /** Line whose track is the straight segments between its stations. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, List.of());
+    }
 
     /** Line with no spare trains in its depot. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -34,6 +43,23 @@ public record Line(String id, String name, String color, List<String> stationIds
         }
         stationIds = List.copyOf(stationIds);
         runSeconds = List.copyOf(runSeconds);
+        if (path == null) {
+            path = List.of();
+        }
+        if (path.size() == 1) {
+            throw new IllegalArgumentException("Line " + id + ": path needs at least two points");
+        }
+        for (List<Double> point : path) {
+            if (point.size() != 2) {
+                throw new IllegalArgumentException("Line " + id + ": path points must be [lon, lat]");
+            }
+        }
+        path = path.stream().map(List::copyOf).toList();
+    }
+
+    /** Whether the network file gave the real track alignment rather than just the stations. */
+    public boolean hasPath() {
+        return !path.isEmpty();
     }
 
     /** Number of stops in the full loop (outbound + inbound, terminals counted once). */
