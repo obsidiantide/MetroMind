@@ -29,7 +29,7 @@ Mark items `[x]` when merged.
 - [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil)
 - [x] Cross-platform interchange: changing between the two directions of a ring (or lines sharing an island
       platform) costs no walk, unlike the default 120 s transfer
-- [ ] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
+- [x] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
