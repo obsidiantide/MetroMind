@@ -56,4 +56,14 @@ public final class TestNetworks {
         Line cross = new Line("L2", "Line 2", "#00f", List.of("X", "C", "Y"), List.of(150, 150), 2, 600);
         return new MetroNetwork("Test", stations, List.of(base.line("L1"), cross), odWeights);
     }
+
+    /**
+     * The six stations of {@link #singleLine()} as a ring A→B→…→F→A, 120 s apart, run clockwise by 3 trains. A trip
+     * F→A is one stop; A→F goes all the way round.
+     */
+    public static MetroNetwork ring() {
+        Line ring = new Line("K", "Ring", "#a52", List.of("A", "B", "C", "D", "E", "F"),
+                List.of(120, 120, 120, 120, 120, 120), 3, 900, 0, List.of(), true);
+        return new MetroNetwork("Test", singleLine().stations(), List.of(ring));
+    }
 }
