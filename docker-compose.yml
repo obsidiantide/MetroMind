@@ -41,6 +41,7 @@ services:
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP: kafka:29092
       CORS_ORIGINS: http://localhost:3000
+      METROMIND_NETWORK: ${METROMIND_NETWORK:-classpath:network/metropolis.json}
     ports: ["8080:8080"]
 
   frontend:
