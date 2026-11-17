@@ -25,7 +25,7 @@ Mark items `[x]` when merged.
 - [x] Investigate why a delay can *reduce* total waiting under NO_CONTROL in some runs; fix or document
 - [x] Platform capacity limits and "passengers left behind" metric
 - [x] Scheduled timetable (planned departures) and lateness vs timetable instead of vs nominal run times
-- [ ] Circular lines (trains run round a ring without reversing), so Moscow-like networks with a ring can be loaded
+- [x] Circular lines (trains run round a ring without reversing), so Moscow-like networks with a ring can be loaded
 - [ ] Branching lines (a service pattern that splits at a junction, like Baku's Red line towards Bakmil)
 
 ### Incidents
