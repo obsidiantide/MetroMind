@@ -96,9 +96,10 @@ Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafk
 
 ### Choosing a network
 
-The simulated city is set by `metromind.network` (env `METROMIND_NETWORK`). Two networks are bundled: the
-fictional seed city `classpath:network/metropolis.json` (default) and the Baku Metro,
-`classpath:network/baku.geojson`. Any Spring resource location works too (`file:/path/city.geojson`):
+The simulated city is set by `metromind.network` (env `METROMIND_NETWORK`). Three networks are bundled: the
+fictional seed city `classpath:network/metropolis.json` (default), the Baku Metro,
+`classpath:network/baku.geojson`, and the fictional ring city `classpath:network/ringtown.json`. Any Spring
+resource location works too (`file:/path/city.geojson`):
 
 ```bash
 cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=standalone \
@@ -112,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` as in the JSON format |
 
 When a line gives no `runSeconds`, each is derived from the distance between its stations *along the track*
@@ -121,6 +122,17 @@ the straight-line distance suggests. Stations must lie within 250 m of their lin
 direction it is drawn; a file that breaks these rules stops startup with a message naming the station. The track
 is kept on the line (`path` in `GET /api/network`): the dashboard draws it, running trains are placed along it
 rather than on the chord between stations, and PostGIS stores it as the line's `LINESTRING`.
+
+**Ring lines.** A line with `"ring": true` has no terminals: its trains run round the stations in the order
+listed and carry on from the last station to the first, so `runSeconds` has one entry per station, the last for
+that closing run (in GeoJSON it is derived from the closed track like the others). A ring runs one way; a ring
+served in both directions is two ring lines over the same stations, one listing them in reverse, each with its own
+platforms and fleet. With no terminal to lay over at, the ring's first station is its timing point, where early
+trains wait for the timetable. Nothing can turn back on a ring, so short-turning strategies and `TURN_BACK`
+closures leave its trains waiting instead; a closed ring station sends its passengers to the stations either side.
+
+The bundled Ringtown network is a small fictional city built this way: two diameters crossing at Cathedral
+Square and an eight-station ring, run in both directions, that they meet at its four gates.
 
 The bundled Baku network has the Red, Green and Purple lines with 24 stations at approximate real locations and
 interchanges at 28 May and Memar Əcəmi; its track is simplified to straight runs between stations, and demand
@@ -183,7 +195,8 @@ WebSocket: connect to `ws://localhost:8080/ws` (STOMP) and subscribe to `/topic/
 
 Each station in a snapshot carries `queues`: waiting passengers per line and direction, e.g.
 `{ "lineId": "RED", "towardsStationId": "R7", "waiting": 42.0 }`. A train only boards the queue for the
-direction it is about to travel in; terminals have a single queue towards the other end of the line.
+direction it is about to travel in; terminals have a single queue towards the other end of the line. A ring
+station has a single queue too, signed towards the next station round the ring.
 
 ### Passenger demand and routing
 
