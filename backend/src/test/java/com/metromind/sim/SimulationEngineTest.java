@@ -63,6 +63,31 @@ class SimulationEngineTest {
     }
 
     @Test
+    void trainsFollowTheTrackAlignmentWhenTheNetworkHasOne() {
+        // Two stations on an east-west axis; the track detours ~1.1 km north between them.
+        var stations = List.of(new com.metromind.network.Station("A", "Alpha", 40.00, 49.80, 5),
+                new com.metromind.network.Station("B", "Bravo", 40.00, 49.82, 5));
+        Line curved = new Line("L", "Loop", "#f00", List.of("A", "B"), List.of(300), 1, 900, 0,
+                List.of(List.of(49.80, 40.00), List.of(49.81, 40.01), List.of(49.82, 40.00)));
+        SimulationEngine engine = new SimulationEngine(
+                new com.metromind.network.MetroNetwork("Test", stations, List.of(curved)), START,
+                HeadwayStrategy.NO_CONTROL);
+
+        boolean sawMidSegment = false;
+        for (int i = 0; i < 700; i++) {
+            engine.step(1);
+            var train = engine.snapshot().trains().get(0);
+            if (train.phase() == TrainPhase.RUNNING) {
+                // On the chord the latitude would stay 40.00; on the track it rises towards the apex.
+                assertThat(train.lat()).isCloseTo(40.00 + 0.01 * (1 - Math.abs(2 * train.progress() - 1)),
+                        within(1e-4));
+                sawMidSegment |= train.progress() > 0.3 && train.progress() < 0.7;
+            }
+        }
+        assertThat(sawMidSegment).isTrue();
+    }
+
+    @Test
     void ridingTimeIntegratesPassengersOnBoard() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.run(900, 1);
