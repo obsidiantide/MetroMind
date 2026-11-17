@@ -57,4 +57,67 @@ class LineTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("[lon, lat]");
     }
+
+    @Test
+    void linearLineReversesAtTerminals() {
+        Line line = new Line("L", "L", "#000", List.of("A", "B", "C"), List.of(60, 90), 2, 800);
+        assertThat(line.ring()).isFalse();
+        assertThat(line.loopLength()).isEqualTo(4);
+        assertThat(List.of(0, 1, 2, 3)).extracting(line::stationAtStop).containsExactly("A", "B", "C", "B");
+        assertThat(List.of(0, 1, 2, 3)).extracting(line::directionAtStop).containsExactly(1, 1, -1, -1);
+        assertThat(List.of(0, 1, 2, 3)).extracting(line::runSecondsFromStop).containsExactly(60, 90, 90, 60);
+        assertThat(line.isTerminalStop(0)).isTrue();
+        assertThat(line.isTerminalStop(2)).isTrue();
+        assertThat(line.isTerminalStop(3)).isFalse();
+        assertThat(line.nextPosition(2, 1)).isEqualTo(-1);
+        assertThat(line.nextPosition(0, -1)).isEqualTo(-1);
+        assertThat(line.sectionBetween(0, 2)).isEqualTo(-1);
+        assertThat(line.towardsStationId(1, -1)).isEqualTo("A");
+        assertThat(line.loopRunSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    void ringLineCirculatesWithoutTerminals() {
+        Line ring = new Line("K", "Ring", "#000", List.of("A", "B", "C", "D"), List.of(60, 70, 80, 90), 2, 800, 0,
+                List.of(), true);
+        assertThat(ring.loopLength()).isEqualTo(4);
+        assertThat(List.of(0, 1, 2, 3)).extracting(ring::stationAtStop).containsExactly("A", "B", "C", "D");
+        assertThat(List.of(0, 1, 2, 3)).extracting(ring::directionAtStop).containsOnly(1);
+        assertThat(List.of(0, 1, 2, 3)).extracting(ring::runSecondsFromStop).containsExactly(60, 70, 80, 90);
+        assertThat(List.of(0, 1, 2, 3)).noneMatch(ring::isTerminalStop);
+        assertThat(ring.nextPosition(3, 1)).isZero();
+        assertThat(ring.nextPosition(1, -1)).isEqualTo(-1);
+        assertThat(ring.sectionCount()).isEqualTo(4);
+        assertThat(ring.sectionBetween(3, 0)).isEqualTo(3);
+        assertThat(ring.sectionBetween(0, 3)).isEqualTo(3);
+        assertThat(ring.sectionEnd(3)).isZero();
+        assertThat(ring.towardsStationId(3, 1)).isEqualTo("A");
+        assertThat(ring.loopRunSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    void ringIsOptionalInJson() throws Exception {
+        Line ring = mapper.readValue("""
+                {"id": "K", "name": "K", "color": "#000", "stationIds": ["A", "B", "C"], "runSeconds": [90, 90, 90],
+                 "trainCount": 2, "trainCapacity": 800, "ring": true}
+                """, Line.class);
+        assertThat(ring.ring()).isTrue();
+        assertThat(ring.loopLength()).isEqualTo(3);
+    }
+
+    @Test
+    void rejectsMalformedRings() {
+        assertThatThrownBy(() -> new Line("K", "K", "#000", List.of("A", "B"), List.of(90, 90), 2, 800, 0,
+                List.of(), true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("three stations");
+        assertThatThrownBy(() -> new Line("K", "K", "#000", List.of("A", "B", "C"), List.of(90, 90), 2, 800, 0,
+                List.of(), true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("closes the ring");
+        assertThatThrownBy(() -> new Line("K", "K", "#000", List.of("A", "B", "A"), List.of(90, 90, 90), 2, 800,
+                0, List.of(), true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("twice");
+    }
 }
