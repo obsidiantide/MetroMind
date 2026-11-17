@@ -31,4 +31,15 @@ class NetworkPersisterTest {
 
         assertThat(persister.trackWkt(straight)).isEqualTo("LINESTRING(49.8 40.0, 49.82 40.0)");
     }
+
+    @Test
+    void closesARingDrawnFromItsStations() {
+        List<Station> triangle = List.of(stations.get(0), stations.get(1), new Station("C", "Charlie", 40.01, 49.81, 5));
+        Line ring = new Line("K", "K", "#000", List.of("A", "B", "C"), List.of(200, 200, 200), 2, 800, 0, List.of(),
+                true);
+        var persister = new NetworkPersister(null, new MetroNetwork("Test", triangle, List.of(ring)));
+
+        assertThat(persister.trackWkt(ring))
+                .isEqualTo("LINESTRING(49.8 40.0, 49.82 40.0, 49.81 40.01, 49.8 40.0)");
+    }
 }

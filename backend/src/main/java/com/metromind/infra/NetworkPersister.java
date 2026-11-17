@@ -9,6 +9,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /** Upserts the network topology into PostGIS so it can be queried spatially (nearest station, buffers...). */
@@ -24,11 +26,18 @@ public class NetworkPersister {
         this.network = network;
     }
 
-    /** The line's real alignment when the network file gives one, otherwise straight segments between stations. */
+    /**
+     * The line's real alignment when the network file gives one, otherwise straight segments between stations; a
+     * ring's segments come back to its first station, so either way a ring is stored as a closed linestring.
+     */
     String trackWkt(Line line) {
+        List<String> stops = new ArrayList<>(line.stationIds());
+        if (line.ring()) {
+            stops.add(stops.get(0));
+        }
         var points = line.hasPath()
                 ? line.path().stream().map(p -> p.get(0) + " " + p.get(1))
-                : line.stationIds().stream().map(network::station).map(s -> s.lon() + " " + s.lat());
+                : stops.stream().map(network::station).map(s -> s.lon() + " " + s.lat());
         return points.collect(Collectors.joining(", ", "LINESTRING(", ")"));
     }
 
