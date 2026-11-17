@@ -20,8 +20,8 @@ import java.util.Map;
  *       {@code baseArrivalsPerMinute}, optional {@code platformCapacity}.</li>
  *   <li>Each {@code LineString} feature is a line whose geometry is its track, drawn from the first station to the
  *       last. Properties: {@code id}, {@code name}, {@code color}, {@code stationIds} (in track order),
- *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains}, and optionally either
- *       {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
+ *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains} and {@code timingStationIds},
+ *       and optionally either {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
  *   <li>The collection's own {@code properties} may hold {@code city}, {@code odWeights} and
  *       {@code crossPlatform} (as in the native format).</li>
@@ -141,9 +141,12 @@ public class GeoJsonNetworkReader {
             runSeconds = deriveRunSeconds(id, new TrackGeometry(track), stationIds, stations, speedKmh / 3.6, ring);
         }
 
+        List<String> timingStationIds = new ArrayList<>();
+        p.path("timingStationIds").forEach(n -> timingStationIds.add(n.asText()));
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
-                p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring);
+                p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring,
+                timingStationIds);
     }
 
     /**
