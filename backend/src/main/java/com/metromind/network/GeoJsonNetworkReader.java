@@ -21,7 +21,8 @@ import java.util.Map;
  *   <li>Each {@code LineString} feature is a line whose geometry is its track, drawn from the first station to the
  *       last. Properties: {@code id}, {@code name}, {@code color}, {@code stationIds} (in track order),
  *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains}, and optionally either
- *       {@code runSeconds} or {@code averageSpeedKmh}.</li>
+ *       {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
+ *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
  *   <li>The collection's own {@code properties} may hold {@code city} and {@code odWeights}.</li>
  * </ul>
  *
@@ -32,6 +33,8 @@ import java.util.Map;
  */
 public class GeoJsonNetworkReader {
 
+    /** Farthest apart the two ends of a ring's track may be (it must come back to where it started). */
+    public static final double MAX_RING_GAP_METERS = 50;
     /** Average start-to-stop speed of a typical metro, matching the seed network's run times. */
     public static final double DEFAULT_AVERAGE_SPEED_KMH = 32.4;
     /** Farthest a station may be from its line's track (platforms are offset from the track centreline). */
@@ -113,6 +116,15 @@ public class GeoJsonNetworkReader {
             }
         }
 
+        boolean ring = p.path("ring").asBoolean(false);
+        if (ring && track.size() >= 2) {
+            double[] first = track.get(0);
+            double[] last = track.get(track.size() - 1);
+            if (InMemoryStationLocator.haversineMeters(first[1], first[0], last[1], last[0]) > MAX_RING_GAP_METERS) {
+                throw new IllegalArgumentException("Ring line " + id
+                        + ": the track must be closed (end where it starts, at the first station)");
+            }
+        }
         List<Integer> runSeconds;
         if (p.has("runSeconds")) {
             runSeconds = new ArrayList<>();
@@ -122,19 +134,23 @@ public class GeoJsonNetworkReader {
             if (!(speedKmh > 0)) {
                 throw new IllegalArgumentException("Line " + id + ": averageSpeedKmh must be positive");
             }
-            runSeconds = deriveRunSeconds(id, new TrackGeometry(track), stationIds, stations, speedKmh / 3.6);
+            runSeconds = deriveRunSeconds(id, new TrackGeometry(track), stationIds, stations, speedKmh / 3.6, ring);
         }
 
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
-                p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path);
+                p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring);
     }
 
-    /** Run time between consecutive stations: their distance along the track over the average speed. */
+    /**
+     * Run time between consecutive stations: their distance along the track over the average speed. A ring also
+     * gets the run from its last station over the end of the track and round to the first.
+     */
     static List<Integer> deriveRunSeconds(String lineId, TrackGeometry track, List<String> stationIds,
-                                          Map<String, Station> stations, double metersPerSecond) {
+                                          Map<String, Station> stations, double metersPerSecond, boolean ring) {
         List<Integer> runSeconds = new ArrayList<>();
         double previous = Double.NaN;
+        double first = Double.NaN;
         for (int i = 0; i < stationIds.size(); i++) {
             Station s = stations.get(stationIds.get(i));
             TrackGeometry.Projection at = track.project(s.lat(), s.lon());
@@ -151,8 +167,14 @@ public class GeoJsonNetworkReader {
                             + "; list stationIds in the direction the track is drawn");
                 }
                 runSeconds.add((int) Math.max(1, Math.round(meters / metersPerSecond)));
+            } else {
+                first = at.chainageMeters();
             }
             previous = at.chainageMeters();
+        }
+        if (ring) {
+            double closing = track.lengthMeters() - previous + first;
+            runSeconds.add((int) Math.max(1, Math.round(closing / metersPerSecond)));
         }
         return runSeconds;
     }

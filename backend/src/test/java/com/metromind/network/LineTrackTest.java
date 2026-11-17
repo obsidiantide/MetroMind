@@ -46,4 +46,20 @@ class LineTrackTest {
         assertThatThrownBy(() -> LineTrack.of(network.line("L"), network).position("A", "Z", 0.5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void ringTrainsRunOverTheEndOfTheTrackBackToTheFirstStation() {
+        // A square ring A (SW) → B (SE) → C (NE) → D (NW) → A, drawn closed.
+        var stations = List.of(new Station("A", "A", 40.00, 49.80, 5), new Station("B", "B", 40.00, 49.82, 5),
+                new Station("C", "C", 40.02, 49.82, 5), new Station("D", "D", 40.02, 49.80, 5));
+        Line ring = new Line("K", "K", "#000", List.of("A", "B", "C", "D"), List.of(100, 100, 100, 100), 2, 800, 0,
+                List.of(List.of(49.80, 40.00), List.of(49.82, 40.00), List.of(49.82, 40.02), List.of(49.80, 40.02),
+                        List.of(49.80, 40.00)), true);
+        LineTrack track = LineTrack.of(ring, new MetroNetwork("Test", stations, List.of(ring)));
+
+        double[] half = track.position("D", "A", 0.5);
+        assertThat(half[0]).as("halfway down the west side, not back round the ring").isCloseTo(40.01, within(1e-6));
+        assertThat(half[1]).isCloseTo(49.80, within(1e-6));
+        assertThat(track.position("D", "A", 1)).containsExactly(40.00, 49.80);
+    }
 }

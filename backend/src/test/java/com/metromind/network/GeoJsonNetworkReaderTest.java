@@ -116,4 +116,43 @@ class GeoJsonNetworkReaderTest {
         assertThatThrownBy(() -> read(network("", "49.84").replace("\"id\": \"B\"", "\"id\": \"A\"")))
                 .hasMessageContaining("Duplicate station A");
     }
+
+    /** Three stations on a closed triangular track A→B→C→A. */
+    private static String ringNetwork(String closingCoordinate) {
+        return """
+                {"type": "FeatureCollection",
+                 "features": [
+                  {"type": "Feature", "id": "A", "geometry": {"type": "Point", "coordinates": [49.80, 40.00]},
+                   "properties": {"baseArrivalsPerMinute": 4}},
+                  {"type": "Feature", "id": "B", "geometry": {"type": "Point", "coordinates": [49.82, 40.00]},
+                   "properties": {"baseArrivalsPerMinute": 4}},
+                  {"type": "Feature", "id": "C", "geometry": {"type": "Point", "coordinates": [49.81, 40.02]},
+                   "properties": {"baseArrivalsPerMinute": 4}},
+                  {"type": "Feature", "geometry": {"type": "LineString",
+                     "coordinates": [[49.80, 40.00], [49.82, 40.00], [49.81, 40.02], %s]},
+                   "properties": {"id": "K", "stationIds": ["A", "B", "C"], "ring": true,
+                                  "trainCount": 2, "trainCapacity": 900}}
+                 ]}
+                """.formatted(closingCoordinate);
+    }
+
+    @Test
+    void readsRingLinesWithTheClosingRunDerivedFromTheTrack() throws Exception {
+        Line ring = read(ringNetwork("[49.80, 40.00]")).line("K");
+
+        assertThat(ring.ring()).isTrue();
+        assertThat(ring.runSeconds()).hasSize(3);
+        double ca = InMemoryStationLocator.haversineMeters(40.02, 49.81, 40.00, 49.80);
+        double speed = GeoJsonNetworkReader.DEFAULT_AVERAGE_SPEED_KMH / 3.6;
+        assertThat(ring.runSeconds().get(2)).isCloseTo((int) Math.round(ca / speed), within(1));
+        assertThat(read(network("", "49.84")).line("L1").ring()).as("ring defaults to false").isFalse();
+    }
+
+    @Test
+    void rejectsRingsWhoseTrackIsNotClosed() {
+        assertThatThrownBy(() -> read(ringNetwork("[49.805, 40.01]")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Ring line K")
+                .hasMessageContaining("closed");
+    }
 }

@@ -11,9 +11,11 @@ public final class LineTrack {
     private final List<String> stationIds;
     private final TrackGeometry geometry;
     private final double[] stationChainage;
+    private final boolean ring;
 
     private LineTrack(Line line, MetroNetwork network) {
         this.stationIds = line.stationIds();
+        this.ring = line.ring();
         this.geometry = new TrackGeometry(line.path().stream().map(p -> new double[]{p.get(0), p.get(1)}).toList());
         this.stationChainage = new double[stationIds.size()];
         for (int i = 0; i < stationIds.size(); i++) {
@@ -29,12 +31,21 @@ public final class LineTrack {
 
     /**
      * Position {@code progress} (0..1) of the way from station {@code fromId} to station {@code toId} along the
-     * track, as {@code [lat, lon]}. Works in either direction of travel.
+     * track, as {@code [lat, lon]}. Works in either direction of travel; on a ring, whose trains only run the way
+     * the track is drawn, the run from the last station back to the first continues over the track's end.
      */
     public double[] position(String fromId, String toId, double progress) {
         double from = stationChainage[index(fromId)];
         double to = stationChainage[index(toId)];
-        double[] lonLat = geometry.pointAt(from + (to - from) * progress);
+        double length = geometry.lengthMeters();
+        if (ring && to < from) {
+            to += length;
+        }
+        double at = from + (to - from) * progress;
+        if (ring && at > length) {
+            at -= length;
+        }
+        double[] lonLat = geometry.pointAt(at);
         return new double[]{lonLat[1], lonLat[0]};
     }
 
