@@ -25,12 +25,13 @@ function heatStyle(extra: number, worst: number) {
 }
 
 /**
- * Maps WGS84 coordinates onto the SVG, to scale and centred. A degree of longitude is shorter than a degree of
+ * Maps WGS84 coordinates onto the SVG, to scale and centred on the stations and any track geometry. A degree of longitude is shorter than a degree of
  * latitude by cos(latitude), so longitudes are scaled by it; otherwise a city at 40°N would look 30 % too wide.
  */
 export function projection(network: MetroNetwork) {
-  const lats = network.stations.map((s) => s.lat);
-  const lons = network.stations.map((s) => s.lon);
+  const track = network.lines.flatMap((l) => l.path ?? []);
+  const lats = [...network.stations.map((s) => s.lat), ...track.map(([, lat]) => lat)];
+  const lons = [...network.stations.map((s) => s.lon), ...track.map(([lon]) => lon)];
   const [minLat, maxLat, minLon, maxLon] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
   const k = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
   const [spanX, spanY] = [(maxLon - minLon) * k, maxLat - minLat];
@@ -73,7 +74,8 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
       {network.lines.map((line) => (
         <polyline
           key={line.id}
-          points={line.stationIds.map((id) => `${x(station(id).lon)},${y(station(id).lat)}`).join(" ")}
+          points={(line.path?.length ? line.path : line.stationIds.map((id) => [station(id).lon, station(id).lat]))
+            .map(([lon, lat]) => `${x(lon)},${y(lat)}`).join(" ")}
           fill="none"
           stroke={line.color}
           strokeWidth={6}

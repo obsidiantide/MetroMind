@@ -4,6 +4,8 @@ export interface Station {
 export interface Line {
   id: string; name: string; color: string; stationIds: string[]; runSeconds: number[];
   trainCount: number; trainCapacity: number; spareTrains: number;
+  /** Track alignment as [lon, lat] pairs from the first station to the last; empty when only stations are known. */
+  path?: [number, number][];
 }
 export interface MetroNetwork {
   city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
