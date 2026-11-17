@@ -12,7 +12,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 
 | Feature | How |
 |---|---|
-| Virtual trains, stations, lines | Network loaded from JSON, persisted to PostGIS (`GEOGRAPHY(POINT)`, `GEOMETRY(LINESTRING)`) |
+| Virtual trains, stations, lines | Network loaded from JSON or GeoJSON (a bundled Baku network included), persisted to PostGIS (`GEOGRAPHY(POINT)`, `GEOMETRY(LINESTRING)`) |
 | Train movement | Discrete-time engine, 1 s step, fixed-block signalling (segment + next platform) |
 | Passenger flow | Fluid demand model with morning/evening peaks; origin–destination matrix (gravity model or explicit weights); fastest-route assignment with transfers at interchanges; one queue per station, line and direction, tracked by destination; crowding-dependent dwell times |
 | Delay detection | Each train tracks lateness against its nominal schedule; alerts at 120 s, recovery at 60 s |
@@ -93,6 +93,38 @@ cd frontend && npm install && npm run dev
 
 Infra in Docker, backend from the IDE: `docker compose up -d postgres redis kafka`, then run
 `MetroMindApplication` with the default profile.
+
+### Choosing a network
+
+The simulated city is set by `metromind.network` (env `METROMIND_NETWORK`). Two networks are bundled: the
+fictional seed city `classpath:network/metropolis.json` (default) and the Baku Metro,
+`classpath:network/baku.geojson`. Any Spring resource location works too (`file:/path/city.geojson`):
+
+```bash
+cd backend && mvn spring-boot:run -Dspring-boot.run.profiles=standalone \
+  -Dspring-boot.run.arguments=--metromind.network=classpath:network/baku.geojson
+METROMIND_NETWORK=classpath:network/baku.geojson docker compose up --build
+```
+
+**GeoJSON networks.** A file ending in `.geojson` is read as a `FeatureCollection`, the format station and track
+data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
+
+| Feature | Geometry | Properties |
+|---|---|---|
+| Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
+| Line | `LineString`: the track, first station to last | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Collection | (its own `properties`) | `city`, optional `odWeights` as in the JSON format |
+
+When a line gives no `runSeconds`, each is derived from the distance between its stations *along the track*
+divided by the line's average start-to-stop speed (32.4 km/h unless set), so a curving section takes longer than
+the straight-line distance suggests. Stations must lie within 250 m of their line's track and be listed in the
+direction it is drawn; a file that breaks these rules stops startup with a message naming the station. The track
+is kept on the line (`path` in `GET /api/network`): the dashboard draws it, running trains are placed along it
+rather than on the chord between stations, and PostGIS stores it as the line's `LINESTRING`.
+
+The bundled Baku network has the Red, Green and Purple lines with 24 stations at approximate real locations and
+interchanges at 28 May and Memar Əcəmi; its track is simplified to straight runs between stations, and demand
+and fleet sizes are illustrative.
 
 ### Tests
 
