@@ -67,6 +67,6 @@ Mark items `[x]` when merged.
 - [x] Visualise what-if result on the map (heat of extra wait per station)
 - [x] Strategy benchmark page
 - [x] Load real city networks from GeoJSON (Baku bundled; a Moscow-like network needs ring lines, tracked below)
-- [ ] Component tests (Vitest + Testing Library) for the charts, detail drawer and benchmark page
+- [x] Component tests (Vitest + Testing Library) for the charts, detail drawer and benchmark page
 - [ ] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
 - [ ] Export a benchmark report as CSV
