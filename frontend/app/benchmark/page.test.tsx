@@ -1,0 +1,82 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import BenchmarkPage from "@/app/benchmark/page";
+import { api } from "@/lib/api";
+import { job } from "@/test/benchmark";
+import { network } from "@/test/fixtures";
+
+describe("BenchmarkPage", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "network").mockResolvedValue(network);
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([]);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("submits the chosen settings and polls the job until its ranking arrives", async () => {
+    const submit = vi.spyOn(api, "submitBenchmark")
+      .mockResolvedValue(job({ status: "RUNNING", completedRuns: 4, progress: 0.25, report: null, finishedAt: null }));
+    vi.spyOn(api, "benchmarkJob").mockResolvedValue(job());
+    render(<BenchmarkPage />);
+
+    fireEvent.change(screen.getByLabelText("Scenarios"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Seed"), { target: { value: "7" } });
+    fireEvent.click(screen.getByLabelText("Breakdowns"));
+    fireEvent.change(screen.getByLabelText(/Rank by/), { target: { value: "TRAVEL_TIME" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run benchmark" }));
+
+    expect(await screen.findByText("Running: 4 of 16 runs")).toBeTruthy();
+    expect(submit).toHaveBeenCalledWith({
+      scenarios: 2, seed: 7, horizonSeconds: 1800, kinds: ["DELAY", "SECTION_CLOSURE", "STATION_CLOSURE"],
+      metric: "TRAVEL_TIME",
+    });
+    expect(screen.getByRole("button", { name: "Run benchmark" })).toHaveProperty("disabled", true);
+
+    expect(await screen.findByText(/Ranking · 2 scenarios · seed 7/, {}, { timeout: 3000 })).toBeTruthy();
+    expect(screen.queryByText(/Running:/)).toBeNull();
+  });
+
+  it("ranks strategies with recovery, short turns and skipped stops, and names scenario places", async () => {
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+
+    // BALANCED also heads the recent-runs table; in the ranking its row is highlighted as the best.
+    expect(screen.getAllByText("BALANCED").map((cell) => cell.closest("tr")?.className)).toContain("best");
+    expect(screen.getByText("never (2/2 not recovered)")).toBeTruthy();
+    expect(screen.getByText("1.5")).toBeTruthy();
+    expect(screen.getByText("2.5 (42 carried past)")).toBeTruthy();
+    expect(screen.getByText("RED-1 delayed 4m 00s")).toBeTruthy();
+    expect(await screen.findByText("Red Line Alpha – Central closed 15m 00s, trains turn back")).toBeTruthy();
+  });
+
+  it("cancels a running job and says how far it got", async () => {
+    vi.spyOn(api, "submitBenchmark")
+      .mockResolvedValue(job({ status: "QUEUED", completedRuns: 0, progress: 0, report: null }));
+    vi.spyOn(api, "benchmarkJob").mockResolvedValue(job({ status: "RUNNING", completedRuns: 3, report: null }));
+    const cancel = vi.spyOn(api, "cancelBenchmarkJob")
+      .mockResolvedValue(job({ status: "CANCELLED", completedRuns: 5, report: null }));
+    render(<BenchmarkPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run benchmark" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByText("Benchmark cancelled after 5 of 16 runs.")).toBeTruthy();
+    expect(cancel).toHaveBeenCalledWith("job-1");
+  });
+
+  it("cannot run without any incident kind and shows submission errors", async () => {
+    vi.spyOn(api, "submitBenchmark").mockRejectedValue(new Error("400 scenarios must be positive"));
+    render(<BenchmarkPage />);
+
+    const run = screen.getByRole("button", { name: "Run benchmark" });
+    for (const kind of ["Train delays", "Breakdowns", "Track closures", "Station closures"]) {
+      fireEvent.click(screen.getByLabelText(kind));
+    }
+    expect(run).toHaveProperty("disabled", true);
+
+    fireEvent.click(screen.getByLabelText("Train delays"));
+    fireEvent.click(run);
+    await waitFor(() => expect(screen.getByText("Error: 400 scenarios must be positive")).toBeTruthy());
+  });
+});
