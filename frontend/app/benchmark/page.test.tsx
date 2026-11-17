@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import BenchmarkPage from "@/app/benchmark/page";
 import { api } from "@/lib/api";
 import { job } from "@/test/benchmark";
@@ -48,6 +48,34 @@ describe("BenchmarkPage", () => {
     expect(screen.getByText("2.5 (42 carried past)")).toBeTruthy();
     expect(screen.getByText("RED-1 delayed 4m 00s")).toBeTruthy();
     expect(await screen.findByText("Red Line Alpha – Central closed 15m 00s, trains turn back")).toBeTruthy();
+  });
+
+  it("exports the shown ranking as a CSV file", async () => {
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
+    const created: Blob[] = [];
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    onTestFinished(() => { URL.createObjectURL = original.create; URL.revokeObjectURL = original.revoke; });
+    URL.createObjectURL = vi.fn((blob: Blob) => { created.push(blob); return "blob:report"; });
+    URL.revokeObjectURL = vi.fn();
+    const clicked: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this);
+    });
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+    fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].download).toBe("benchmark-seed7-wait-per-boarding.csv");
+    expect(clicked[0].href).toBe("blob:report");
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(created[0]);
+    });
+    expect(text).toContain("1,BALANCED,101,151,");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:report");
   });
 
   it("cancels a running job and says how far it got", async () => {

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { benchmarkCsv, benchmarkCsvName } from "@/lib/benchmarkCsv";
 import { duration } from "@/lib/format";
 import type {
   BenchmarkJob, BenchmarkReport, IncidentScenario, MetroNetwork, RankingMetric, ScenarioKind, StrategyRanking,
@@ -167,15 +168,30 @@ function recovery(r: StrategyRanking, scenarios: number) {
   return r.unrecoveredScenarios > 0 ? `${mean} (${r.unrecoveredScenarios}/${scenarios} not recovered)` : mean;
 }
 
+/** Saves the ranking as a CSV file through a temporary object URL. */
+function downloadCsv(report: BenchmarkReport) {
+  const url = URL.createObjectURL(new Blob([benchmarkCsv(report)], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = benchmarkCsvName(report);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
   const n = report.scenarios.length;
   const byWait = report.metric === "WAIT_PER_BOARDING";
   return (
     <section className="panel">
-      <h2>
-        Ranking · {n} scenarios · seed {report.seed} · {Math.round(report.horizonSeconds / 60)} min horizon · by{" "}
-        {byWait ? "platform wait per boarding" : "total travel time"}
-      </h2>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2>
+          Ranking · {n} scenarios · seed {report.seed} · {Math.round(report.horizonSeconds / 60)} min horizon · by{" "}
+          {byWait ? "platform wait per boarding" : "total travel time"}
+        </h2>
+        <button onClick={() => downloadCsv(report)}>Export CSV</button>
+      </div>
       <div className="table-scroll">
         <table>
           <thead>
