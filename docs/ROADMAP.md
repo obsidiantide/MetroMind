@@ -72,5 +72,5 @@ Mark items `[x]` when merged.
 - [x] Load real city networks from GeoJSON (Baku bundled; a Moscow-like network needs ring lines, tracked below)
 - [x] Component tests (Vitest + Testing Library) for the charts, detail drawer and benchmark page
 - [ ] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
-- [ ] Export a benchmark report as CSV
+- [x] Export a benchmark report as CSV
 - [ ] Line legend with ring direction arrows on the map
