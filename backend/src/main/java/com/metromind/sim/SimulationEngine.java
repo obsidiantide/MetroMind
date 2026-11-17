@@ -1,6 +1,7 @@
 package com.metromind.sim;
 
 import com.metromind.network.Line;
+import com.metromind.network.LineTrack;
 import com.metromind.network.MetroNetwork;
 import com.metromind.network.Station;
 
@@ -77,6 +78,8 @@ public final class SimulationEngine {
     private final MetroNetwork network;
     private final Map<String, Line> lines = new LinkedHashMap<>();
     private final Map<String, double[]> cumulativeStopSeconds = new LinkedHashMap<>();
+    /** Track alignment of lines whose network file gives one; others run on the chord between stations. */
+    private final Map<String, LineTrack> tracks = new LinkedHashMap<>();
     private final Map<String, List<String>> linesByStation = new LinkedHashMap<>();
     /** Stations next to each station on any line, in network order; where a closed station's passengers go. */
     private final Map<String, List<String>> neighbours = new LinkedHashMap<>();
@@ -120,6 +123,10 @@ public final class SimulationEngine {
                 cum[k + 1] = cum[k] + line.runSecondsFromStop(k) + NOMINAL_DWELL;
             }
             cumulativeStopSeconds.put(line.id(), cum);
+            LineTrack track = LineTrack.of(line, network);
+            if (track != null) {
+                tracks.put(line.id(), track);
+            }
             depot.put(line.id(), line.spareTrains());
             dispatchedCount.put(line.id(), 0);
             for (String sid : line.stationIds()) {
@@ -173,6 +180,7 @@ public final class SimulationEngine {
         this.network = other.network;
         this.lines.putAll(other.lines);
         this.cumulativeStopSeconds.putAll(other.cumulativeStopSeconds);
+        this.tracks.putAll(other.tracks);
         this.linesByStation.putAll(other.linesByStation);
         this.neighbours.putAll(other.neighbours);
         this.routes = other.routes;
@@ -1161,9 +1169,13 @@ public final class SimulationEngine {
             Station from = network.station(line.stationAtStop(t.stop));
             Station to = network.station(line.stationAtStop((t.stop + 1) % line.loopLength()));
             double progress = t.phase == TrainPhase.RUNNING ? Math.min(1, t.segmentElapsed / t.segmentDuration) : 0;
+            LineTrack track = tracks.get(t.lineId);
+            double[] latLon = track != null
+                    ? track.position(from.id(), to.id(), progress)
+                    : new double[]{from.lat() + (to.lat() - from.lat()) * progress,
+                                   from.lon() + (to.lon() - from.lon()) * progress};
             trainViews.add(new SimulationSnapshot.TrainView(t.id, t.lineId, from.id(), to.id(), progress,
-                    from.lat() + (to.lat() - from.lat()) * progress,
-                    from.lon() + (to.lon() - from.lon()) * progress,
+                    latLon[0], latLon[1],
                     t.phase, t.delaySeconds, t.passengers, t.capacity, t.failed));
         }
         List<SimulationSnapshot.StationView> stationViews = new ArrayList<>();
