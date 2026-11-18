@@ -63,7 +63,7 @@ Mark items `[x]` when merged.
 - [x] What-if analysis for track-section and station closures, not only train delays
 - [x] Benchmark ranking metric selectable: platform wait per boarding or total passenger travel time
 - [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
-- [ ] Adaptive dispatching on branched lines: send a spare train to the pattern with the worst overload forecast
+- [x] Adaptive dispatching on branched lines: send a spare train to the pattern with the worst overload forecast
       (today spare trains always join the main route)
 
 ### Platform
