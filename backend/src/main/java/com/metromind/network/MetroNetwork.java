@@ -21,7 +21,7 @@ public record MetroNetwork(String city, List<Station> stations, List<Line> lines
         lines = List.copyOf(lines);
         Map<String, Station> byId = stations.stream().collect(Collectors.toMap(Station::id, Function.identity()));
         for (Line line : lines) {
-            for (String sid : line.stationIds()) {
+            for (String sid : line.allStationIds()) {
                 if (!byId.containsKey(sid)) {
                     throw new IllegalArgumentException("Line " + line.id() + " references unknown station " + sid);
                 }
@@ -35,7 +35,7 @@ public record MetroNetwork(String city, List<Station> stations, List<Line> lines
                         () -> new IllegalArgumentException("Cross-platform interchange references unknown line " + lid)));
             }
             for (String sid : x.stationIds()) {
-                if (!served.stream().allMatch(l -> l.stationIds().contains(sid))) {
+                if (!served.stream().allMatch(l -> l.allStationIds().contains(sid))) {
                     throw new IllegalArgumentException("Cross-platform interchange at " + sid
                             + ": not every line " + x.lineIds() + " calls there");
                 }

@@ -10,7 +10,7 @@ import java.util.List;
  * @param stationIds     ordered stations from terminal A to terminal B
  * @param runSeconds     nominal running time between consecutive stations (size = stations - 1); a ring also
  *                       gives the run from its last station back to the first (size = stations)
- * @param trainCount     trains in service on this line
+ * @param trainCount     trains in service on this line, shared between its main route and branches
  * @param trainCapacity  passengers per train
  * @param spareTrains    extra trains kept in a depot next to the first terminal; strategies that dispatch from the
  *                       depot may bring them into service (0 if the network file leaves it out)
@@ -19,11 +19,22 @@ import java.util.List;
  *                       segments between them); a ring's path runs from its first station round to the first again
  * @param ring           whether trains circulate round the stations instead of reversing at terminals
  * @param timingStationIds stations where trains keep to the timetable, waiting there when early; empty for the
- *                       default: the terminals, or a ring's first station (a ring has no terminal to lay over at)
+ *                       default: the terminals, or a ring's first station (a ring has no terminal to lay over at);
+ *                       stations on a branch may be timing points too
+ * @param branches       branches some of the line's trains run to instead of the end of the main route (empty for
+ *                       an unbranched line; a ring cannot branch)
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
-                   List<String> timingStationIds) implements LoopTopology {
+                   List<String> timingStationIds, List<Branch> branches) implements LoopTopology {
+
+    /** Unbranched line. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, List.of());
+    }
 
     /** Line with the default timing points. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -83,9 +94,11 @@ public record Line(String id, String name, String color, List<String> stationIds
             }
         }
         path = path.stream().map(List::copyOf).toList();
+        branches = branches == null ? List.of() : List.copyOf(branches);
+        validateBranches(id, stationIds, ring, trainCount, branches);
         timingStationIds = timingStationIds == null ? List.of() : List.copyOf(timingStationIds);
         for (String sid : timingStationIds) {
-            if (!stationIds.contains(sid)) {
+            if (!stationIds.contains(sid) && branches.stream().noneMatch(b -> b.stationIds().contains(sid))) {
                 throw new IllegalArgumentException("Line " + id + ": timing point " + sid + " is not on the line");
             }
         }
@@ -96,8 +109,83 @@ public record Line(String id, String name, String color, List<String> stationIds
         return !path.isEmpty();
     }
 
-    /** The station sequences this line's trains follow: just the line's own stations while it has no branches. */
+    private static void validateBranches(String id, List<String> stationIds, boolean ring, int trainCount,
+                                         List<Branch> branches) {
+        if (branches.isEmpty()) {
+            return;
+        }
+        if (ring) {
+            throw new IllegalArgumentException("Ring line " + id + " cannot have branches");
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>(stationIds);
+        int branchTrains = 0;
+        for (Branch b : branches) {
+            int j = stationIds.indexOf(b.junctionStationId());
+            if (j <= 0 || j >= stationIds.size() - 1) {
+                throw new IllegalArgumentException("Line " + id + ": branch junction " + b.junctionStationId()
+                        + " must be an intermediate station of the main route");
+            }
+            for (String sid : b.stationIds()) {
+                if (!seen.add(sid)) {
+                    throw new IllegalArgumentException("Line " + id + ": branch station " + sid
+                            + " is already on the line");
+                }
+            }
+            int trains = branchTrainCount(trainCount, b);
+            if (trains < 1) {
+                throw new IllegalArgumentException("Line " + id + ": branch to " + b.terminalStationId()
+                        + " gets no train out of " + trainCount);
+            }
+            branchTrains += trains;
+        }
+        if (branchTrains >= trainCount) {
+            throw new IllegalArgumentException("Line " + id + ": branches leave no train for the main route");
+        }
+    }
+
+    private static int branchTrainCount(int trainCount, Branch branch) {
+        return (int) Math.round(trainCount * branch.share());
+    }
+
+    /** Every station the line serves: the main route, then each branch's stations. */
+    public List<String> allStationIds() {
+        if (branches.isEmpty()) {
+            return stationIds;
+        }
+        List<String> all = new java.util.ArrayList<>(stationIds);
+        branches.forEach(b -> all.addAll(b.stationIds()));
+        return List.copyOf(all);
+    }
+
+    /**
+     * The station sequences this line's trains follow. The main pattern (id = the line id) runs the line's own
+     * stations; each branch adds a pattern (id = {@code line/branch-terminal}) that follows the main route from the
+     * first terminal to the junction and then the branch. Each branch gets its {@link Branch#share()} of the
+     * trains, rounded, and the main pattern the rest. A pattern keeps the line's timing points that lie on it.
+     */
     public List<ServicePattern> patterns() {
-        return List.of(new ServicePattern(id, id, stationIds, runSeconds, ring, timingStationIds, trainCount));
+        if (branches.isEmpty()) {
+            return List.of(new ServicePattern(id, id, stationIds, runSeconds, ring, timingStationIds, trainCount));
+        }
+        List<ServicePattern> patterns = new java.util.ArrayList<>();
+        int mainTrains = trainCount;
+        for (Branch b : branches) {
+            mainTrains -= branchTrainCount(trainCount, b);
+        }
+        patterns.add(new ServicePattern(id, id, stationIds, runSeconds, false, timingOn(stationIds), mainTrains));
+        for (Branch b : branches) {
+            int j = stationIds.indexOf(b.junctionStationId());
+            List<String> stops = new java.util.ArrayList<>(stationIds.subList(0, j + 1));
+            stops.addAll(b.stationIds());
+            List<Integer> runs = new java.util.ArrayList<>(runSeconds.subList(0, j));
+            runs.addAll(b.runSeconds());
+            patterns.add(new ServicePattern(id + "/" + b.terminalStationId(), id, stops, runs, false,
+                    timingOn(stops), branchTrainCount(trainCount, b)));
+        }
+        return List.copyOf(patterns);
+    }
+
+    private List<String> timingOn(List<String> stops) {
+        return timingStationIds.stream().filter(stops::contains).toList();
     }
 }
