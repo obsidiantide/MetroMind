@@ -60,6 +60,58 @@ class GeoJsonNetworkReaderTest {
         assertThat(n.odWeights().get("A")).containsEntry("C", 3.0);
     }
 
+    /** {@link #network} with a branch from B north to X, given as its own LineString feature. */
+    private static String withBranch(String branchProperties) {
+        return network("", "49.84").replaceFirst("\\s*]}\\s*$", """
+                  ,{"type": "Feature", "id": "X", "geometry": {"type": "Point", "coordinates": [49.82, 40.02]},
+                   "properties": {"baseArrivalsPerMinute": 3}},
+                  {"type": "Feature", "geometry": {"type": "LineString",
+                     "coordinates": [[49.82, 40.00], [49.82, 40.02]]},
+                   "properties": {"id": "L1-X", %s}}
+                 ]}""".formatted(branchProperties));
+    }
+
+    @Test
+    void readsBranchesAsLineStringsFromTheirJunction() throws Exception {
+        MetroNetwork n = read(withBranch(
+                "\"branchOf\": \"L1\", \"junctionStationId\": \"B\", \"stationIds\": [\"X\"], \"share\": 0.34"));
+
+        assertThat(n.lines()).extracting(Line::id).containsExactly("L1");
+        Line line = n.line("L1");
+        assertThat(line.branches()).singleElement().satisfies(b -> {
+            assertThat(b.junctionStationId()).isEqualTo("B");
+            assertThat(b.stationIds()).containsExactly("X");
+            assertThat(b.share()).isEqualTo(0.34);
+            assertThat(b.path()).containsExactly(java.util.List.of(49.82, 40.00), java.util.List.of(49.82, 40.02));
+            // 0.02° of latitude is about 2224 m, at the default 9 m/s.
+            assertThat(b.runSeconds()).singleElement().satisfies(s -> assertThat(s).isBetween(245, 250));
+        });
+        assertThat(line.patterns()).extracting(ServicePattern::id).containsExactly("L1", "L1/X");
+    }
+
+    @Test
+    void branchRunTimesMayBeGivenExplicitly() throws Exception {
+        MetroNetwork n = read(withBranch("\"branchOf\": \"L1\", \"junctionStationId\": \"B\", "
+                + "\"stationIds\": [\"X\"], \"share\": 0.34, \"runSeconds\": [180]"));
+        assertThat(n.line("L1").branches().get(0).runSeconds()).containsExactly(180);
+    }
+
+    @Test
+    void rejectsBranchesOfUnknownLinesOrWithoutAJunctionOrShare() {
+        assertThatThrownBy(() -> read(withBranch(
+                "\"branchOf\": \"L9\", \"junctionStationId\": \"B\", \"stationIds\": [\"X\"], \"share\": 0.34")))
+                .hasMessageContaining("unknown line L9");
+        assertThatThrownBy(() -> read(withBranch(
+                "\"branchOf\": \"L1\", \"stationIds\": [\"X\"], \"share\": 0.34")))
+                .hasMessageContaining("junctionStationId");
+        assertThatThrownBy(() -> read(withBranch(
+                "\"branchOf\": \"L1\", \"junctionStationId\": \"B\", \"stationIds\": [\"X\"]")))
+                .hasMessageContaining("share is required");
+        assertThatThrownBy(() -> read(withBranch(
+                "\"branchOf\": \"L1\", \"junctionStationId\": \"B\", \"stationIds\": [\"Z\"], \"share\": 0.34")))
+                .hasMessageContaining("unknown station Z");
+    }
+
     @Test
     void readsCrossPlatformInterchangesFromTheCollectionProperties() throws Exception {
         String json = network("", "49.84")
