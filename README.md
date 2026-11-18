@@ -398,6 +398,11 @@ scenarios, most first:
 
 The dashboard's what-if table shows the count and stations per strategy.
 
+On a branched line the follower that counts is the train that will serve the stations given up. Heading for the
+first terminal on the shared trunk those are all trunk stations, served by every pattern, so the next train of
+any pattern calling at the platform counts; anywhere else, including on the trunk heading out, the train would
+give up the far end of its own route, so only a follower of its own pattern does.
+
 ### Skip-stop for recovery
 
 Under the `SKIP_STOP` strategy a train that is at least 2 minutes behind its timetable may run through an
@@ -409,7 +414,9 @@ enough: in a busy peak every train runs a little late. Passengers on board for t
 the next stop and queue there for a train back; they are reported as `passengersCarriedPast` in the snapshot
 `metrics`, not as transfers, next to `stopsSkipped`. Each skip appears as a `TRAIN_SKIPPED_STOP` event. On the
 test line with a quiet stop, a train delayed by 4 minutes in the morning peak skips that stop and the line ends
-the half hour with lower worst and average lateness than balanced holding alone.
+the half hour with lower worst and average lateness than balanced holding alone. On a branched line's trunk the
+neighbours are the trains of every pattern calling at the platform, since the passengers left behind board the
+next one whatever its pattern: a branch train that only lags behind its own pattern's leader keeps calling.
 
 The engine logs every skipped stop (train, line, station, time, lateness and the passengers carried past; the
 last 1000 are kept). Each what-if outcome lists the skips its strategy made during the incident run under
