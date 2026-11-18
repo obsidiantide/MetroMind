@@ -12,8 +12,16 @@ import java.util.List;
  * @param runSeconds        nominal run times: junction to first branch station, then between branch stations
  *                          (size = branch stations)
  * @param share             fraction of the line's trains that run to the branch, in (0, 1)
+ * @param path              track alignment as {@code [lon, lat]} pairs from the junction to the branch terminal;
+ *                          empty when only the stations are known
  */
-public record Branch(String junctionStationId, List<String> stationIds, List<Integer> runSeconds, double share) {
+public record Branch(String junctionStationId, List<String> stationIds, List<Integer> runSeconds, double share,
+                     List<List<Double>> path) {
+
+    /** Branch whose track is the straight segments between its stations. */
+    public Branch(String junctionStationId, List<String> stationIds, List<Integer> runSeconds, double share) {
+        this(junctionStationId, stationIds, runSeconds, share, List.of());
+    }
 
     public Branch {
         if (junctionStationId == null) {
@@ -31,6 +39,24 @@ public record Branch(String junctionStationId, List<String> stationIds, List<Int
         }
         stationIds = List.copyOf(stationIds);
         runSeconds = List.copyOf(runSeconds);
+        path = path == null ? List.of() : path.stream().map(List::copyOf).toList();
+        if (path.size() == 1 || path.stream().anyMatch(point -> point.size() != 2)) {
+            throw new IllegalArgumentException("Branch at " + junctionStationId
+                    + ": path needs at least two [lon, lat] points");
+        }
+    }
+
+    /** Whether the network file gave the branch's real track alignment. */
+    public boolean hasPath() {
+        return !path.isEmpty();
+    }
+
+    /** The junction followed by the branch stations, in the order the branch track runs. */
+    public List<String> trackStationIds() {
+        List<String> ids = new java.util.ArrayList<>();
+        ids.add(junctionStationId);
+        ids.addAll(stationIds);
+        return List.copyOf(ids);
     }
 
     /** The branch's far terminal. */
