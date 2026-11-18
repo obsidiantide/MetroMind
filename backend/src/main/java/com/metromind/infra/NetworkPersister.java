@@ -1,5 +1,6 @@
 package com.metromind.infra;
 
+import com.metromind.network.Branch;
 import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import com.metromind.network.Station;
@@ -41,6 +42,14 @@ public class NetworkPersister {
         return points.collect(Collectors.joining(", ", "LINESTRING(", ")"));
     }
 
+    /** A branch's real alignment from its junction when the file gives one, otherwise straight segments. */
+    String trackWkt(Branch branch) {
+        var points = branch.hasPath()
+                ? branch.path().stream().map(p -> p.get(0) + " " + p.get(1))
+                : branch.trackStationIds().stream().map(network::station).map(s -> s.lon() + " " + s.lat());
+        return points.collect(Collectors.joining(", ", "LINESTRING(", ")"));
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public void persist() {
         for (Station s : network.stations()) {
@@ -60,6 +69,14 @@ public class NetworkPersister {
                     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color,
                         path = EXCLUDED.path, train_count = EXCLUDED.train_count
                     """, l.id(), l.name(), l.color(), wkt, l.trainCount());
+            // A line's branches are replaced as a whole, so a branch dropped from the network file disappears too.
+            jdbc.update("DELETE FROM line_branch WHERE line_id = ?", l.id());
+            for (Branch b : l.branches()) {
+                jdbc.update("""
+                        INSERT INTO line_branch (line_id, terminal_station_id, junction_station_id, share, path)
+                        VALUES (?, ?, ?, ?, ST_GeomFromText(?, 4326))
+                        """, l.id(), b.terminalStationId(), b.junctionStationId(), b.share(), trackWkt(b));
+            }
         }
     }
 }
