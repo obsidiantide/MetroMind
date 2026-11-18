@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MetroMap, projection } from "@/components/MetroMap";
+import { MetroMap, pointsAlong, projection } from "@/components/MetroMap";
 import type { MetroNetwork } from "@/lib/types";
 import { network, snapshot, stationView } from "@/test/fixtures";
 
@@ -29,7 +29,59 @@ describe("projection", () => {
   });
 });
 
+describe("pointsAlong", () => {
+  it("finds points by share of the whole length, with the heading of their segment", () => {
+    // An L: 30 units east, then 10 units down (+y on screen).
+    const [first, second] = pointsAlong([[0, 0], [30, 0], [30, 10]], [0.5, 0.875]);
+
+    expect(first).toEqual({ x: 20, y: 0, angle: 0 });
+    expect(second.x).toBeCloseTo(30);
+    expect(second.y).toBeCloseTo(5);
+    expect(second.angle).toBeCloseTo(90);
+  });
+});
+
 describe("MetroMap", () => {
+  // Four stations round a square, listed clockwise on a north-up map.
+  const square: MetroNetwork = {
+    ...network,
+    stations: [
+      { id: "N", name: "North", lat: 40.01, lon: 49.8, baseArrivalsPerMinute: 1 },
+      { id: "E", name: "East", lat: 40.0, lon: 49.81, baseArrivalsPerMinute: 1 },
+      { id: "S", name: "South", lat: 39.99, lon: 49.8, baseArrivalsPerMinute: 1 },
+      { id: "W", name: "West", lat: 40.0, lon: 49.79, baseArrivalsPerMinute: 1 },
+    ],
+    lines: [
+      { id: "CW", name: "Ring CW", color: "#aa8866", stationIds: ["N", "E", "S", "W"], runSeconds: [90, 90, 90, 90],
+        trainCount: 2, trainCapacity: 900, spareTrains: 0, ring: true },
+      { id: "LINE", name: "Straight", color: "#1e88e5", stationIds: ["W", "E"], runSeconds: [120],
+        trainCount: 1, trainCapacity: 900, spareTrains: 0 },
+    ],
+  };
+
+  it("lists every line in the legend and marks the way a ring turns", () => {
+    const { container } = render(<MetroMap network={square} snapshot={null} />);
+    const legend = screen.getByLabelText("Line legend");
+
+    expect(legend.querySelector('[data-legend="CW"] text')?.textContent).toBe("Ring CW ↻");
+    expect(legend.querySelector('[data-legend="CW"] title')?.textContent).toContain("clockwise");
+    expect(legend.querySelector('[data-legend="LINE"] text')?.textContent).toBe("Straight");
+    expect(legend.querySelector('[data-legend="CW"] line')?.getAttribute("stroke")).toBe("#aa8866");
+    expect(container.querySelectorAll("polyline[data-track]")).toHaveLength(2); // the swatches are not tracks
+  });
+
+  it("points one arrow per run along a ring the way its trains go, and none along other lines", () => {
+    const { container } = render(<MetroMap network={square} snapshot={null} />);
+    const arrows = [...container.querySelectorAll('[data-ring-arrows="CW"] path')];
+    // The first run is North → East: down and to the right on screen, so heading between 0° and 90°.
+    const angle = Number(/rotate\(([-\d.]+)\)/.exec(arrows[0].getAttribute("transform")!)![1]);
+
+    expect(arrows).toHaveLength(4);
+    expect(angle).toBeGreaterThan(0);
+    expect(angle).toBeLessThan(90);
+    expect(container.querySelector('[data-ring-arrows="LINE"]')).toBeNull();
+  });
+
   it("closes a ring drawn from its stations back to the first one", () => {
     const ring: MetroNetwork = { ...network, lines: [{ ...network.lines[0], ring: true, runSeconds: [180, 180, 180] }] };
     const { container } = render(<MetroMap network={ring} snapshot={null} />);
