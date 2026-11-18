@@ -1,7 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
+import type { Branch, Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
 const H = 640;
@@ -29,7 +29,7 @@ function heatStyle(extra: number, worst: number) {
  * latitude by cos(latitude), so longitudes are scaled by it; otherwise a city at 40°N would look 30 % too wide.
  */
 export function projection(network: MetroNetwork) {
-  const track = network.lines.flatMap((l) => l.path ?? []);
+  const track = network.lines.flatMap((l) => [...(l.path ?? []), ...(l.branches ?? []).flatMap((b) => b.path ?? [])]);
   const lats = [...network.stations.map((s) => s.lat), ...track.map(([, lat]) => lat)];
   const lons = [...network.stations.map((s) => s.lon), ...track.map(([lon]) => lon)];
   const [minLat, maxLat, minLon, maxLon] = [Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons)];
@@ -51,6 +51,12 @@ export function trackPoints(line: Line, station: (id: string) => Station): [numb
   if (line.path?.length) return line.path;
   const stops = line.ring ? [...line.stationIds, line.stationIds[0]] : line.stationIds;
   return stops.map((id) => [station(id).lon, station(id).lat]);
+}
+
+/** A branch's track as [lon, lat] pairs from its junction: its alignment when known, otherwise straight segments. */
+export function branchPoints(branch: Branch, station: (id: string) => Station): [number, number][] {
+  if (branch.path?.length) return branch.path;
+  return [branch.junctionStationId, ...branch.stationIds].map((id) => [station(id).lon, station(id).lat]);
 }
 
 /** Keyboard and pointer props that make a map element pick `target` when activated. */
@@ -81,17 +87,23 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Metro network map">
-      {network.lines.map((line) => (
+      {network.lines.flatMap((line) => [
+        { key: line.id, points: trackPoints(line, station) },
+        ...(line.branches ?? []).map((b) => ({
+          key: `${line.id}/${b.stationIds[b.stationIds.length - 1]}`, points: branchPoints(b, station),
+        })),
+      ].map(({ key, points }) => (
         <polyline
-          key={line.id}
-          points={trackPoints(line, station).map(([lon, lat]) => `${x(lon)},${y(lat)}`).join(" ")}
+          key={key}
+          data-track={key}
+          points={points.map(([lon, lat]) => `${x(lon)},${y(lat)}`).join(" ")}
           fill="none"
           stroke={line.color}
           strokeWidth={6}
           strokeLinecap="round"
           opacity={0.75}
         />
-      ))}
+      )))}
       {snapshot?.closedSections.map((c) => {
         const [a, b] = [station(c.fromStationId), station(c.toStationId)];
         const action = c.response === "TURN_BACK" ? "trains turn back" : "trains wait";
