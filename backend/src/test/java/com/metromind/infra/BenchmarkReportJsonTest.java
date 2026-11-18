@@ -28,4 +28,21 @@ class BenchmarkReportJsonTest {
 
         assertThat(mapper.readValue(json, BenchmarkReport.class)).isEqualTo(report);
     }
+
+    @Test
+    void aReportStoredBeforeTrunkRegularityExistedReadsBackWithNoTrunks() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        String json = """
+                {"seed":1,"horizonSeconds":600,"metric":"WAIT_PER_BOARDING","scenarios":[],
+                 "rankings":[{"rank":1,"strategy":"BALANCED","meanWaitSeconds":60,"p95WaitSeconds":70,
+                              "meanTravelMinutes":500,"p95TravelMinutes":550,"meanRecoverySeconds":null,
+                              "unrecoveredScenarios":0,"meanShortTurns":0,"shortTurnsByStation":{},
+                              "meanStopsSkipped":0,"meanPassengersCarriedPast":0,"stopsSkippedByStation":{},
+                              "waitSecondsPerScenario":[]}]}
+                """;
+
+        BenchmarkReport report = mapper.readValue(json, BenchmarkReport.class);
+
+        assertThat(report.rankings().get(0).meanTrunkHeadwayCv()).isEmpty();
+    }
 }
