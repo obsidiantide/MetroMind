@@ -145,7 +145,10 @@ the first branch station, then between them), the `share` of the line's trains t
 
 The engine runs each way through the network as a *service pattern*: the main route, and for each branch the
 trunk from the first terminal to the junction followed by the branch. A branch gets its share of the trains
-(rounded), the main route the rest, and each pattern keeps its own timetable and headway control. Signalling
+(rounded), the main route the rest, and each pattern keeps its own timetable. Headway control regulates what
+passengers on a platform see: on the trunk the combined service of every pattern calling there (its even headway
+is `1 / Σ trains / loop time` over those patterns), on a branch or beyond the junction that pattern alone, so
+trains of the two patterns do not bunch on the trunk. Signalling
 blocks are physical track (a station's platform in one direction, or the run to the next station), so trains of
 both patterns exclude each other on the shared trunk and at the junction platform where the branch merges back.
 On a trunk platform everyone for a trunk station boards the first train, while passengers for the branch (or
