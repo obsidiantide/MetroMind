@@ -43,6 +43,10 @@ Mark items `[x]` when merged.
       run together (today each pattern is regulated on its own, so trains of two patterns can bunch on the trunk)
 - [x] Overload forecast on branched lines: count only the free space of trains whose pattern serves each waiting
       passenger's destination (today every train of the line calling at the platform relieves the queue)
+- [ ] Trunk regularity metric: headway CV of the combined service on each shared trunk, reported next to the
+      per-pattern CV in metrics, what-if and benchmark results (today trunk bunching only shows up in waiting)
+- [ ] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
+      other way for the crossing time (today branch and main tracks never conflict)
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -65,6 +69,8 @@ Mark items `[x]` when merged.
 - [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
 - [x] Adaptive dispatching on branched lines: send a spare train to the pattern with the worst overload forecast
       (today spare trains always join the main route)
+- [ ] Short-turning and skip-stop on a shared trunk judge the follower by the platform headway, so a train of the
+      other pattern close behind can take over the stations a late train gives up
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
@@ -92,3 +98,4 @@ Mark items `[x]` when merged.
 - [x] Export a benchmark report as CSV
 - [ ] Line legend with ring direction arrows on the map
 - [ ] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
+- [ ] Highlight the stations of a train's service pattern on the map when its detail drawer is open
