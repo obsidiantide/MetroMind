@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { boundFor, isBranchTerminal, lineSections, lineStationIds, ringTurn } from "@/lib/lines";
+import {
+  boundFor, isBranchTerminal, lineSections, lineStationIds, patternStationIds, ringTurn,
+} from "@/lib/lines";
 import type { Line, Station } from "@/lib/types";
 
 const red: Line = {
@@ -68,5 +70,18 @@ describe("boundFor", () => {
 
   it("signs a ring train by its next station", () => {
     expect(boundFor({ ...red, ring: true }, "Bee", "B")).toBe("next Bee");
+  });
+});
+
+describe("patternStationIds", () => {
+  it("derives the main route and a branch pattern from the line's branches", () => {
+    expect(patternStationIds(branched, "RED")).toEqual(["A", "B", "C"]);
+    expect(patternStationIds(branched, "RED/Y")).toEqual(["A", "B", "X", "Y"]);
+  });
+
+  it("prefers the patterns the network lists", () => {
+    const listed: Line = { ...branched, patterns: [{ id: "RED/Y", lineId: "RED", stationIds: ["B", "X", "Y"],
+      runSeconds: [90, 80], ring: false, timingStationIds: ["B", "Y"], trainCount: 1 }] };
+    expect(patternStationIds(listed, "RED/Y")).toEqual(["B", "X", "Y"]);
   });
 });

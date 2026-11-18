@@ -148,6 +148,25 @@ describe("MetroMap", () => {
     expect(titles[2]).toMatch(/^RED-3 to Bravo · /);
   });
 
+  it("highlights the stations of the selected train's pattern and fades the rest", () => {
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }, { ...network.lines[1], stationIds: ["A", "B"] }] };
+    const snap = snapshot({ trains: [trainView("RED-1", { patternId: "RED/N", towardsStationId: "N" })] });
+    const { container, rerender } = render(
+      <MetroMap network={branched} snapshot={snap} selected={{ kind: "train", id: "RED-1" }} />);
+    const onRoute = () => [...container.querySelectorAll("[data-on-route]")].map((g) => g.querySelector("text")?.textContent);
+
+    expect(onRoute()).toEqual(["Alpha", "Central", "North"]);
+    expect(screen.getAllByRole("button").find((b) => b.textContent?.includes("Bravo"))?.getAttribute("opacity")).toBe("0.35");
+    expect(container.querySelector('polyline[data-track="BLUE"]')?.getAttribute("opacity")).toBe("0.25");
+    expect(container.querySelector('polyline[data-track="RED"]')?.getAttribute("opacity")).toBe("0.75");
+
+    rerender(<MetroMap network={branched} snapshot={snap} selected={{ kind: "station", id: "C" }} />);
+    expect(onRoute()).toEqual([]);
+    expect(container.querySelector('polyline[data-track="BLUE"]')?.getAttribute("opacity")).toBe("0.75");
+  });
+
   it("selects a station by click or keyboard and marks the selected one", () => {
     const onSelect = vi.fn();
     render(<MetroMap network={network} snapshot={snapshot({ stations: [stationView("C", { waiting: 120 })] })}
