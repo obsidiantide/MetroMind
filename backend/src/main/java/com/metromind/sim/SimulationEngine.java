@@ -709,6 +709,81 @@ public final class SimulationEngine {
         return best;
     }
 
+    /*
+     * Platform headways: the gaps a passenger on t's platform sees, counting every train of the line that calls
+     * there in t's direction, whatever its service pattern. On an unbranched line they equal the pattern headways
+     * above; on the trunk of a branched line they measure how evenly the patterns run together.
+     */
+
+    /** Loop stop of {@code p} at which trains call at {@code stationId} leaving in {@code direction}, or -1. */
+    private static int callingStop(ServicePattern p, String stationId, int direction) {
+        for (int k = 0; k < p.loopLength(); k++) {
+            if (p.directionAtStop(k) == direction && p.stationAtStop(k).equals(stationId)) {
+                return k;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Nominal gap from the platform where {@code t} stands to the nearest other train of its line, ahead of it
+     * ({@code ahead}: seconds since that train left the platform) or behind it (seconds until it gets there).
+     * Only trains whose pattern calls at the platform count; with none, the whole loop of {@code t}'s pattern.
+     */
+    private double platformGap(TrainState t, boolean ahead) {
+        ServicePattern own = pattern(t);
+        String stationId = own.stationAtStop(t.stop);
+        int direction = own.directionAtStop(t.stop);
+        double best = loopTotal(own);
+        for (TrainState o : trains) {
+            if (o == t || !o.lineId.equals(t.lineId)) {
+                continue;
+            }
+            ServicePattern op = pattern(o);
+            int k = callingStop(op, stationId, direction);
+            if (k < 0) {
+                continue;
+            }
+            double total = loopTotal(op);
+            double diff = ahead ? loopPosition(o) - cumulativeStopSeconds.get(op.id())[k]
+                    : cumulativeStopSeconds.get(op.id())[k] - loopPosition(o);
+            double d = Math.floorMod(Math.round(diff * 1000), (long) (total * 1000)) / 1000.0;
+            if (d > 0 && d < best) {
+                best = d;
+            }
+        }
+        return best;
+    }
+
+    /** Nominal gap to the last train of the line, of any pattern, to leave the platform where {@code t} is. */
+    double platformForwardHeadway(TrainState t) {
+        return platformGap(t, true);
+    }
+
+    /** Nominal gap to the next train of the line, of any pattern, due at the platform where {@code t} is. */
+    double platformBackwardHeadway(TrainState t) {
+        return platformGap(t, false);
+    }
+
+    /**
+     * Even headway at the platform where {@code t} is: the combined service of every pattern calling there, each
+     * running its trains evenly round its own loop ({@code 1 / Σ trains / loop time}). On a stretch served by one
+     * pattern it is that pattern's loop time divided by its trains.
+     */
+    double platformEvenHeadway(TrainState t) {
+        ServicePattern own = pattern(t);
+        String stationId = own.stationAtStop(t.stop);
+        int direction = own.directionAtStop(t.stop);
+        double trainsPerSecond = 0;
+        for (ServicePattern p : patternsByLine.get(t.lineId)) {
+            if (callingStop(p, stationId, direction) >= 0) {
+                long running = trains.stream().filter(o -> o.patternId.equals(p.id())).count();
+                trainsPerSecond += running / loopTotal(p);
+            }
+        }
+        return 1 / trainsPerSecond; // t's own pattern calls here, so the sum is positive
+    }
+
     // ------------------------------------------------------------------ signalling
 
     /*
