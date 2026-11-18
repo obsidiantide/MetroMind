@@ -1,5 +1,7 @@
 package com.metromind.network;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
 /**
@@ -162,7 +164,9 @@ public record Line(String id, String name, String color, List<String> stationIds
      * stations; each branch adds a pattern (id = {@code line/branch-terminal}) that follows the main route from the
      * first terminal to the junction and then the branch. Each branch gets its {@link Branch#share()} of the
      * trains, rounded, and the main pattern the rest. A pattern keeps the line's timing points that lie on it.
+     * Serialised with the line (read-only: a network file never gives it, it follows from the branches).
      */
+    @JsonProperty(value = "patterns", access = JsonProperty.Access.READ_ONLY)
     public List<ServicePattern> patterns() {
         if (branches.isEmpty()) {
             return List.of(new ServicePattern(id, id, stationIds, runSeconds, ring, timingStationIds, trainCount));
