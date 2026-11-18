@@ -453,7 +453,7 @@ public final class SimulationEngine {
 
     /** Passengers on {@code t} who would leave the train if it called at its current stop. */
     private double alightingAt(TrainState t) {
-        boolean[] stays = routes.staysAboard(routes.lineIndex(t.lineId), t.stop);
+        boolean[] stays = routes.staysAboard(routes.patternIndex(t.patternId), t.stop);
         double alighting = 0;
         for (int d = 0; d < t.onboard.length; d++) {
             if (!stays[d]) {
@@ -536,9 +536,9 @@ public final class SimulationEngine {
      * the train has run through get off at the first open station after it and finish their trip on foot.
      */
     private double alight(TrainState t, StationState st) {
-        int lineIdx = routes.lineIndex(t.lineId);
+        int patternIdx = routes.patternIndex(t.patternId);
         int here = routes.index(st.id);
-        boolean[] stays = routes.staysAboard(lineIdx, t.stop);
+        boolean[] stays = routes.staysAboard(patternIdx, t.stop);
         double alight = 0;
         for (int d = 0; d < t.onboard.length; d++) {
             double amount = t.onboard[d];
@@ -549,13 +549,15 @@ public final class SimulationEngine {
             alight += amount;
             boolean arrived = d == here || (!closedStations.isEmpty()
                     && closedStations.containsKey(network.stations().get(d).id()));
-            StationState.QueueKey next = arrived ? null : routes.transferQueue(lineIdx, t.stop, d);
+            StationState.QueueKey next = arrived ? null : routes.transferQueue(patternIdx, t.stop, d);
             if (next == null) {
                 st.delivered += amount;
             } else {
                 st.waiting.get(next)[d] += amount;
-                // Going back along the same line only happens after being carried past a skipped stop.
-                if (next.lineId().equals(t.lineId)) {
+                // Going back along the same line to a station this train serves only happens after being carried
+                // past a skipped stop; staying on a branched line for a station it does not serve is a change of
+                // route at the junction.
+                if (next.lineId().equals(t.lineId) && routes.serves(patternIdx, d)) {
                     st.carriedPast += amount;
                 } else {
                     st.transfers += amount;
@@ -568,8 +570,9 @@ public final class SimulationEngine {
     }
 
     /**
-     * Boards the queue for the train's direction; if it does not fit, every destination boards pro rata. Nobody
-     * boards a train that is about to turn back short of a closed section.
+     * Boards the queue for the train's direction: everyone whose route this train serves (on a branched line,
+     * passengers for the other branch wait for their own train). If they do not fit, every destination boards pro
+     * rata. Nobody boards a train that is about to turn back short of a closed section.
      */
     private double board(TrainState t, ServicePattern p, StationState st) {
         SectionClosure closure = closureAhead(p, t.stop);
@@ -580,7 +583,13 @@ public final class SimulationEngine {
         if (queue == null) {
             return 0;
         }
-        double waiting = StationState.sum(queue);
+        boolean[] boards = routes.boards(routes.patternIndex(t.patternId), t.stop);
+        double waiting = 0;
+        for (int d = 0; d < queue.length; d++) {
+            if (boards[d]) {
+                waiting += queue[d];
+            }
+        }
         double room = Math.max(0, t.capacity - t.passengers);
         if (waiting <= 0) {
             return 0;
@@ -595,6 +604,9 @@ public final class SimulationEngine {
         }
         double board = 0;
         for (int d = 0; d < queue.length; d++) {
+            if (!boards[d]) {
+                continue;
+            }
             double b = queue[d] * fraction;
             queue[d] -= b;
             t.onboard[d] += b;
@@ -1139,13 +1151,13 @@ public final class SimulationEngine {
      * (everyone alighting at or before that stop frees their place).
      */
     double passengersAboardAfter(TrainState t, ServicePattern p, int stop) {
-        int lineIdx = routes.lineIndex(t.lineId);
+        int patternIdx = routes.patternIndex(t.patternId);
         boolean[] aboard = new boolean[t.onboard.length];
         java.util.Arrays.fill(aboard, true);
         int k = t.stop;
         do {
             k = (k + 1) % p.loopLength();
-            boolean[] stays = routes.staysAboard(lineIdx, k);
+            boolean[] stays = routes.staysAboard(patternIdx, k);
             for (int d = 0; d < aboard.length; d++) {
                 aboard[d] &= stays[d];
             }
