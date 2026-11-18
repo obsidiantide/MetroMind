@@ -35,6 +35,8 @@ class PostgisStationLocatorIT extends InfrastructureIT {
             assertThat(jdbc.queryForObject("SELECT ST_NPoints(path) FROM line WHERE id = ?", Integer.class,
                     line.id())).isEqualTo(line.stationIds().size());
         }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM line_branch", Integer.class))
+                .isEqualTo(network.lines().stream().mapToInt(l -> l.branches().size()).sum());
         Station first = network.stations().getFirst();
         assertThat(jdbc.queryForObject("SELECT ST_Y(location::geometry) FROM station WHERE id = ?", Double.class,
                 first.id())).isCloseTo(first.lat(), within(1e-9));
