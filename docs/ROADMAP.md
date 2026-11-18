@@ -78,7 +78,7 @@ Mark items `[x]` when merged.
       when every topic has passed it (today a backlog on positions lets metrics close minutes early and drops samples)
 - [x] Cancel a queued or running benchmark job (`DELETE /api/analysis/benchmark/jobs/{id}`)
 - [x] Persist finished benchmark jobs in PostgreSQL so results survive restarts
-- [ ] Service patterns in `GET /api/network` (stations, run times and trains of each) and the pattern of each train
+- [x] Service patterns in `GET /api/network` (stations, run times and trains of each) and the pattern of each train
       in the snapshot
 
 ### Frontend
