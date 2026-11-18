@@ -42,7 +42,10 @@ export interface TrainView {
   id: string; lineId: string;
   /** Service pattern the train follows (see Line.patterns); equals lineId on an unbranched line. */
   patternId: string;
-  fromStationId: string; toStationId: string; progress: number;
+  fromStationId: string; toStationId: string;
+  /** Terminal the train is bound for on its current run (a branch train heading out: the branch terminal); on a ring, the next station. */
+  towardsStationId: string;
+  progress: number;
   lat: number; lon: number; phase: TrainPhase; delaySeconds: number; load: number; capacity: number; failed: boolean;
 }
 export interface QueueView { lineId: string; towardsStationId: string; waiting: number }
