@@ -45,7 +45,7 @@ Mark items `[x]` when merged.
       passenger's destination (today every train of the line calling at the platform relieves the queue)
 - [x] Trunk regularity metric: headway CV of the combined service on each shared trunk, reported next to the
       per-pattern CV in metrics, what-if and benchmark results (today trunk bunching only shows up in waiting)
-- [ ] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
+- [x] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
       other way for the crossing time (today branch and main tracks never conflict)
 
 ### Incidents
