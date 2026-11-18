@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { duration, lateness } from "@/lib/format";
-import { lineStationIds } from "@/lib/lines";
+import { boundFor, isBranchTerminal, lineStationIds } from "@/lib/lines";
 import type { Departure, MetroNetwork, Snapshot, TrainPhase } from "@/lib/types";
 
 export type Selection = { kind: "station"; id: string } | { kind: "train"; id: string };
@@ -114,7 +114,12 @@ function StationDetail({ stationId, network, snapshot }: {
               <tr key={`${d.trainId}-${d.plannedTime}`}>
                 <td>{d.plannedClock.slice(0, 5)}</td>
                 <td style={{ color: line(d.lineId)?.color }}>{d.trainId}</td>
-                <td>{name(d.towardsStationId)}</td>
+                <td>
+                  {name(d.towardsStationId)}
+                  {line(d.lineId) && isBranchTerminal(line(d.lineId)!, d.towardsStationId) && (
+                    <span className="muted"> · branch</span>
+                  )}
+                </td>
                 <td style={{ color: d.delaySeconds >= 60 ? "var(--warn)" : undefined }}>{lateness(d.delaySeconds)}</td>
               </tr>
             ))}
@@ -156,6 +161,7 @@ function TrainDetail({ trainId, network, snapshot }: {
         {train.failed && <span className="chip" style={{ borderColor: "var(--bad)" }}>broken down</span>}
       </div>
       <dl className="facts">
+        <dt>Heading</dt><dd>{boundFor(line, name(train.towardsStationId), train.towardsStationId)}</dd>
         <dt>Where</dt><dd>{where}</dd>
         <dt>Doing</dt><dd>{PHASE_LABEL[train.phase]}</dd>
         <dt>Lateness</dt>

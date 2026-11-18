@@ -1,7 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ringTurn } from "@/lib/lines";
+import { boundFor, isBranchTerminal, ringTurn } from "@/lib/lines";
 import type { Branch, Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
@@ -102,6 +102,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
   const { x, y } = projection(network);
   const station = (id: string) => network.stations.find((s) => s.id === id)!;
   const stationState = new Map(snapshot?.stations.map((s) => [s.id, s]) ?? []);
+  const lineById = new Map(network.lines.map((l) => [l.id, l]));
   const lineColor = new Map(network.lines.map((l) => [l.id, l.color]));
   const lineName = new Map(network.lines.map((l) => [l.id, l.name]));
   const turns = new Map(network.lines.map((l) => [l.id, ringTurn(l, station)]));
@@ -197,12 +198,17 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
       })}
       {snapshot?.trains.map((t) => {
         const fill = t.failed ? "#f85149" : t.delaySeconds > 120 ? "#d29922" : "#ffffff";
+        const line = lineById.get(t.lineId);
+        const towards = network.stations.find((s) => s.id === t.towardsStationId)?.name ?? t.towardsStationId;
+        // Trains leaving the main route are labelled on the map; the others only in their tooltip.
+        const branchBound = line !== undefined && isBranchTerminal(line, t.towardsStationId);
         return (
           <g key={t.id} transform={`translate(${x(t.lon)},${y(t.lat)})`} style={{ transition: "transform 0.5s linear" }}
              {...selectable({ kind: "train", id: t.id }, selected, onSelect)}>
             <rect x={-7} y={-5} width={14} height={10} rx={3} fill={fill} stroke={lineColor.get(t.lineId)} strokeWidth={2.5}>
-              <title>{`${t.id} · ${t.phase} · delay ${Math.round(t.delaySeconds)} s · load ${Math.round(t.load)}/${t.capacity}`}</title>
+              <title>{`${t.id} ${boundFor(line, towards, t.towardsStationId)} · ${t.phase} · delay ${Math.round(t.delaySeconds)} s · load ${Math.round(t.load)}/${t.capacity}`}</title>
             </rect>
+            {branchBound && <text x={9} y={14} data-bound-for={t.towardsStationId}>{`to ${towards}`}</text>}
           </g>
         );
       })}

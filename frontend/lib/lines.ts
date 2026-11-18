@@ -20,6 +20,20 @@ export function lineSections(line: Line): [string, string][] {
   return sections;
 }
 
+/** Whether a station is the far end of one of the line's branches, so trains bound for it leave the main route. */
+export function isBranchTerminal(line: Line, stationId: string): boolean {
+  return (line.branches ?? []).some((b) => b.stationIds[b.stationIds.length - 1] === stationId);
+}
+
+/**
+ * Where a train is bound for, as shown on its marker and in its drawer: "to Bakmil" towards a terminal (with the
+ * branch named as such), or "next Foundry" on a ring, whose trains are signed by the next station.
+ */
+export function boundFor(line: Line | undefined, towardsName: string, towardsStationId: string): string {
+  if (line?.ring) return `next ${towardsName}`;
+  return line && isBranchTerminal(line, towardsStationId) ? `to ${towardsName} (branch)` : `to ${towardsName}`;
+}
+
 export type RingTurn = "clockwise" | "anticlockwise";
 
 /**
