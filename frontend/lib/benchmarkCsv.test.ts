@@ -21,6 +21,18 @@ describe("benchmarkCsv", () => {
     expect(csv.split("\r\n")[1]).toMatch(/^1,"ODD, ""QUOTED""",12\.346,/);
   });
 
+  it("adds a trunk CV column per branched line, blank where a strategy has no value", () => {
+    const csv = benchmarkCsv({
+      ...report,
+      rankings: [ranking(1, "BALANCED", { meanTrunkHeadwayCv: { M1: 0.12345, M3: 0.2 } }),
+        ranking(2, "NO_CONTROL", { meanTrunkHeadwayCv: { M1: 0.4 } })],
+    }).split("\r\n");
+
+    expect(csv[0]).toMatch(/,mean_passengers_carried_past,trunk_cv_M1,trunk_cv_M3$/);
+    expect(csv[1]).toMatch(/,0\.123,0\.2$/);
+    expect(csv[2]).toMatch(/,0\.4,$/);
+  });
+
   it("names the file after the seed and ranking metric", () => {
     expect(benchmarkCsvName(report)).toBe("benchmark-seed7-wait-per-boarding.csv");
     expect(benchmarkCsvName({ ...report, seed: 3, metric: "TRAVEL_TIME" })).toBe("benchmark-seed3-travel-time.csv");

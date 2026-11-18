@@ -15,14 +15,18 @@ function field(value: string | number | null): string {
 /**
  * A benchmark's strategy ranking as CSV, one row per strategy in rank order, with raw numbers (seconds and
  * minutes, rounded to 3 decimals) so it can be charted or compared in a spreadsheet. A strategy that never
- * recovered within the horizon has an empty `mean_recovery_s`.
+ * recovered within the horizon has an empty `mean_recovery_s`. A network with branched lines adds a
+ * `trunk_cv_<line>` column per line (in line id order) with the mean trunk headway CV.
  */
 export function benchmarkCsv(report: BenchmarkReport): string {
+  const trunkLines = [...new Set(report.rankings.flatMap((r) => Object.keys(r.meanTrunkHeadwayCv)))].sort();
+  const header = [...COLUMNS, ...trunkLines.map((id) => `trunk_cv_${id}`)];
   const rows = report.rankings.map((r) => [
     r.rank, r.strategy, r.meanWaitSeconds, r.p95WaitSeconds, r.meanTravelMinutes, r.p95TravelMinutes,
     r.meanRecoverySeconds, r.unrecoveredScenarios, r.meanShortTurns, r.meanStopsSkipped, r.meanPassengersCarriedPast,
+    ...trunkLines.map((id) => r.meanTrunkHeadwayCv[id] ?? null),
   ].map(field).join(","));
-  return [COLUMNS.join(","), ...rows].join("\r\n") + "\r\n";
+  return [header.map(field).join(","), ...rows].join("\r\n") + "\r\n";
 }
 
 /** File name for a report's CSV, e.g. `benchmark-seed7-wait-per-boarding.csv`. */
