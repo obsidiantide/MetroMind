@@ -148,13 +148,13 @@ trunk from the first terminal to the junction followed by the branch. A branch g
 (rounded), the main route the rest, and each pattern keeps its own timetable. Headway control regulates what
 passengers on a platform see: on the trunk the combined service of every pattern calling there (its even headway
 is `1 / Σ trains / loop time` over those patterns), on a branch or beyond the junction that pattern alone, so
-trains of the two patterns do not bunch on the trunk. Signalling
-blocks are physical track (a station's platform in one direction, or the run to the next station), so trains of
+trains of the two patterns do not bunch on the trunk. Signalling blocks are physical track (a station's platform in one direction, or the run to the next station), so trains of
 both patterns exclude each other on the shared trunk and at the junction platform where the branch merges back.
 On a trunk platform everyone for a trunk station boards the first train, while passengers for the branch (or
 for the far end of the main route) wait for a train going there; travelling from a branch to the far end of the
 main route means changing trains at the junction. Track closures may be on the trunk, which stops both
-patterns, or on a branch. Spare trains from the depot join the main route. The dashboard draws each branch in
+patterns, or on a branch. Under `ADAPTIVE_DISPATCH` a spare train from the depot runs the pattern whose
+passengers (those its trains would board) have the worst forecast, the main route on a tie. The dashboard draws each branch in
 its line's colour from the junction (along its `path` when given) and offers branch sections for closures;
 PostGIS keeps each branch's track in `line_branch`.
 
