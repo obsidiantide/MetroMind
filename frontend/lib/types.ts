@@ -8,6 +8,18 @@ export interface Line {
   path?: [number, number][];
   /** Trains circulate round the stations in order instead of reversing; runSeconds then also closes the ring. */
   ring?: boolean;
+  /** Branches some of the line's trains run to instead of the end of the main route. */
+  branches?: Branch[];
+}
+/** Past the junction, a share of the line's trains run to the branch stations instead. */
+export interface Branch {
+  junctionStationId: string;
+  /** Branch stations in order away from the junction; the last is the branch terminal. */
+  stationIds: string[];
+  runSeconds: number[];
+  share: number;
+  /** Track alignment as [lon, lat] pairs from the junction to the branch terminal; empty when only stations are known. */
+  path?: [number, number][];
 }
 export interface MetroNetwork {
   city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
