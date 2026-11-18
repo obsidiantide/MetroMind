@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { WaitHeat } from "@/components/MetroMap";
 import { api } from "@/lib/api";
+import { trunkCv } from "@/lib/format";
 import { lineSections } from "@/lib/lines";
 import type { ClosureResponse, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
 
@@ -79,6 +80,8 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
   }, [snapshot, trainId]);
 
   const stationName = new Map(network?.stations.map((s) => [s.id, s.name]) ?? []);
+  const lineName = new Map(network?.lines.map((l) => [l.id, l.name]) ?? []);
+  const hasTrunk = report?.outcomes.some((o) => Object.keys(o.trunkHeadwayCvAtHorizon).length > 0) ?? false;
   // Every pair of adjacent stations, branches and a ring's closing run included, encoded as "line|from|to".
   const sections = (network?.lines ?? []).flatMap((l) =>
     lineSections(l).map(([from, to]) => ({
@@ -196,7 +199,13 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
             <thead>
               <tr>
                 <th>Strategy</th><th>Trains hit</th><th>Max delay</th><th>Extra wait</th><th>Extra on board</th>
-                <th>Total travel</th><th>Headways recover</th><th>Short turns</th><th>Skipped stops</th>
+                <th>Total travel</th><th>Headways recover</th>
+                {hasTrunk && (
+                  <th title="Headway CV of a branched line's patterns together on the shared trunk, at the horizon">
+                    Trunk CV
+                  </th>
+                )}
+                <th>Short turns</th><th>Skipped stops</th>
               </tr>
             </thead>
             <tbody>
@@ -218,6 +227,7 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
                         ? "unaffected"
                         : `${Math.round(o.headwayRecoverySeconds / 60)} min`}
                   </td>
+                  {hasTrunk && <td>{trunkCv(o.trunkHeadwayCvAtHorizon, (id) => lineName.get(id) ?? id)}</td>}
                   <td
                     title={o.shortTurns
                       .map((t) => `${t.trainId} at ${stationName.get(t.stationId) ?? t.stationId}, ${clock(t.simTime)}`)
