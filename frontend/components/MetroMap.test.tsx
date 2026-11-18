@@ -50,6 +50,33 @@ describe("MetroMap", () => {
     expect(blue.getAttribute("points")?.split(" ")).toHaveLength(2);
   });
 
+  it("draws each branch from its junction in the line's colour", () => {
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }] };
+    const { container } = render(<MetroMap network={branched} snapshot={null} />);
+    const branch = container.querySelector('polyline[data-track="RED/N"]')!;
+    const [junction, terminal] = branch.getAttribute("points")!.split(" ");
+    const main = container.querySelector('polyline[data-track="RED"]')!.getAttribute("points")!.split(" ");
+
+    expect(branch.getAttribute("stroke")).toBe("#e53935");
+    expect(junction).toBe(main[1]); // C, where the branch leaves the main route
+    expect(terminal).not.toBe(junction);
+  });
+
+  it("follows a branch's own track and fits the map to it", () => {
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5,
+        path: [[49.82, 40.0], [49.85, 40.05], [49.82, 40.02]] },
+    ] }] };
+    const { container } = render(<MetroMap network={branched} snapshot={null} />);
+    const points = container.querySelector('polyline[data-track="RED/N"]')!.getAttribute("points")!.split(" ");
+    const { y } = projection(branched);
+
+    expect(points).toHaveLength(3);
+    expect(y(40.05)).toBeGreaterThanOrEqual(50);
+  });
+
   it("selects a station by click or keyboard and marks the selected one", () => {
     const onSelect = vi.fn();
     render(<MetroMap network={network} snapshot={snapshot({ stations: [stationView("C", { waiting: 120 })] })}
