@@ -73,6 +73,19 @@ class BranchTest {
                  "branches": [{"junctionStationId": "B", "stationIds": ["X"], "runSeconds": [70], "share": 0.5}]}
                 """, Line.class);
         assertThat(withBranch.patterns()).extracting(ServicePattern::id).containsExactly("L", "L/X");
+        assertThat(withBranch.branches().get(0).flatJunction()).isFalse();
+    }
+
+    @Test
+    void networkFilesMayGiveTheCrossingTimeOfAFlatJunction() throws Exception {
+        Line line = new ObjectMapper().readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B", "C"], "runSeconds": [90, 90],
+                 "trainCount": 4, "trainCapacity": 800,
+                 "branches": [{"junctionStationId": "B", "stationIds": ["X"], "runSeconds": [70], "share": 0.5,
+                               "crossingSeconds": 30}]}
+                """, Line.class);
+        assertThat(line.branches().get(0).crossingSeconds()).isEqualTo(30);
+        assertThat(line.branches().get(0).flatJunction()).isTrue();
     }
 
     @Test
@@ -83,6 +96,8 @@ class BranchTest {
                 .hasMessageContaining("share");
         assertThatThrownBy(() -> new Branch("B", List.of(), List.of(), 0.5))
                 .hasMessageContaining("at least one station");
+        assertThatThrownBy(() -> new Branch("B", List.of("X"), List.of(90), 0.5, List.of(), -1))
+                .hasMessageContaining("crossingSeconds");
     }
 
     @Test
