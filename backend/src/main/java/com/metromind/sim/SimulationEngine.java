@@ -1521,7 +1521,7 @@ public final class SimulationEngine {
                     ? track.position(from.id(), to.id(), progress)
                     : new double[]{from.lat() + (to.lat() - from.lat()) * progress,
                                    from.lon() + (to.lon() - from.lon()) * progress};
-            trainViews.add(new SimulationSnapshot.TrainView(t.id, t.lineId, from.id(), to.id(), progress,
+            trainViews.add(new SimulationSnapshot.TrainView(t.id, t.lineId, t.patternId, from.id(), to.id(), progress,
                     latLon[0], latLon[1],
                     t.phase, t.delaySeconds, t.passengers, t.capacity, t.failed));
         }

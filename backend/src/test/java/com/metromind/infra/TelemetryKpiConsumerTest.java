@@ -24,7 +24,7 @@ class TelemetryKpiConsumerTest {
 
     private String position(double simTime, String trainId, double delay) throws Exception {
         return json(new KafkaSnapshotPublisher.Position(simTime, new SimulationSnapshot.TrainView(trainId, "RED",
-                "R1", "R2", 0.3, 40.4, 49.8, TrainPhase.RUNNING, delay, 120, 240, false)));
+                "RED", "R1", "R2", 0.3, 40.4, 49.8, TrainPhase.RUNNING, delay, 120, 240, false)));
     }
 
     @Test

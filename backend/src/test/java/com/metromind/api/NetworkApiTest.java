@@ -39,4 +39,13 @@ class NetworkApiTest {
                 .andExpect(jsonPath("$.lines[1].patterns", hasSize(1)))
                 .andExpect(jsonPath("$.lines[1].patterns[0].id").value("M2"));
     }
+
+    @Test
+    void namesThePatternOfEachTrainInTheSnapshot() throws Exception {
+        mvc.perform(get("/api/state"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trains[?(@.patternId == 'M1/bakmil')]", hasSize(2)))
+                .andExpect(jsonPath("$.trains[?(@.lineId == 'M2')].patternId", org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is("M2"))));
+    }
 }
