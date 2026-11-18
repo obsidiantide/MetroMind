@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { WaitHeat } from "@/components/MetroMap";
 import { api } from "@/lib/api";
+import { lineSections } from "@/lib/lines";
 import type { ClosureResponse, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
 
 /** A what-if result ready to show: what was simulated and how each strategy coped. */
@@ -78,11 +79,11 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
   }, [snapshot, trainId]);
 
   const stationName = new Map(network?.stations.map((s) => [s.id, s.name]) ?? []);
-  // Every pair of adjacent stations, encoded as "line|from|to".
+  // Every pair of adjacent stations, branches and a ring's closing run included, encoded as "line|from|to".
   const sections = (network?.lines ?? []).flatMap((l) =>
-    l.stationIds.slice(1).map((to, i) => ({
-      key: `${l.id}|${l.stationIds[i]}|${to}`,
-      label: `${l.name}: ${stationName.get(l.stationIds[i])} – ${stationName.get(to)}`,
+    lineSections(l).map(([from, to]) => ({
+      key: `${l.id}|${from}|${to}`,
+      label: `${l.name}: ${stationName.get(from)} – ${stationName.get(to)}`,
     })),
   );
   const selectedSection = () => {
