@@ -478,16 +478,11 @@ public final class SimulationEngine {
             return;
         }
         int next = (t.stop + 1) % p.loopLength();
-        for (TrainState o : trains) {
-            if (o == t || !o.patternId.equals(t.patternId)) {
-                continue;
-            }
-            boolean inSegment = o.phase == TrainPhase.RUNNING && o.stop == t.stop;
-            boolean atNextPlatform = o.phase != TrainPhase.RUNNING && o.stop == next;
-            if (inSegment || atNextPlatform) {
-                t.phase = TrainPhase.WAITING_SIGNAL;
-                return;
-            }
+        String to = p.stationAtStop(next);
+        if (sectionTaken(t, t.lineId, p.stationAtStop(t.stop), to)
+                || platformTaken(t, t.lineId, to, p.directionAtStop(next))) {
+            t.phase = TrainPhase.WAITING_SIGNAL;
+            return;
         }
         t.phase = TrainPhase.RUNNING;
         t.segmentElapsed = 0;
@@ -670,6 +665,44 @@ public final class SimulationEngine {
         return best;
     }
 
+    // ------------------------------------------------------------------ signalling
+
+    /*
+     * Fixed blocks are physical track, not loop stops, so trains of every service pattern of a line exclude each
+     * other on the trunk they share: a platform is a station's track in one direction of travel, and a section is
+     * the track from one station to the next in one direction.
+     */
+
+    /**
+     * Whether a train of line {@code lineId} other than {@code self} stands at the platform of {@code stationId}
+     * from which trains leave in {@code direction} (at a terminal: the platform trains reverse at).
+     */
+    private boolean platformTaken(TrainState self, String lineId, String stationId, int direction) {
+        for (TrainState o : trains) {
+            if (o != self && o.phase != TrainPhase.RUNNING && o.lineId.equals(lineId)) {
+                ServicePattern op = pattern(o);
+                if (op.stationAtStop(o.stop).equals(stationId) && op.directionAtStop(o.stop) == direction) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a train of line {@code lineId} other than {@code self} is running from {@code from} to {@code to}. */
+    private boolean sectionTaken(TrainState self, String lineId, String from, String to) {
+        for (TrainState o : trains) {
+            if (o != self && o.phase == TrainPhase.RUNNING && o.lineId.equals(lineId)) {
+                ServicePattern op = pattern(o);
+                if (op.stationAtStop(o.stop).equals(from)
+                        && op.stationAtStop((o.stop + 1) % op.loopLength()).equals(to)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------------ incidents
 
     /** Holds a train in place for {@code seconds} (e.g. door fault, passenger incident). */
@@ -712,12 +745,10 @@ public final class SimulationEngine {
             return false; // closed on both sides: nowhere to go
         }
         int before = (mirror - 1 + p.loopLength()) % p.loopLength();
-        for (TrainState o : trains) {
-            if (o != t && o.patternId.equals(t.patternId)
-                    && ((o.stop == mirror && o.phase != TrainPhase.RUNNING)
-                    || (o.stop == before && o.phase == TrainPhase.RUNNING))) {
-                return false;
-            }
+        String here = p.stationAtStop(t.stop);
+        if (platformTaken(t, t.lineId, here, p.directionAtStop(mirror))
+                || sectionTaken(t, t.lineId, p.stationAtStop(before), here)) {
+            return false;
         }
         StationState st = stations.get(p.stationAtStop(t.stop));
         double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, p.directionAtStop(t.stop)));
@@ -955,14 +986,9 @@ public final class SimulationEngine {
         if (closedStations.containsKey(line.stationIds().get(0))) {
             return false;
         }
-        for (TrainState o : trains) {
-            int last = pattern(o).loopLength() - 1;
-            if (o.lineId.equals(line.id()) && ((o.stop == 0 && o.phase != TrainPhase.RUNNING)
-                    || (o.stop == last && o.phase == TrainPhase.RUNNING))) {
-                return false;
-            }
-        }
-        return true;
+        String first = line.stationIds().get(0);
+        return !platformTaken(null, line.id(), first, 1)
+                && !sectionTaken(null, line.id(), line.stationIds().get(1), first);
     }
 
     /**
