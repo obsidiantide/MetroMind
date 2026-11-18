@@ -67,8 +67,8 @@ a late train catch up, so a four-minute delay leaves a gap that only layover sla
             │                               │               metromind.network-metrics ──► TelemetryKpiConsumer
  REST ─────►│  REST /api/*                  ├──► Redis      metromind:snapshot, metromind:station-waiting,
             │                               │               metromind:replay
-            │                               └──► PostGIS    station, line, incident, minute_kpi,
-            │                                               benchmark_job          │
+            │                               └──► PostGIS    station, line, line_branch, incident,
+            │                                               minute_kpi, benchmark_job│
             └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -151,7 +151,9 @@ both patterns exclude each other on the shared trunk and at the junction platfor
 On a trunk platform everyone for a trunk station boards the first train, while passengers for the branch (or
 for the far end of the main route) wait for a train going there; travelling from a branch to the far end of the
 main route means changing trains at the junction. Track closures may be on the trunk, which stops both
-patterns, or on a branch. Spare trains from the depot join the main route.
+patterns, or on a branch. Spare trains from the depot join the main route. The dashboard draws each branch in
+its line's colour from the junction (along its `path` when given) and offers branch sections for closures;
+PostGIS keeps each branch's track in `line_branch`.
 
 The bundled Ringtown network is a small fictional city built this way: two diameters crossing at Cathedral
 Square and an eight-station ring, run in both directions, that they meet at its four gates.
