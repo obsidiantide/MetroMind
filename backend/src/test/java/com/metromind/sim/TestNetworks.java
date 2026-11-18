@@ -78,12 +78,22 @@ public final class TestNetworks {
 
     /** {@link #branched()} with explicit origin–destination weights. */
     public static MetroNetwork branched(Map<String, Map<String, Double>> odWeights) {
+        return branched(odWeights, 0);
+    }
+
+    /** {@link #branched()} with a flat junction at B whose crossing takes {@code crossingSeconds}. */
+    public static MetroNetwork branchedFlat(double crossingSeconds) {
+        return branched(Map.of(), crossingSeconds);
+    }
+
+    private static MetroNetwork branched(Map<String, Map<String, Double>> odWeights, double crossingSeconds) {
         List<Station> stations = List.of(
                 new Station("A", "A", 0, 0.00, 10), new Station("B", "B", 0, 0.01, 8),
                 new Station("C", "C", 0, 0.02, 6), new Station("D", "D", 0, 0.03, 6),
                 new Station("X", "X", 0.01, 0.02, 5), new Station("Y", "Y", 0.01, 0.03, 5));
         Line line = new Line("L", "Line", "#c00", List.of("A", "B", "C", "D"), List.of(100, 110, 120), 6, 900, 0,
-                List.of(), false, List.of(), List.of(new Branch("B", List.of("X", "Y"), List.of(90, 80), 1.0 / 3)));
+                List.of(), false, List.of(), List.of(new Branch("B", List.of("X", "Y"), List.of(90, 80), 1.0 / 3, List.of(),
+                        crossingSeconds)));
         return new MetroNetwork("Test", stations, List.of(line), odWeights);
     }
 }
