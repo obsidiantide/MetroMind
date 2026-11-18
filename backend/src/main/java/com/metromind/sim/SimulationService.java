@@ -10,6 +10,7 @@ import com.metromind.incident.IncidentHistory;
 import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.incident.StrategyBenchmark;
+import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -77,6 +78,16 @@ public class SimulationService {
                 snap -> snap.metrics().trainsInService());
         gauge("metromind.headway.cv", "Coefficient of variation of headways: 0 is perfectly regular", null,
                 snap -> snap.metrics().headwayCoefficientOfVariation());
+        for (Line line : network.lines()) {
+            if (!line.branches().isEmpty()) {
+                Gauge.builder("metromind.headway.trunk.cv", this,
+                                service -> service.last.metrics().trunkHeadwayCv().getOrDefault(line.id(), 0.0))
+                        .description("Headway CV of the combined service of a branched line's patterns on the trunk "
+                                + "they share: 0 is perfectly regular")
+                        .tag("line", line.id())
+                        .register(meters);
+            }
+        }
     }
 
     /** A gauge read from the latest published snapshot, so scraping never takes the engine lock. */

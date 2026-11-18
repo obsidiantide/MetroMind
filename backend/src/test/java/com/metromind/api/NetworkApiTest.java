@@ -1,5 +1,6 @@
 package com.metromind.api;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -7,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -20,6 +22,9 @@ class NetworkApiTest {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    MeterRegistry meters;
 
     @Test
     void listsTheServicePatternsOfABranchedLine() throws Exception {
@@ -55,5 +60,11 @@ class NetworkApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.trunkHeadwayCv.M1").isNumber())
                 .andExpect(jsonPath("$.metrics.trunkHeadwayCv.M2").doesNotExist());
+    }
+
+    @Test
+    void gaugesTrunkRegularityForEachBranchedLine() {
+        assertThat(meters.find("metromind.headway.trunk.cv").tag("line", "M1").gauge()).isNotNull();
+        assertThat(meters.find("metromind.headway.trunk.cv").tag("line", "M2").gauge()).isNull();
     }
 }
