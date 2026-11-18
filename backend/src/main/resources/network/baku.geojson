@@ -298,6 +298,18 @@
   },
   {
    "type": "Feature",
+   "id": "bakmil",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [49.8794, 40.4189]
+   },
+   "properties": {
+    "name": "Bakmil",
+    "baseArrivalsPerMinute": 3
+   }
+  },
+  {
+   "type": "Feature",
    "id": "M1",
    "geometry": {
     "type": "LineString",
@@ -323,6 +335,21 @@
     "trainCount": 10,
     "trainCapacity": 1000,
     "spareTrains": 2
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "M1-bakmil",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [[49.8705, 40.4028], [49.8794, 40.4189]]
+   },
+   "properties": {
+    "name": "Red Line to Bakmil",
+    "branchOf": "M1",
+    "junctionStationId": "narimanov",
+    "stationIds": ["bakmil"],
+    "share": 0.2
    }
   },
   {
