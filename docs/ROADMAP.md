@@ -41,7 +41,7 @@ Mark items `[x]` when merged.
 - [x] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
 - [x] Headway control on a shared trunk: regulate the combined headway of a branched line's patterns where they
       run together (today each pattern is regulated on its own, so trains of two patterns can bunch on the trunk)
-- [ ] Overload forecast on branched lines: count only the free space of trains whose pattern serves each waiting
+- [x] Overload forecast on branched lines: count only the free space of trains whose pattern serves each waiting
       passenger's destination (today every train of the line calling at the platform relieves the queue)
 
 ### Incidents
