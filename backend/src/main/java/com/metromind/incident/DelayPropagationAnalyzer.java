@@ -111,7 +111,8 @@ public final class DelayPropagationAnalyzer {
         return new DelayImpactReport.StrategyOutcome(strategy.name(), affected, max, totalExtra, totalAbs,
                 extraRide, totalExtra + extraRide,
                 totalAbs + (perturbed.passengerRideSeconds() - live.passengerRideSeconds()) / 60.0,
-                perturbed.snapshot().metrics().headwayCoefficientOfVariation(), recovery.recoverySeconds(),
+                perturbed.snapshot().metrics().headwayCoefficientOfVariation(), perturbed.trunkHeadwayCv(),
+                recovery.recoverySeconds(),
                 recovery.peakCvExcess(), perturbed.shortTurnsSince(injectedAt),
                 perturbed.skippedStopsSince(injectedAt), trainImpacts, stationImpacts);
     }

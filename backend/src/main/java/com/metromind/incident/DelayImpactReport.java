@@ -4,6 +4,7 @@ import com.metromind.sim.ShortTurn;
 import com.metromind.sim.SkippedStop;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Result of a counterfactual delay analysis: the same network is simulated twice from the same state,
@@ -21,6 +22,9 @@ import java.util.List;
  * <p>{@code headwayRecoverySeconds} is how long after the incident the headways were back to the baseline's
  * regularity for good (see {@link HeadwayRecovery}); {@code null} when they were still disrupted at the horizon.
  * {@code peakHeadwayCvExcess} is the worst bunching the incident caused, as headway CV above the baseline.
+ * {@code trunkHeadwayCvAtHorizon} gives, for each branched line, the headway CV of the combined service of its
+ * patterns on the shared trunk at the horizon; {@code headwayCvAtHorizon} judges each pattern on its own, so trains
+ * of two patterns running as a pair on the trunk only show up in the former.
  *
  * <p>{@code shortTurns} lists the trains the strategy reversed early during the incident run (only strategies that
  * short-turn late trains make any), oldest first, so the report shows where service was cut back and when.
@@ -34,7 +38,8 @@ public record DelayImpactReport(String trainId, double injectedDelaySeconds, dou
                                   double totalExtraPassengerWaitMinutes, double totalPassengerWaitMinutes,
                                   double totalExtraRideMinutes, double totalExtraTravelMinutes,
                                   double totalPassengerTravelMinutes,
-                                  double headwayCvAtHorizon, Double headwayRecoverySeconds,
+                                  double headwayCvAtHorizon, Map<String, Double> trunkHeadwayCvAtHorizon,
+                                  Double headwayRecoverySeconds,
                                   double peakHeadwayCvExcess, List<ShortTurn> shortTurns,
                                   List<SkippedStop> skippedStops,
                                   List<TrainImpact> trains, List<StationImpact> stations) {
