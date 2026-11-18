@@ -50,6 +50,30 @@ describe("BenchmarkPage", () => {
     expect(await screen.findByText("Red Line Alpha – Central closed 15m 00s, trains turn back")).toBeTruthy();
   });
 
+  it("shows each branched line's trunk regularity when the network has one", async () => {
+    const report = job().report!;
+    const withTrunk = {
+      ...report,
+      rankings: report.rankings.map((r, i) => ({ ...r, meanTrunkHeadwayCv: { RED: 0.1 * (i + 1) } })),
+    };
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job({ report: withTrunk })]);
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+
+    expect(screen.getByText("Trunk CV")).toBeTruthy();
+    expect(await screen.findByText("Red Line 0.20")).toBeTruthy();
+  });
+
+  it("leaves the trunk column out for a network without branches", async () => {
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+
+    expect(screen.queryByText("Trunk CV")).toBeNull();
+  });
+
   it("exports the shown ranking as a CSV file", async () => {
     vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
     const created: Blob[] = [];

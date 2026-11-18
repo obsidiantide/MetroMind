@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { benchmarkCsv, benchmarkCsvName } from "@/lib/benchmarkCsv";
-import { duration } from "@/lib/format";
+import { duration, trunkCv } from "@/lib/format";
 import type {
   BenchmarkJob, BenchmarkReport, IncidentScenario, MetroNetwork, RankingMetric, ScenarioKind, StrategyRanking,
 } from "@/lib/types";
@@ -183,6 +183,7 @@ function downloadCsv(report: BenchmarkReport) {
 function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
   const n = report.scenarios.length;
   const byWait = report.metric === "WAIT_PER_BOARDING";
+  const hasTrunk = report.rankings.some((r) => Object.keys(r.meanTrunkHeadwayCv).length > 0);
   return (
     <section className="panel">
       <div className="row" style={{ justifyContent: "space-between" }}>
@@ -197,7 +198,9 @@ function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
           <thead>
             <tr>
               <th>#</th><th>Strategy</th><th>Wait / boarding</th><th>p95</th><th>Travel</th><th>p95</th>
-              <th>Headways recover</th><th>Short turns</th><th>Skipped stops</th>
+              <th>Headways recover</th>
+              {hasTrunk && <th title="Mean headway CV of a branched line's patterns together on its trunk">Trunk CV</th>}
+              <th>Short turns</th><th>Skipped stops</th>
             </tr>
           </thead>
           <tbody>
@@ -210,6 +213,7 @@ function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
                 <td className={byWait ? "" : "sorted"}>{Math.round(r.meanTravelMinutes)} min</td>
                 <td>{Math.round(r.p95TravelMinutes)} min</td>
                 <td>{recovery(r, n)}</td>
+                {hasTrunk && <td>{trunkCv(r.meanTrunkHeadwayCv, name)}</td>}
                 <td>{r.meanShortTurns > 0 ? r.meanShortTurns.toFixed(1) : "–"}</td>
                 <td>
                   {r.meanStopsSkipped > 0
