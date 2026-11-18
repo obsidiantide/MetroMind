@@ -1062,7 +1062,7 @@ public final class SimulationEngine {
         for (Line line : lines.values()) {
             double forecast = lineForecast(line);
             if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && depotExitClear(line)) {
-                dispatch(line);
+                dispatch(line, mostOverloadedPattern(line));
             } else if (forecast < OVERLOAD_MEDIUM && trainsInService(line.id()) > line.trainCount()) {
                 withdrawAtDepot(line);
             }
@@ -1114,6 +1114,54 @@ public final class SimulationEngine {
         return worst;
     }
 
+    /**
+     * Highest 15-minute forecast of the passengers that trains of pattern {@code p} would take, over the line's
+     * stations: a passenger bound for a branch only weighs on that branch's pattern, one bound for a trunk station
+     * on every pattern. Closed stations are left out.
+     */
+    double patternForecast(Line line, ServicePattern p) {
+        double mult = DemandProfile.multiplier(simTime + DISPATCH_FORECAST_SECONDS / 2);
+        int bit = 1 << patternsByLine.get(line.id()).indexOf(p);
+        double worst = 0;
+        for (String sid : line.allStationIds()) {
+            if (closedStations.containsKey(sid)) {
+                continue;
+            }
+            StationState st = stations.get(sid);
+            double atStation = 0;
+            for (StationState.QueueKey key : st.waiting.keySet()) {
+                if (key.lineId().equals(line.id())) {
+                    for (Map.Entry<Integer, Double> g
+                            : predictQueueGroups(st, key, DISPATCH_FORECAST_SECONDS, mult).entrySet()) {
+                        if ((g.getKey() & bit) != 0) {
+                            atStation += g.getValue();
+                        }
+                    }
+                }
+            }
+            worst = Math.max(worst, atStation);
+        }
+        return worst;
+    }
+
+    /** The service pattern a spare train should run: the one with the worst forecast, the main route on a tie. */
+    private ServicePattern mostOverloadedPattern(Line line) {
+        List<ServicePattern> own = patternsByLine.get(line.id());
+        ServicePattern best = own.get(0);
+        if (own.size() == 1) {
+            return best;
+        }
+        double worst = patternForecast(line, best);
+        for (ServicePattern p : own.subList(1, own.size())) {
+            double forecast = patternForecast(line, p);
+            if (forecast > worst) {
+                worst = forecast;
+                best = p;
+            }
+        }
+        return best;
+    }
+
     private boolean depotExitClear(Line line) {
         if (closedStations.containsKey(line.stationIds().get(0))) {
             return false;
@@ -1124,23 +1172,23 @@ public final class SimulationEngine {
     }
 
     /**
-     * Puts a spare train on the first terminal's platform, with its own timetable starting now. It runs the line's
-     * main service pattern.
+     * Puts a spare train on the first terminal's platform, with its own timetable starting now. It runs service
+     * pattern {@code pattern}; every pattern of a line starts at its first terminal, next to the depot.
      */
-    private void dispatch(Line line) {
+    private void dispatch(Line line, ServicePattern pattern) {
         int number = line.trainCount() + dispatchedCount.merge(line.id(), 1, Integer::sum);
-        ServicePattern main = patternsByLine.get(line.id()).get(0);
-        TrainState t = new TrainState(line.id() + "-" + number, line.id(), main.id(), line.trainCapacity(),
+        TrainState t = new TrainState(line.id() + "-" + number, line.id(), pattern.id(), line.trainCapacity(),
                 network.stations().size());
         t.stop = 0;
         t.scheduledArrival = simTime;
         t.phase = TrainPhase.DWELLING;
-        double board = board(t, main, stations.get(line.stationIds().get(0)));
+        double board = board(t, pattern, stations.get(line.stationIds().get(0)));
         t.phaseRemaining = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * board));
         trains.add(t);
         depot.merge(line.id(), -1, Integer::sum);
-        emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train %s left the depot to relieve line %s".formatted(
-                t.id, line.id()));
+        String towards = network.station(pattern.towardsStationId(0, 1)).name();
+        emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train %s left the depot to relieve line %s towards %s"
+                .formatted(t.id, line.id(), towards));
     }
 
     /** Trains currently running on a line (at least 1, so it can divide a loop time). */
@@ -1197,6 +1245,19 @@ public final class SimulationEngine {
      * every train boards everyone, so there is one group.
      */
     private double predictQueue(StationState st, StationState.QueueKey key, double horizon, double mult) {
+        double expected = 0;
+        for (double left : predictQueueGroups(st, key, horizon, mult).values()) {
+            expected += left;
+        }
+        return expected;
+    }
+
+    /**
+     * Forecast of one platform queue per group of passengers, keyed by the bit mask (over the line's service
+     * patterns) of the patterns whose trains would board them; see {@link #predictQueue}.
+     */
+    private Map<Integer, Double> predictQueueGroups(StationState st, StationState.QueueKey key, double horizon,
+                                                    double mult) {
         Line line = lines.get(key.lineId());
         double rate = boardingRate(st, key, mult);
         double lineRate = 0;
@@ -1235,11 +1296,11 @@ public final class SimulationEngine {
                 }
             }
         }
-        double expected = 0;
+        Map<Integer, Double> left = new java.util.TreeMap<>();
         for (Map.Entry<Integer, Double> g : demand.entrySet()) {
-            expected += Math.max(0, g.getValue() - relief.getOrDefault(g.getKey(), 0.0));
+            left.put(g.getKey(), Math.max(0, g.getValue() - relief.getOrDefault(g.getKey(), 0.0)));
         }
-        return expected;
+        return left;
     }
 
     /**
