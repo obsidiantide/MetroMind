@@ -43,7 +43,7 @@ Mark items `[x]` when merged.
       run together (today each pattern is regulated on its own, so trains of two patterns can bunch on the trunk)
 - [x] Overload forecast on branched lines: count only the free space of trains whose pattern serves each waiting
       passenger's destination (today every train of the line calling at the platform relieves the queue)
-- [ ] Trunk regularity metric: headway CV of the combined service on each shared trunk, reported next to the
+- [x] Trunk regularity metric: headway CV of the combined service on each shared trunk, reported next to the
       per-pattern CV in metrics, what-if and benchmark results (today trunk bunching only shows up in waiting)
 - [ ] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
       other way for the crossing time (today branch and main tracks never conflict)
