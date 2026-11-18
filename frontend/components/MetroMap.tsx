@@ -1,7 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { boundFor, isBranchTerminal, ringTurn } from "@/lib/lines";
+import { boundFor, isBranchTerminal, patternStationIds, ringTurn } from "@/lib/lines";
 import type { Branch, Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
@@ -105,6 +105,12 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
   const lineById = new Map(network.lines.map((l) => [l.id, l]));
   const lineColor = new Map(network.lines.map((l) => [l.id, l.color]));
   const lineName = new Map(network.lines.map((l) => [l.id, l.name]));
+  // With a train's drawer open, the stations of its service pattern stand out and the rest of the map fades.
+  const selectedTrain = selected?.kind === "train" ? snapshot?.trains.find((t) => t.id === selected.id) : undefined;
+  const selectedLine = selectedTrain && lineById.get(selectedTrain.lineId);
+  const route = selectedTrain && selectedLine
+    ? { color: selectedLine.color, stations: new Set(patternStationIds(selectedLine, selectedTrain.patternId)) }
+    : null;
   const turns = new Map(network.lines.map((l) => [l.id, ringTurn(l, station)]));
   const worstHeat = heat ? Math.max(0, ...Object.values(heat.extraWaitMinutes).map(Math.abs)) : 0;
 
@@ -124,7 +130,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
           stroke={line.color}
           strokeWidth={6}
           strokeLinecap="round"
-          opacity={0.75}
+          opacity={route && line.id !== selectedLine?.id ? 0.25 : 0.75}
         />
       )))}
       {network.lines.filter((l) => l.ring).map((line) => {
@@ -187,8 +193,14 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
             </g>
           );
         }
+        const onRoute = route?.stations.has(s.id);
         return (
-          <g key={s.id} {...selectable({ kind: "station", id: s.id }, selected, onSelect)}>
+          <g key={s.id} {...selectable({ kind: "station", id: s.id }, selected, onSelect)}
+             opacity={route && !onRoute ? 0.35 : undefined} data-on-route={onRoute || undefined}>
+            {onRoute && (
+              <circle cx={x(s.lon)} cy={y(s.lat)} r={r + 5} fill="none" stroke={route!.color} strokeWidth={3}
+                      opacity={0.8} pointerEvents="none" />
+            )}
             <circle cx={x(s.lon)} cy={y(s.lat)} r={r} fill="#0d1117" stroke={RISK_COLOR[st?.overloadRisk ?? "LOW"]} strokeWidth={3}>
               <title>{`${s.name}: ${Math.round(st?.waiting ?? 0)} waiting${capacity}${held}, ${Math.round(st?.predictedWaiting15m ?? 0)} predicted in 15 min${leftBehind}${queues}${heatNote}`}</title>
             </circle>

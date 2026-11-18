@@ -20,6 +20,19 @@ export function lineSections(line: Line): [string, string][] {
   return sections;
 }
 
+/**
+ * Stations a service pattern calls at: from the line's `patterns` when the network lists them, otherwise the main
+ * route for the line's own id, or the trunk up to the junction plus the branch for `line/branch-terminal`.
+ */
+export function patternStationIds(line: Line, patternId: string): string[] {
+  const listed = line.patterns?.find((p) => p.id === patternId);
+  if (listed) return listed.stationIds;
+  const branch = (line.branches ?? []).find((b) => `${line.id}/${b.stationIds[b.stationIds.length - 1]}` === patternId);
+  if (!branch) return line.stationIds;
+  const junction = line.stationIds.indexOf(branch.junctionStationId);
+  return [...line.stationIds.slice(0, junction + 1), ...branch.stationIds];
+}
+
 /** Whether a station is the far end of one of the line's branches, so trains bound for it leave the main route. */
 export function isBranchTerminal(line: Line, stationId: string): boolean {
   return (line.branches ?? []).some((b) => b.stationIds[b.stationIds.length - 1] === stationId);
