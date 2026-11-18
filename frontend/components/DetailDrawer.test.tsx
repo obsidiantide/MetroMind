@@ -21,6 +21,18 @@ describe("DetailDrawer", () => {
     expect(screen.getByText("Blue Line")).toBeTruthy();
   });
 
+  it("says when a station is a flat junction and what crossing it costs", async () => {
+    vi.spyOn(api, "departures").mockResolvedValue([]);
+    const flat: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5, crossingSeconds: 30 },
+    ] }, network.lines[1]] };
+
+    render(<DetailDrawer selection={{ kind: "station", id: "C" }} network={flat} snapshot={null} onClose={() => {}} />);
+
+    expect(await screen.findByText(/Flat junction: Red Line trains to North cross the opposite track for 30 s/))
+      .toBeTruthy();
+  });
+
   it("shows a station's crowding, platforms and departure board", async () => {
     const departures = vi.spyOn(api, "departures").mockResolvedValue([
       { trainId: "RED-1", lineId: "RED", towardsStationId: "B", plannedTime: 28_860, plannedClock: "08:01:00",
