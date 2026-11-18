@@ -217,7 +217,7 @@ are started once and shared by every integration test.
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/network` | Stations and lines, each line with its service `patterns` (stations, run times, trains) |
-| GET | `/api/state` | Latest simulation snapshot; each train names the `patternId` it follows |
+| GET | `/api/state` | Latest simulation snapshot; each train names the `patternId` it follows and the `towardsStationId` it is bound for |
 | GET | `/api/stations/{id}/departures?horizonSeconds=1800` | Departure board: planned vs expected departures |
 | GET | `/api/stations/nearest?lat=40.375&lon=49.82&limit=3` | Stations closest to a point, nearest first |
 | GET | `/api/stations/within?lat=40.375&lon=49.82&radiusMeters=1500` | Stations within a radius, nearest first |
@@ -592,8 +592,13 @@ track (Ringtown's) can be told apart.
 
 Click a station or train on the map (or focus it with Tab and press Enter) to open a detail drawer. A station
 shows its lines, passengers waiting now and predicted in 15 minutes with the overload risk, the queue on each
-platform and its live departure board with lateness. A train shows where it is, what it is doing (running,
-dwelling, held, waiting at a signal), its lateness and load, and any incident and recent events concerning it.
+platform and its live departure board with lateness. A train shows where it is heading, where it is, what it is
+doing (running, dwelling, held, waiting at a signal), its lateness and load, and any incident and recent events
+concerning it.
+
+On a branched line, a train bound for the branch terminal carries a label on the map ("to Bakmil") until it turns
+back; every train's tooltip names its destination (on a ring, the next station, as on the platform signs), and
+departure board rows bound for a branch terminal are marked as such.
 
 A what-if result is also drawn on the map: each station is ringed by the extra passenger-minutes of waiting the
 incident causes under the best strategy, red where waiting grows and blue where it falls, scaled to the worst
