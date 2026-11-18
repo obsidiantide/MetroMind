@@ -61,6 +61,34 @@ describe("DetailDrawer", () => {
     expect(departures).toHaveBeenCalledWith("C");
   });
 
+  it("marks departures bound for a branch terminal", async () => {
+    vi.spyOn(api, "departures").mockResolvedValue([
+      { trainId: "RED-1", lineId: "RED", towardsStationId: "N", plannedTime: 28_860, plannedClock: "08:01:00",
+        expectedTime: 28_860, delaySeconds: 0 },
+      { trainId: "RED-2", lineId: "RED", towardsStationId: "B", plannedTime: 28_920, plannedClock: "08:02:00",
+        expectedTime: 28_920, delaySeconds: 0 },
+    ]);
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }] };
+
+    render(<DetailDrawer selection={{ kind: "station", id: "A" }} network={branched} snapshot={null} onClose={() => {}} />);
+
+    const [toNorth, toBravo] = (await screen.findAllByRole("row")).slice(1);
+    expect(toNorth.textContent).toContain("North · branch");
+    expect(toBravo.textContent).not.toContain("branch");
+  });
+
+  it("says where a train is heading, naming a branch", () => {
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }] };
+    const snap = snapshot({ trains: [trainView("RED-1", { patternId: "RED/N", towardsStationId: "N" })] });
+    render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={branched} snapshot={snap} onClose={() => {}} />);
+
+    expect(screen.getByText("to North (branch)")).toBeTruthy();
+  });
+
   it("says when the departure board cannot be loaded", async () => {
     vi.spyOn(api, "departures").mockRejectedValue(new Error("500 boom"));
     render(<DetailDrawer selection={{ kind: "station", id: "A" }} network={network} snapshot={null} onClose={() => {}} />);
@@ -78,6 +106,7 @@ describe("DetailDrawer", () => {
     render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={network} snapshot={snap} onClose={() => {}} />);
 
     expect(screen.getByText("Alpha → Central (42 %)")).toBeTruthy();
+    expect(screen.getByText("to Bravo")).toBeTruthy();
     expect(screen.getByText("Running")).toBeTruthy();
     expect(screen.getByText("+3m 05s")).toBeTruthy();
     expect(screen.getByText("broken down")).toBeTruthy();
