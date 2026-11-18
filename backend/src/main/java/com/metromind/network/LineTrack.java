@@ -13,10 +13,10 @@ public final class LineTrack {
     private final double[] stationChainage;
     private final boolean ring;
 
-    private LineTrack(Line line, MetroNetwork network) {
-        this.stationIds = line.stationIds();
-        this.ring = line.ring();
-        this.geometry = new TrackGeometry(line.path().stream().map(p -> new double[]{p.get(0), p.get(1)}).toList());
+    private LineTrack(List<String> stationIds, List<List<Double>> path, boolean ring, MetroNetwork network) {
+        this.stationIds = stationIds;
+        this.ring = ring;
+        this.geometry = new TrackGeometry(path.stream().map(p -> new double[]{p.get(0), p.get(1)}).toList());
         this.stationChainage = new double[stationIds.size()];
         for (int i = 0; i < stationIds.size(); i++) {
             Station s = network.station(stationIds.get(i));
@@ -26,7 +26,12 @@ public final class LineTrack {
 
     /** The line's track, or {@code null} when the network gives no alignment for it. */
     public static LineTrack of(Line line, MetroNetwork network) {
-        return line.hasPath() ? new LineTrack(line, network) : null;
+        return line.hasPath() ? new LineTrack(line.stationIds(), line.path(), line.ring(), network) : null;
+    }
+
+    /** A branch's track from its junction, or {@code null} when the network gives no alignment for it. */
+    public static LineTrack of(Branch branch, MetroNetwork network) {
+        return branch.hasPath() ? new LineTrack(branch.trackStationIds(), branch.path(), false, network) : null;
     }
 
     /**
@@ -50,8 +55,8 @@ public final class LineTrack {
     }
 
     /**
-     * Whether both stations lie on this track, so {@link #position} can place a train between them. The run from a
-     * branch's junction onto the branch does not: the line's path only follows its main route.
+     * Whether both stations lie on this track, so {@link #position} can place a train between them. A line's track
+     * only follows its main route; each branch has its own, starting at the junction.
      */
     public boolean covers(String fromId, String toId) {
         return stationIds.contains(fromId) && stationIds.contains(toId);

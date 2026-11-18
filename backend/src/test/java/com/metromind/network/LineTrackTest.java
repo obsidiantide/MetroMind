@@ -34,6 +34,31 @@ class LineTrackTest {
     }
 
     @Test
+    void aBranchHasItsOwnTrackFromTheJunction() {
+        List<Station> stations = List.of(new Station("A", "A", 40.00, 49.80, 5),
+                new Station("B", "B", 40.00, 49.81, 5), new Station("C", "C", 40.00, 49.82, 5),
+                new Station("X", "X", 40.02, 49.81, 5));
+        Branch toX = new Branch("B", List.of("X"), List.of(150), 0.5,
+                List.of(List.of(49.81, 40.00), List.of(49.82, 40.01), List.of(49.81, 40.02)));
+        Line line = new Line("L", "L", "#000", List.of("A", "B", "C"), List.of(100, 100), 4, 800, 0,
+                List.of(List.of(49.80, 40.00), List.of(49.82, 40.00)), false, List.of(), List.of(toX));
+        MetroNetwork branched = new MetroNetwork("Test", stations, List.of(line));
+
+        LineTrack main = LineTrack.of(line, branched);
+        LineTrack branch = LineTrack.of(toX, branched);
+        assertThat(main.covers("B", "X")).isFalse();
+        assertThat(branch.covers("B", "X")).isTrue();
+        assertThat(branch.covers("A", "B")).isFalse();
+        double[] half = branch.position("B", "X", 0.5);
+        assertThat(half[0]).as("halfway round the curve, east of the chord").isCloseTo(40.01, within(1e-6));
+        assertThat(half[1]).isCloseTo(49.82, within(1e-6));
+
+        assertThat(LineTrack.of(new Branch("B", List.of("X"), List.of(150), 0.5), branched)).isNull();
+        assertThatThrownBy(() -> new Branch("B", List.of("X"), List.of(150), 0.5, List.of(List.of(49.8, 40.0))))
+                .hasMessageContaining("[lon, lat]");
+    }
+
+    @Test
     void pointAtClampsToTheTrackEnds() {
         TrackGeometry g = new TrackGeometry(List.of(new double[]{49.80, 40.00}, new double[]{49.82, 40.00}));
         assertThat(g.pointAt(-10)).containsExactly(49.80, 40.00);

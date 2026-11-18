@@ -83,8 +83,11 @@ public final class SimulationEngine {
     private final Map<String, List<ServicePattern>> patternsByLine = new LinkedHashMap<>();
     /** Per service pattern: nominal seconds from loop stop 0 to each stop, run plus dwell (last = whole loop). */
     private final Map<String, double[]> cumulativeStopSeconds = new LinkedHashMap<>();
-    /** Track alignment of lines whose network file gives one; others run on the chord between stations. */
-    private final Map<String, LineTrack> tracks = new LinkedHashMap<>();
+    /**
+     * Track alignments of each line, main route first, then its branches, where the network file gives them; trains
+     * elsewhere run on the chord between stations.
+     */
+    private final Map<String, List<LineTrack>> tracks = new LinkedHashMap<>();
     private final Map<String, List<String>> linesByStation = new LinkedHashMap<>();
     /** Stations next to each station on any line, in network order; where a closed station's passengers go. */
     private final Map<String, List<String>> neighbours = new LinkedHashMap<>();
@@ -132,10 +135,10 @@ public final class SimulationEngine {
                 }
                 cumulativeStopSeconds.put(p.id(), cum);
             }
-            LineTrack track = LineTrack.of(line, network);
-            if (track != null) {
-                tracks.put(line.id(), track);
-            }
+            List<LineTrack> own = new ArrayList<>();
+            java.util.Optional.ofNullable(LineTrack.of(line, network)).ifPresent(own::add);
+            line.branches().forEach(b -> java.util.Optional.ofNullable(LineTrack.of(b, network)).ifPresent(own::add));
+            tracks.put(line.id(), List.copyOf(own));
             depot.put(line.id(), line.spareTrains());
             dispatchedCount.put(line.id(), 0);
             for (String sid : line.allStationIds()) {
@@ -1304,8 +1307,9 @@ public final class SimulationEngine {
             Station from = network.station(p.stationAtStop(t.stop));
             Station to = network.station(p.stationAtStop((t.stop + 1) % p.loopLength()));
             double progress = t.phase == TrainPhase.RUNNING ? Math.min(1, t.segmentElapsed / t.segmentDuration) : 0;
-            LineTrack track = tracks.get(t.lineId);
-            double[] latLon = track != null && track.covers(from.id(), to.id())
+            LineTrack track = tracks.get(t.lineId).stream().filter(tr -> tr.covers(from.id(), to.id()))
+                    .findFirst().orElse(null);
+            double[] latLon = track != null
                     ? track.position(from.id(), to.id(), progress)
                     : new double[]{from.lat() + (to.lat() - from.lat()) * progress,
                                    from.lon() + (to.lon() - from.lon()) * progress};
