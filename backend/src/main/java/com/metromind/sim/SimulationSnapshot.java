@@ -8,10 +8,13 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
                                  List<ClosedSectionView> closedSections, List<ActiveIncidentView> activeIncidents) {
 
     /**
-     * @param patternId service pattern the train follows: the line id, or {@code line/branch-terminal} on a branch
+     * @param patternId        service pattern the train follows: the line id, or {@code line/branch-terminal} on a
+     *                         branch
+     * @param towardsStationId terminal the train is bound for on its current run (on a branch pattern, the branch
+     *                         terminal while heading out); on a ring, the next station, as on the platform signs
      */
     public record TrainView(String id, String lineId, String patternId, String fromStationId, String toStationId,
-                            double progress, double lat, double lon, TrainPhase phase, double delaySeconds,
+                            String towardsStationId, double progress, double lat, double lon, TrainPhase phase, double delaySeconds,
                             double load, int capacity, boolean failed) {
     }
 
