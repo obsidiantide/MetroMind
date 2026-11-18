@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { duration, lateness } from "@/lib/format";
+import { lineStationIds } from "@/lib/lines";
 import type { Departure, MetroNetwork, Snapshot, TrainPhase } from "@/lib/types";
 
 export type Selection = { kind: "station"; id: string } | { kind: "train"; id: string };
@@ -57,7 +58,7 @@ function StationDetail({ stationId, network, snapshot }: {
   if (!station) return <p className="muted">Unknown station {stationId}</p>;
   const name = (id: string) => network.stations.find((s) => s.id === id)?.name ?? id;
   const line = (id: string) => network.lines.find((l) => l.id === id);
-  const lines = network.lines.filter((l) => l.stationIds.includes(stationId));
+  const lines = network.lines.filter((l) => lineStationIds(l).includes(stationId));
   const st = snapshot?.stations.find((s) => s.id === stationId);
 
   return (

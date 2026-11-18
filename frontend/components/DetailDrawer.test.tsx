@@ -2,10 +2,24 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DetailDrawer } from "@/components/DetailDrawer";
 import { api } from "@/lib/api";
+import type { MetroNetwork } from "@/lib/types";
 import { network, snapshot, stationView, trainView } from "@/test/fixtures";
 
 describe("DetailDrawer", () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it("lists a branched line among the lines of a station on its branch", async () => {
+    vi.spyOn(api, "departures").mockResolvedValue([]);
+    // North is on a branch of the Red line from Central, and on the Blue line.
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }, network.lines[1]] };
+
+    render(<DetailDrawer selection={{ kind: "station", id: "N" }} network={branched} snapshot={null} onClose={() => {}} />);
+
+    expect(await screen.findByText("Red Line")).toBeTruthy();
+    expect(screen.getByText("Blue Line")).toBeTruthy();
+  });
 
   it("shows a station's crowding, platforms and departure board", async () => {
     const departures = vi.spyOn(api, "departures").mockResolvedValue([
