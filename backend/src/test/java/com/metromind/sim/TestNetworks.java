@@ -1,5 +1,6 @@
 package com.metromind.sim;
 
+import com.metromind.network.Branch;
 import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import com.metromind.network.Station;
@@ -65,5 +66,19 @@ public final class TestNetworks {
         Line ring = new Line("K", "Ring", "#a52", List.of("A", "B", "C", "D", "E", "F"),
                 List.of(120, 120, 120, 120, 120, 120), 3, 900, 0, List.of(), true);
         return new MetroNetwork("Test", singleLine().stations(), List.of(ring));
+    }
+
+    /**
+     * A branched line: A–B–C–D (100, 110, 120 s) with a branch from B to X–Y (90, 80 s). Of its six trains, a third
+     * run to Y and the rest to D, so A–B is the trunk both patterns share.
+     */
+    public static MetroNetwork branched() {
+        List<Station> stations = List.of(
+                new Station("A", "A", 0, 0.00, 10), new Station("B", "B", 0, 0.01, 8),
+                new Station("C", "C", 0, 0.02, 6), new Station("D", "D", 0, 0.03, 6),
+                new Station("X", "X", 0.01, 0.02, 5), new Station("Y", "Y", 0.01, 0.03, 5));
+        Line line = new Line("L", "Line", "#c00", List.of("A", "B", "C", "D"), List.of(100, 110, 120), 6, 900, 0,
+                List.of(), false, List.of(), List.of(new Branch("B", List.of("X", "Y"), List.of(90, 80), 1.0 / 3)));
+        return new MetroNetwork("Test", stations, List.of(line));
     }
 }
