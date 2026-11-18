@@ -81,6 +81,21 @@ public final class TestNetworks {
         return branched(odWeights, 0);
     }
 
+    /**
+     * A branched line with a longer trunk: A–B–C–D–E (100, 110, 120, 100 s) with a branch from C to X–Y (90, 80 s).
+     * Of its eight trains a quarter run to Y, so A–B–C is the trunk both patterns share.
+     */
+    public static MetroNetwork longTrunk() {
+        List<Station> stations = List.of(
+                new Station("A", "A", 0, 0.00, 10), new Station("B", "B", 0, 0.01, 1),
+                new Station("C", "C", 0, 0.02, 8), new Station("D", "D", 0, 0.03, 6),
+                new Station("E", "E", 0, 0.04, 6), new Station("X", "X", 0.01, 0.03, 5),
+                new Station("Y", "Y", 0.01, 0.04, 5));
+        Line line = new Line("L", "Line", "#c00", List.of("A", "B", "C", "D", "E"), List.of(100, 110, 120, 100), 8,
+                900, 0, List.of(), false, List.of(), List.of(new Branch("C", List.of("X", "Y"), List.of(90, 80), 0.25)));
+        return new MetroNetwork("Test", stations, List.of(line));
+    }
+
     /** {@link #branched()} with a flat junction at B whose crossing takes {@code crossingSeconds}. */
     public static MetroNetwork branchedFlat(double crossingSeconds) {
         return branched(Map.of(), crossingSeconds);
