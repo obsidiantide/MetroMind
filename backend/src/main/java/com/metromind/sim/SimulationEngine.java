@@ -1,5 +1,6 @@
 package com.metromind.sim;
 
+import com.metromind.network.Branch;
 import com.metromind.network.Line;
 import com.metromind.network.LineTrack;
 import com.metromind.network.MetroNetwork;
@@ -125,6 +126,23 @@ public final class SimulationEngine {
     private final Map<String, String> trunkEnds = new LinkedHashMap<>();
     /** Recent departure times from each trunk end, keyed by line and direction (see {@link #trunkKey}). */
     private final Map<String, Deque<Double>> trunkDepartures = new LinkedHashMap<>();
+    /** Flat junctions of every line, where trains leaving for a branch cross the opposite main track. */
+    private final List<FlatCrossing> flatCrossings = new ArrayList<>();
+    /** Simulated time until which a train leaving for a branch occupies each flat crossing (by its key). */
+    private final Map<String, Double> crossingBusyUntil = new LinkedHashMap<>();
+
+    /**
+     * A flat junction: a train running from {@code junctionId} to the branch's first station
+     * {@code branchFirstId} crosses the track that main-route trains run on from {@code mainNextId} back into the
+     * junction, and occupies the crossing for its first {@code seconds}; a main-route train occupies it for its
+     * last {@code seconds} before the junction platform.
+     */
+    private record FlatCrossing(String lineId, String junctionId, String branchFirstId, String mainNextId,
+                                double seconds) {
+        String key() {
+            return lineId + "@" + junctionId;
+        }
+    }
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -136,6 +154,13 @@ public final class SimulationEngine {
             line.stationIds().stream()
                     .filter(id -> line.branches().stream().anyMatch(b -> b.junctionStationId().equals(id)))
                     .findFirst().ifPresent(junction -> trunkEnds.put(line.id(), junction));
+            for (Branch b : line.branches()) {
+                if (b.flatJunction()) {
+                    String mainNext = line.stationIds().get(line.stationIds().indexOf(b.junctionStationId()) + 1);
+                    flatCrossings.add(new FlatCrossing(line.id(), b.junctionStationId(), b.stationIds().get(0),
+                            mainNext, b.crossingSeconds()));
+                }
+            }
             for (ServicePattern p : line.patterns()) {
                 patterns.put(p.id(), p);
                 double[] cum = new double[p.loopLength() + 1];
@@ -223,6 +248,8 @@ public final class SimulationEngine {
         this.shortTurnLog.addAll(other.shortTurnLog);
         this.skippedStopLog.addAll(other.skippedStopLog);
         this.trunkEnds.putAll(other.trunkEnds);
+        this.flatCrossings.addAll(other.flatCrossings);
+        this.crossingBusyUntil.putAll(other.crossingBusyUntil);
         other.trunkDepartures.forEach((k, v) -> this.trunkDepartures.put(k, new ArrayDeque<>(v)));
     }
 
@@ -403,7 +430,7 @@ public final class SimulationEngine {
             }
             case WAITING_SIGNAL -> tryDepart(t);
             case RUNNING -> {
-                t.segmentElapsed += dt;
+                t.segmentElapsed = advanceToCrossing(t, t.segmentElapsed + dt);
                 if (t.segmentElapsed >= t.segmentDuration) {
                     arrive(t);
                 }
@@ -528,6 +555,14 @@ public final class SimulationEngine {
                 || platformTaken(t, t.lineId, to, p.directionAtStop(next))) {
             t.phase = TrainPhase.WAITING_SIGNAL;
             return;
+        }
+        FlatCrossing crossing = crossing(t.lineId, p.stationAtStop(t.stop), to, true);
+        if (crossing != null) {
+            if (crossingApproached(crossing)) {
+                t.phase = TrainPhase.WAITING_SIGNAL;
+                return;
+            }
+            crossingBusyUntil.put(crossing.key(), simTime + crossing.seconds());
         }
         t.phase = TrainPhase.RUNNING;
         t.segmentElapsed = 0;
@@ -823,6 +858,61 @@ public final class SimulationEngine {
             }
         }
         return false;
+    }
+
+    /*
+     * Flat junctions: a train leaving the junction for the branch and a main-route train running back into the
+     * junction use the same piece of track where their paths cross, so only one of them may be on it. The
+     * main-route train has priority once it is within the crossing time of the platform; otherwise the branch
+     * train goes first and the main-route train stops short of the crossing until it is clear.
+     */
+
+    /**
+     * The flat crossing a run from {@code from} to {@code to} on line {@code lineId} uses, or null: as the train
+     * leaving for the branch ({@code diverging}) or as the main-route train running into the junction.
+     */
+    private FlatCrossing crossing(String lineId, String from, String to, boolean diverging) {
+        for (FlatCrossing c : flatCrossings) {
+            if (c.lineId().equals(lineId) && (diverging
+                    ? c.junctionId().equals(from) && c.branchFirstId().equals(to)
+                    : c.mainNextId().equals(from) && c.junctionId().equals(to))) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /** Whether a main-route train is already within the crossing time of the junction, i.e. on the crossing. */
+    private boolean crossingApproached(FlatCrossing c) {
+        for (TrainState o : trains) {
+            if (o.phase == TrainPhase.RUNNING && o.lineId.equals(c.lineId())) {
+                ServicePattern op = pattern(o);
+                if (op.stationAtStop(o.stop).equals(c.mainNextId())
+                        && op.stationAtStop((o.stop + 1) % op.loopLength()).equals(c.junctionId())
+                        && o.segmentDuration - o.segmentElapsed <= c.seconds()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * How far along its run {@code t} gets when it would reach {@code elapsed}: a main-route train running into a
+     * flat junction stops at the crossing while a train leaving for the branch is on it.
+     */
+    private double advanceToCrossing(TrainState t, double elapsed) {
+        if (flatCrossings.isEmpty()) {
+            return elapsed;
+        }
+        ServicePattern p = pattern(t);
+        FlatCrossing c = crossing(t.lineId, p.stationAtStop(t.stop), p.stationAtStop((t.stop + 1) % p.loopLength()),
+                false);
+        if (c == null || crossingBusyUntil.getOrDefault(c.key(), Double.NEGATIVE_INFINITY) <= simTime) {
+            return elapsed;
+        }
+        double signal = t.segmentDuration - c.seconds();
+        return elapsed > signal ? Math.max(t.segmentElapsed, signal) : elapsed;
     }
 
     /** Whether a train of line {@code lineId} other than {@code self} is running from {@code from} to {@code to}. */
