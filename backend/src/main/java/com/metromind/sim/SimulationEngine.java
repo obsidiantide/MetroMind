@@ -425,9 +425,11 @@ public final class SimulationEngine {
                     return; // dwelling again on the opposite platform; the hold is decided when it is ready
                 }
             }
+            // Regulate the service passengers on the platform see: on the trunk of a branched line that is the
+            // combined headway of every pattern calling there, so trains of different patterns do not bunch.
             double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
-            double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
-                    strategy.targetHeadway(target, demand));
+            double hold = strategy.holdSeconds(platformForwardHeadway(t), platformBackwardHeadway(t),
+                    strategy.targetHeadway(platformEvenHeadway(t), demand));
             if (p.isTimingStop(t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
