@@ -155,6 +155,14 @@ for the far end of the main route) wait for a train going there; travelling from
 main route means changing trains at the junction. Track closures may be on the trunk, which stops both
 patterns, or on a branch.
 
+**Flat junctions.** A branch is grade-separated by default: its trains never get in the way of the main route.
+Give it `"crossingSeconds"` (in JSON or as a GeoJSON branch property) to model a flat junction instead, where a
+train leaving the junction for the branch crosses the opposite main track. It occupies the crossing for that many
+seconds after departing; a main-route train running back into the junction stops short of the crossing meanwhile,
+and one already within the crossing time of the platform goes first, so the branch train waits at the junction.
+Trains merging back from the branch join their own track and do not cross anything. The station drawer of a
+junction says when it is flat.
+
 **Trunk regularity.** The overall headway CV judges each pattern on its own, so two trains of different patterns
 running as a pair on the trunk look perfectly regular. The engine therefore also logs the last 8 departures, of
 any pattern, from the trunk's last station (the junction) in each direction and reports the coefficient of
