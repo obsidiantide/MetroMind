@@ -117,6 +117,9 @@ public final class SimulationEngine {
         this.simTime = startTime;
         this.strategy = strategy;
         for (Line line : network.lines()) {
+            if (!line.branches().isEmpty()) {
+                throw new IllegalArgumentException("Line " + line.id() + ": branched lines are not simulated yet");
+            }
             lines.put(line.id(), line);
             double[] cum = new double[line.loopLength() + 1];
             for (int k = 0; k < line.loopLength(); k++) {
