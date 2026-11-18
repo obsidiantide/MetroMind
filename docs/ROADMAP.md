@@ -69,7 +69,7 @@ Mark items `[x]` when merged.
 - [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
 - [x] Adaptive dispatching on branched lines: send a spare train to the pattern with the worst overload forecast
       (today spare trains always join the main route)
-- [ ] Short-turning and skip-stop on a shared trunk judge the follower by the platform headway, so a train of the
+- [x] Short-turning and skip-stop on a shared trunk judge the follower by the platform headway, so a train of the
       other pattern close behind can take over the stations a late train gives up
 
 ### Platform
