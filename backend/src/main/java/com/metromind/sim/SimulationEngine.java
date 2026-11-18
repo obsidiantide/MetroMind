@@ -492,7 +492,19 @@ public final class SimulationEngine {
                 && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS
                 && !closedStations.containsKey(p.stationAtStop(t.stop))
                 && trainsOnPattern(p.id()) > 1
-                && backwardHeadway(t) < SHORT_TURN_FOLLOWER_FRACTION * targetHeadway;
+                && shortTurnFollowerHeadway(t, p) < SHORT_TURN_FOLLOWER_FRACTION * targetHeadway;
+    }
+
+    /**
+     * Gap to the train that would serve the stations {@code t} gives up by turning back here. Heading for the line's
+     * first terminal on a shared trunk, those stations (on to the terminal and back) are all on the trunk, so the
+     * next train of any pattern serves them; anywhere else only trains of {@code t}'s own pattern call at all of
+     * them (the far end of its route is its own). On an unbranched line both are the same gap.
+     */
+    private double shortTurnFollowerHeadway(TrainState t, ServicePattern p) {
+        String stationId = p.stationAtStop(t.stop);
+        boolean onTrunk = patternsByLine.get(t.lineId).stream().allMatch(q -> q.stationIds().contains(stationId));
+        return p.directionAtStop(t.stop) < 0 && onTrunk ? platformBackwardHeadway(t) : backwardHeadway(t);
     }
 
     /**
