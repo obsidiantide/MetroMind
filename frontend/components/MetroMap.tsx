@@ -1,6 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { ringTurn } from "@/lib/lines";
 import type { Branch, Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
@@ -59,6 +60,26 @@ export function branchPoints(branch: Branch, station: (id: string) => Station): 
   return [branch.junctionStationId, ...branch.stationIds].map((id) => [station(id).lon, station(id).lat]);
 }
 
+/**
+ * Points at the given fractions (0–1) of a polyline's length, each with the heading of the segment it falls on in
+ * degrees clockwise from the x axis, for placing direction arrows along a track.
+ */
+export function pointsAlong(points: [number, number][], fractions: number[]): { x: number; y: number; angle: number }[] {
+  const lengths = points.slice(1).map(([x, y], i) => Math.hypot(x - points[i][0], y - points[i][1]));
+  const total = lengths.reduce((a, b) => a + b, 0);
+  if (total === 0) return [];
+  return fractions.map((f) => {
+    let along = f * total;
+    let i = 0;
+    while (i < lengths.length - 1 && along > lengths[i]) along -= lengths[i++];
+    const [[x0, y0], [x1, y1]] = [points[i], points[i + 1]];
+    const t = lengths[i] > 0 ? along / lengths[i] : 0;
+    return { x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t, angle: (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI };
+  });
+}
+
+const TURN_ARROW = { clockwise: "↻", anticlockwise: "↺" } as const;
+
 /** Keyboard and pointer props that make a map element pick `target` when activated. */
 function selectable(target: Selection, selected: Selection | null, onSelect: (s: Selection) => void) {
   const isSelected = selected?.kind === target.kind && selected.id === target.id;
@@ -83,6 +104,7 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
   const stationState = new Map(snapshot?.stations.map((s) => [s.id, s]) ?? []);
   const lineColor = new Map(network.lines.map((l) => [l.id, l.color]));
   const lineName = new Map(network.lines.map((l) => [l.id, l.name]));
+  const turns = new Map(network.lines.map((l) => [l.id, ringTurn(l, station)]));
   const worstHeat = heat ? Math.max(0, ...Object.values(heat.extraWaitMinutes).map(Math.abs)) : 0;
 
   return (
@@ -104,6 +126,20 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
           opacity={0.75}
         />
       )))}
+      {network.lines.filter((l) => l.ring).map((line) => {
+        // One chevron per station-to-station run, 40 % of the way along, pointing the way the trains go. Two rings
+        // over the same stations in opposite directions place theirs 40 % from opposite ends, so they do not overlap.
+        const n = line.stationIds.length;
+        const track = trackPoints(line, station).map(([lon, lat]): [number, number] => [x(lon), y(lat)]);
+        return (
+          <g key={`dir-${line.id}`} data-ring-arrows={line.id} pointerEvents="none">
+            {pointsAlong(track, line.stationIds.map((_, k) => (k + 0.4) / n)).map((p, k) => (
+              <path key={k} d="M-5,-5L5,0L-5,5Z" fill="#e6edf3"
+                    transform={`translate(${p.x},${p.y}) rotate(${p.angle})`} stroke={line.color} strokeWidth={1.5} />
+            ))}
+          </g>
+        );
+      })}
       {snapshot?.closedSections.map((c) => {
         const [a, b] = [station(c.fromStationId), station(c.toStationId)];
         const action = c.response === "TURN_BACK" ? "trains turn back" : "trains wait";
@@ -170,6 +206,18 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
           </g>
         );
       })}
+      <g transform={`translate(${PAD - 30},16)`} aria-label="Line legend">
+        {network.lines.map((l, i) => {
+          const turn = turns.get(l.id);
+          return (
+            <g key={l.id} transform={`translate(0,${i * 16})`} data-legend={l.id}>
+              <line x1={0} y1={-3} x2={18} y2={-3} stroke={l.color} strokeWidth={5} strokeLinecap="round" />
+              <text x={26} y={0}>{turn ? `${l.name} ${TURN_ARROW[turn]}` : l.name}</text>
+              {turn && <title>{`${l.name}: trains run ${turn} round the ring`}</title>}
+            </g>
+          );
+        })}
+      </g>
       {heat && (
         <g transform={`translate(${PAD - 30},${H - 24})`} aria-label="What-if heat legend">
           <circle cx={6} cy={-4} r={6} fill="#f85149" opacity={0.6} />
