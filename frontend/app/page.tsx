@@ -44,6 +44,13 @@ export default function Home() {
             <div className="kpi"><b>{Math.round(m.passengersHeldAtEntrance)}</b><span>held at entrances</span></div>
             <div className="kpi"><b>{Math.round(m.passengersLeftBehind)}</b><span>left behind by full trains</span></div>
             <div className="kpi"><b>{m.headwayCoefficientOfVariation.toFixed(2)}</b><span>headway CV (bunching)</span></div>
+            {Object.entries(m.trunkHeadwayCv).map(([lineId, cv]) => (
+              <div className="kpi" key={lineId}
+                   title="Headway CV of all the line's service patterns together where they share the trunk">
+                <b>{cv.toFixed(2)}</b>
+                <span>trunk CV · {network?.lines.find((l) => l.id === lineId)?.name ?? lineId}</span>
+              </div>
+            ))}
             {m.stopsSkipped > 0 && (
               <div className="kpi">
                 <b>{m.stopsSkipped}</b>
