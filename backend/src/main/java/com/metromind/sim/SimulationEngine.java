@@ -1189,7 +1189,13 @@ public final class SimulationEngine {
         return predicted + st.heldAtEntrance;
     }
 
-    /** Forecast for one platform queue of a station; see {@link #predictWaiting(String, double)}. */
+    /**
+     * Forecast for one platform queue of a station; see {@link #predictWaiting(String, double)}. On the trunk of a
+     * branched line not every train takes every passenger: someone bound for the branch waits for a branch train.
+     * The queue is therefore split by the set of service patterns that would board each passenger, and a train's
+     * free space only relieves the groups its pattern boards, in proportion to their demand. On an unbranched line
+     * every train boards everyone, so there is one group.
+     */
     private double predictQueue(StationState st, StationState.QueueKey key, double horizon, double mult) {
         Line line = lines.get(key.lineId());
         double rate = boardingRate(st, key, mult);
@@ -1200,19 +1206,83 @@ public final class SimulationEngine {
         // A train's spare room is shared by every station it serves in this direction, roughly in proportion
         // to demand, so this queue can only count on its share of it.
         double share = lineRate > 0 ? rate / lineRate : 0;
-        double expected = st.waiting(key) + rate * horizon;
+        Map<Integer, Double> demand = groupDemand(st, key, horizon, mult);
+        Map<Integer, Double> relief = new java.util.HashMap<>();
+        List<ServicePattern> own = patternsByLine.get(key.lineId());
         for (TrainState t : trains) {
             if (!t.lineId.equals(key.lineId())) {
                 continue;
             }
             ServicePattern p = pattern(t);
             int stop = nextCallStop(t, p, st.id, key.direction());
-            if (stop >= 0 && secondsUntilStop(t, p, stop) <= horizon) {
-                double residual = Math.max(0, t.capacity - passengersAboardAfter(t, p, stop));
-                expected -= residual * share;
+            if (stop < 0 || secondsUntilStop(t, p, stop) > horizon) {
+                continue;
+            }
+            double residual = Math.max(0, t.capacity - passengersAboardAfter(t, p, stop)) * share;
+            int bit = 1 << own.indexOf(p);
+            double eligible = 0;
+            for (Map.Entry<Integer, Double> g : demand.entrySet()) {
+                if ((g.getKey() & bit) != 0) {
+                    eligible += g.getValue();
+                }
+            }
+            if (eligible <= 0) {
+                continue;
+            }
+            for (Map.Entry<Integer, Double> g : demand.entrySet()) {
+                if ((g.getKey() & bit) != 0) {
+                    relief.merge(g.getKey(), residual * g.getValue() / eligible, Double::sum);
+                }
             }
         }
-        return Math.max(0, expected);
+        double expected = 0;
+        for (Map.Entry<Integer, Double> g : demand.entrySet()) {
+            expected += Math.max(0, g.getValue() - relief.getOrDefault(g.getKey(), 0.0));
+        }
+        return expected;
+    }
+
+    /**
+     * Passengers expected in queue {@code key} over the horizon (waiting now plus arrivals), grouped by the set of
+     * the line's service patterns whose trains would board them, as a bit mask over {@code patternsByLine}. Transfer
+     * inflow is split like the passengers queueing now, or like new arrivals when the queue is empty.
+     */
+    private Map<Integer, Double> groupDemand(StationState st, StationState.QueueKey key, double horizon,
+                                             double mult) {
+        double[] queued = st.waiting.get(key);
+        double[] arrivals = st.arrivalShare.getOrDefault(key, new double[queued.length]);
+        double queuedTotal = StationState.sum(queued);
+        double arrivalTotal = StationState.sum(arrivals);
+        double perSecond = network.station(st.id).baseArrivalsPerMinute() * mult / 60.0;
+        double transfers = st.recentTransfers.getOrDefault(key, 0.0) / TRANSFER_RATE_WINDOW_SECONDS;
+        List<ServicePattern> own = patternsByLine.get(key.lineId());
+        List<boolean[]> boards = new ArrayList<>();
+        int all = 0;
+        for (int i = 0; i < own.size(); i++) {
+            int stop = callingStop(own.get(i), st.id, key.direction());
+            boards.add(stop < 0 ? null : routes.boards(routes.patternIndex(own.get(i).id()), stop));
+            all |= stop < 0 ? 0 : 1 << i;
+        }
+        Map<Integer, Double> demand = new java.util.TreeMap<>();
+        for (int d = 0; d < queued.length; d++) {
+            double transferShare = queuedTotal > 0 ? queued[d] / queuedTotal
+                    : arrivalTotal > 0 ? arrivals[d] / arrivalTotal : 0;
+            double amount = queued[d] + (perSecond * arrivals[d] + transfers * transferShare) * horizon;
+            if (amount <= 0) {
+                continue;
+            }
+            int mask = 0;
+            for (int i = 0; i < own.size(); i++) {
+                if (boards.get(i) != null && boards.get(i)[d]) {
+                    mask |= 1 << i;
+                }
+            }
+            demand.merge(mask, amount, Double::sum);
+        }
+        if (queuedTotal <= 0 && arrivalTotal <= 0 && transfers > 0) {
+            demand.merge(all, transfers * horizon, Double::sum); // nothing says where they go: any train will do
+        }
+        return demand;
     }
 
     /** Expected passengers per second joining queue {@code key} at a station (0 if it has no such queue). */
