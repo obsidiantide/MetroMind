@@ -48,4 +48,12 @@ class NetworkApiTest {
                 .andExpect(jsonPath("$.trains[?(@.lineId == 'M2')].patternId", org.hamcrest.Matchers.everyItem(
                         org.hamcrest.Matchers.is("M2"))));
     }
+
+    @Test
+    void reportsTrunkRegularityOnlyForTheBranchedLine() throws Exception {
+        mvc.perform(get("/api/state"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.trunkHeadwayCv.M1").isNumber())
+                .andExpect(jsonPath("$.metrics.trunkHeadwayCv.M2").doesNotExist());
+    }
 }
