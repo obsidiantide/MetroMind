@@ -19,8 +19,8 @@ class KpiAggregatorTest {
     private static final double T0 = 8 * 3600;
 
     private static SimulationSnapshot.TrainView train(String id, double delay, double load) {
-        return new SimulationSnapshot.TrainView(id, "RED", "RED", "R1", "R2", 0.5, 0, 0, TrainPhase.RUNNING, delay, load,
-                200, false);
+        return new SimulationSnapshot.TrainView(id, "RED", "RED", "R1", "R2", "R5", 0.5, 0, 0, TrainPhase.RUNNING, delay,
+                load, 200, false);
     }
 
     private static SimulationSnapshot.Metrics metrics(double waiting, double cv) {

@@ -1638,8 +1638,9 @@ public final class SimulationEngine {
                     ? track.position(from.id(), to.id(), progress)
                     : new double[]{from.lat() + (to.lat() - from.lat()) * progress,
                                    from.lon() + (to.lon() - from.lon()) * progress};
-            trainViews.add(new SimulationSnapshot.TrainView(t.id, t.lineId, t.patternId, from.id(), to.id(), progress,
-                    latLon[0], latLon[1],
+            String towards = p.towardsStationId(p.positionAtStop(t.stop), p.directionAtStop(t.stop));
+            trainViews.add(new SimulationSnapshot.TrainView(t.id, t.lineId, t.patternId, from.id(), to.id(), towards,
+                    progress, latLon[0], latLon[1],
                     t.phase, t.delaySeconds, t.passengers, t.capacity, t.failed));
         }
         List<SimulationSnapshot.StationView> stationViews = new ArrayList<>();
