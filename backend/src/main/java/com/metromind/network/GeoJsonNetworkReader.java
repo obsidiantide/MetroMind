@@ -27,7 +27,8 @@ import java.util.Map;
  *       from the junction to the branch terminal. Properties: {@code id}, {@code branchOf},
  *       {@code junctionStationId}, {@code stationIds} (the branch stations after the junction, in track order),
  *       {@code share} (fraction of the line's trains that run to the branch), and optionally either
- *       {@code runSeconds} (junction to first branch station, then between them) or {@code averageSpeedKmh}.</li>
+ *       {@code runSeconds} (junction to first branch station, then between them) or {@code averageSpeedKmh},
+ *       and {@code crossingSeconds} for a flat junction (see {@link Branch#crossingSeconds()}).</li>
  *   <li>The collection's own {@code properties} may hold {@code city}, {@code odWeights} and
  *       {@code crossPlatform} (as in the native format).</li>
  * </ul>
@@ -152,7 +153,8 @@ public class GeoJsonNetworkReader {
             runSeconds = deriveRunSeconds(id, new TrackGeometry(track), alongTrack, stations, speedKmh / 3.6, false);
         }
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
-        return new Branch(junction, stationIds, runSeconds, p.get("share").asDouble(), path);
+        return new Branch(junction, stationIds, runSeconds, p.get("share").asDouble(), path,
+                p.path("crossingSeconds").asDouble(0));
     }
 
     private Line line(JsonNode feature, Map<String, Station> stations, List<Branch> branches) {

@@ -97,6 +97,18 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void aBranchMayHaveAFlatJunction() throws Exception {
+        MetroNetwork flat = read(withBranch("\"branchOf\": \"L1\", \"junctionStationId\": \"B\", "
+                + "\"stationIds\": [\"X\"], \"share\": 0.34, \"crossingSeconds\": 25"));
+        assertThat(flat.line("L1").branches().get(0).crossingSeconds()).isEqualTo(25);
+        assertThat(flat.line("L1").branches().get(0).flatJunction()).isTrue();
+
+        MetroNetwork separated = read(withBranch(
+                "\"branchOf\": \"L1\", \"junctionStationId\": \"B\", \"stationIds\": [\"X\"], \"share\": 0.34"));
+        assertThat(separated.line("L1").branches().get(0).flatJunction()).isFalse();
+    }
+
+    @Test
     void rejectsBranchesOfUnknownLinesOrWithoutAJunctionOrShare() {
         assertThatThrownBy(() -> read(withBranch(
                 "\"branchOf\": \"L9\", \"junctionStationId\": \"B\", \"stationIds\": [\"X\"], \"share\": 0.34")))
