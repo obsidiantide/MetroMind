@@ -78,6 +78,9 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
      * @param meanRecoverySeconds     mean headway recovery time (see {@link HeadwayRecovery}) over the scenarios the
      *                                strategy recovered from within the horizon; {@code null} if it recovered from none
      * @param unrecoveredScenarios    scenarios whose headways were still disrupted at the horizon
+     * @param meanTrunkHeadwayCv      per branched line, mean over the scenarios of the headway CV of the combined
+     *                                service on its shared trunk at the horizon (empty for a network without
+     *                                branches; reports stored before this field existed read back empty too)
      * @param meanShortTurns          trains reversed early per scenario, on average (0 unless the strategy
      *                                short-turns late trains)
      * @param shortTurnsByStation     short turns over all scenarios by the station where they happened, most first
@@ -91,15 +94,20 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
     public record StrategyRanking(int rank, String strategy, double meanWaitSeconds, double p95WaitSeconds,
                                   double meanTravelMinutes, double p95TravelMinutes,
                                   Double meanRecoverySeconds, int unrecoveredScenarios,
-                                  double meanShortTurns, Map<String, Integer> shortTurnsByStation,
+                                  Map<String, Double> meanTrunkHeadwayCv, double meanShortTurns, Map<String, Integer> shortTurnsByStation,
                                   double meanStopsSkipped, double meanPassengersCarriedPast,
                                   Map<String, Integer> stopsSkippedByStation,
                                   List<Double> waitSecondsPerScenario) {
 
+        public StrategyRanking {
+            meanTrunkHeadwayCv = meanTrunkHeadwayCv == null ? Map.of() : meanTrunkHeadwayCv;
+        }
+
         /** The same ranking at position {@code newRank}. */
         public StrategyRanking withRank(int newRank) {
             return new StrategyRanking(newRank, strategy, meanWaitSeconds, p95WaitSeconds, meanTravelMinutes,
-                    p95TravelMinutes, meanRecoverySeconds, unrecoveredScenarios, meanShortTurns, shortTurnsByStation,
+                    p95TravelMinutes, meanRecoverySeconds, unrecoveredScenarios, meanTrunkHeadwayCv, meanShortTurns,
+                    shortTurnsByStation,
                     meanStopsSkipped, meanPassengersCarriedPast, stopsSkippedByStation, waitSecondsPerScenario);
         }
     }

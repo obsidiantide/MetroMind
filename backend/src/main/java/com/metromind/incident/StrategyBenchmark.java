@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Random;
+import java.util.TreeMap;
 
 /**
  * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a train
@@ -111,6 +112,7 @@ public final class StrategyBenchmark {
             Map<String, Integer> skipsByStation = new HashMap<>();
             int skips = 0;
             double carriedPast = 0;
+            Map<String, Double> trunkCvSum = new TreeMap<>();
             for (BenchmarkReport.Scenario scenario : scenarios) {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
@@ -127,6 +129,7 @@ public final class StrategyBenchmark {
                 double waited = totalWaitSeconds(run) - startWait;
                 waits.add(boarded > 0 ? waited / boarded : 0);
                 travels.add((waited + run.passengerRideSeconds() - startRide) / 60.0);
+                run.trunkHeadwayCv().forEach((line, cv) -> trunkCvSum.merge(line, cv, Double::sum));
                 for (ShortTurn turn : run.shortTurnsSince(injectedAt)) {
                     turnsByStation.merge(turn.stationId(), 1, Integer::sum);
                     turns++;
@@ -142,7 +145,8 @@ public final class StrategyBenchmark {
             unranked.add(new BenchmarkReport.StrategyRanking(0, strategy.name(), mean, percentile(waits, 0.95),
                     travels.stream().mapToDouble(Double::doubleValue).average().orElse(0),
                     percentile(travels, 0.95), recovered > 0 ? recoverySum / recovered : null,
-                    scenarios.size() - recovered, (double) turns / scenarios.size(), mostFirst(turnsByStation),
+                    scenarios.size() - recovered, meanOver(trunkCvSum, scenarios.size()),
+                    (double) turns / scenarios.size(), mostFirst(turnsByStation),
                     (double) skips / scenarios.size(), carriedPast / scenarios.size(), mostFirst(skipsByStation),
                     List.copyOf(waits)));
         }
@@ -152,6 +156,13 @@ public final class StrategyBenchmark {
             rankings.add(unranked.get(i).withRank(i + 1));
         }
         return new BenchmarkReport(seed, horizonSeconds, metric, scenarios, rankings);
+    }
+
+    /** Each line's sum divided by {@code count}, in line order. */
+    private static Map<String, Double> meanOver(Map<String, Double> sums, int count) {
+        Map<String, Double> means = new LinkedHashMap<>();
+        sums.forEach((line, sum) -> means.put(line, sum / count));
+        return means;
     }
 
     /** Best first by the metric's mean, then its p95, then strategy name. */

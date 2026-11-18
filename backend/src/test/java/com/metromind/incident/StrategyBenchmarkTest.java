@@ -45,6 +45,25 @@ class StrategyBenchmarkTest {
     }
 
     @Test
+    void averagesTheTrunkRegularityOfEachBranchedLineOverTheScenarios() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.branched(), 7 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(1800, 1);
+        BenchmarkReport report = new StrategyBenchmark().run(live, 3, 11, 900,
+                List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED));
+
+        assertThat(report.rankings()).allSatisfy(r -> {
+            assertThat(r.meanTrunkHeadwayCv()).containsOnlyKeys("L");
+            assertThat(r.meanTrunkHeadwayCv().get("L")).isPositive();
+        });
+    }
+
+    @Test
+    void anUnbranchedNetworkReportsNoTrunk() {
+        BenchmarkReport report = new StrategyBenchmark().run(live(), 2, 3, 600, List.of(HeadwayStrategy.NO_CONTROL));
+        assertThat(report.rankings().get(0).meanTrunkHeadwayCv()).isEmpty();
+    }
+
+    @Test
     void countsScenariosRecoveredFromAndAveragesTheirRecoveryTime() {
         BenchmarkReport report = new StrategyBenchmark().run(live(), 4, 7, 2400,
                 List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED));
@@ -287,8 +306,8 @@ class StrategyBenchmarkTest {
     }
 
     private static BenchmarkReport.StrategyRanking ranking(String strategy, double meanTravel, double p95Travel) {
-        return new BenchmarkReport.StrategyRanking(0, strategy, 0, 0, meanTravel, p95Travel, null, 0, 0, Map.of(),
-                0, 0, Map.of(), List.of());
+        return new BenchmarkReport.StrategyRanking(0, strategy, 0, 0, meanTravel, p95Travel, null, 0, Map.of(), 0,
+                Map.of(), 0, 0, Map.of(), List.of());
     }
 
     @Test
