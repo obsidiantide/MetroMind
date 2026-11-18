@@ -10,6 +10,13 @@ export interface Line {
   ring?: boolean;
   /** Branches some of the line's trains run to instead of the end of the main route. */
   branches?: Branch[];
+  /** Station sequences the line's trains follow: the main route, then one per branch (trunk plus branch). */
+  patterns?: ServicePattern[];
+}
+/** One way a line's trains run; `id` is the line id for the main route, `line/branch-terminal` for a branch. */
+export interface ServicePattern {
+  id: string; lineId: string; stationIds: string[]; runSeconds: number[]; ring: boolean;
+  timingStationIds: string[]; trainCount: number;
 }
 /** Past the junction, a share of the line's trains run to the branch stations instead. */
 export interface Branch {
@@ -27,7 +34,10 @@ export interface MetroNetwork {
 
 export type TrainPhase = "DWELLING" | "HELD" | "WAITING_SIGNAL" | "RUNNING";
 export interface TrainView {
-  id: string; lineId: string; fromStationId: string; toStationId: string; progress: number;
+  id: string; lineId: string;
+  /** Service pattern the train follows (see Line.patterns); equals lineId on an unbranched line. */
+  patternId: string;
+  fromStationId: string; toStationId: string; progress: number;
   lat: number; lon: number; phase: TrainPhase; delaySeconds: number; load: number; capacity: number; failed: boolean;
 }
 export interface QueueView { lineId: string; towardsStationId: string; waiting: number }

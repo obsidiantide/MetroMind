@@ -26,7 +26,7 @@ export function stationView(id: string, over: Partial<StationView> = {}): Statio
 
 export function trainView(id: string, over: Partial<TrainView> = {}): TrainView {
   return {
-    id, lineId: "RED", fromStationId: "A", toStationId: "C", progress: 0.5, lat: 40.0, lon: 49.81,
+    id, lineId: "RED", patternId: "RED", fromStationId: "A", toStationId: "C", progress: 0.5, lat: 40.0, lon: 49.81,
     phase: "RUNNING", delaySeconds: 0, load: 300, capacity: 900, failed: false, ...over,
   };
 }
