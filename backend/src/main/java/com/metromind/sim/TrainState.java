@@ -7,6 +7,8 @@ import java.util.List;
 public final class TrainState {
     final String id;
     final String lineId;
+    /** Service pattern the train follows; {@link #stop} indexes that pattern's loop. */
+    final String patternId;
     final int capacity;
 
     int stop;
@@ -32,15 +34,16 @@ public final class TrainState {
     boolean skippedLastStop;
     final List<Double> arrivals = new ArrayList<>();
 
-    TrainState(String id, String lineId, int capacity, int stationCount) {
+    TrainState(String id, String lineId, String patternId, int capacity, int stationCount) {
         this.id = id;
         this.lineId = lineId;
+        this.patternId = patternId;
         this.capacity = capacity;
         this.onboard = new double[stationCount];
     }
 
     TrainState copy() {
-        TrainState t = new TrainState(id, lineId, capacity, onboard.length);
+        TrainState t = new TrainState(id, lineId, patternId, capacity, onboard.length);
         System.arraycopy(onboard, 0, t.onboard, 0, onboard.length);
         t.stop = stop;
         t.phase = phase;
@@ -62,6 +65,7 @@ public final class TrainState {
 
     public String id() { return id; }
     public String lineId() { return lineId; }
+    public String patternId() { return patternId; }
     public int stop() { return stop; }
     public TrainPhase phase() { return phase; }
     public double passengers() { return passengers; }
