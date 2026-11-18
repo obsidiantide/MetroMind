@@ -499,7 +499,8 @@ public final class SimulationEngine {
      * Whether a train that has just reached a platform should run through it instead of calling: the strategy
      * allows it, the train is at least {@link #SKIP_STOP_LATENESS_SECONDS} late, the stop is an intermediate one
      * that is not an interchange (skipping it would strand transfers), the train did not skip its previous stop,
-     * it is lagging between its neighbours (see {@link #SKIP_STOP_FOLLOWER_FRACTION}), and fewer than
+     * it is lagging between its neighbours at the platform, trains of any pattern calling there (see
+     * {@link #SKIP_STOP_FOLLOWER_FRACTION}), and fewer than
      * {@link #SKIP_STOP_MAX_PASSENGERS} passengers would board or alight here. Under a strategy that also
      * short-turns, a train late enough to be short-turned never skips: it calls so it can turn back here (except
      * on a ring, where nothing turns back).
@@ -515,7 +516,9 @@ public final class SimulationEngine {
                 || trainsOnPattern(p.id()) < 2) {
             return false;
         }
-        if (backwardHeadway(t) >= SKIP_STOP_FOLLOWER_FRACTION * forwardHeadway(t)) {
+        // The passengers left on the platform board the next train of any pattern calling here, so on a shared
+        // trunk the train must lag within the combined service, not only behind its own pattern's leader.
+        if (platformBackwardHeadway(t) >= SKIP_STOP_FOLLOWER_FRACTION * platformForwardHeadway(t)) {
             return false;
         }
         double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, p.directionAtStop(t.stop)));
