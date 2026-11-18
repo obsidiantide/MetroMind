@@ -1,6 +1,7 @@
 package com.metromind.sim;
 
 import java.util.List;
+import java.util.Map;
 
 public record SimulationSnapshot(double simTime, String clock, String strategy, List<TrainView> trains,
                                  List<StationView> stations, List<SimEvent> recentEvents, Metrics metrics,
@@ -63,11 +64,18 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      * @param stopsSkipped       stops trains ran through under a skip-stop strategy
      * @param passengersCarriedPast passengers whose train ran through their destination, who rode back from the
      *                           next stop (not counted as transfers)
+     * @param trunkHeadwayCv     per branched line, headway CV of the combined service of all its patterns where they
+     *                           share the trunk (see {@link SimulationEngine#trunkHeadwayCv()}); the overall
+     *                           {@code headwayCoefficientOfVariation} looks at each pattern on its own
      */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
                           double passengersServed, double passengersDelivered, double transfers,
                           double passengersLeftBehind, double passengersHeldAtEntrance,
                           double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
-                          int stopsSkipped, double passengersCarriedPast) {
+                          int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv) {
+
+        public Metrics {
+            trunkHeadwayCv = trunkHeadwayCv == null ? Map.of() : Map.copyOf(trunkHeadwayCv);
+        }
     }
 }

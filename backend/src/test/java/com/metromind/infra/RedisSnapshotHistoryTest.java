@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +41,7 @@ class RedisSnapshotHistoryTest {
                 List.of(new SimulationSnapshot.TrainView("RED-1", "RED", "RED", "R1", "R2", 0.5, 40.4, 49.8,
                         TrainPhase.RUNNING, 12, 80, 200, false)),
                 List.of(), List.of(new SimEvent(simTime, SimEvent.Type.DELAY_DETECTED, "RED-1", "late")),
-                new SimulationSnapshot.Metrics(1, 2, 3, 4, 5, 6, 7, 8, 0.1, 9, 1, 0, 0), List.of(), List.of());
+                new SimulationSnapshot.Metrics(1, 2, 3, 4, 5, 6, 7, 8, 0.1, 9, 1, 0, 0, Map.of()), List.of(), List.of());
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,7 +24,7 @@ class KpiAggregatorTest {
     }
 
     private static SimulationSnapshot.Metrics metrics(double waiting, double cv) {
-        return new SimulationSnapshot.Metrics(0, 0, waiting, 0, 0, 0, 0, 0, cv, 0, 0, 0, 0);
+        return new SimulationSnapshot.Metrics(0, 0, waiting, 0, 0, 0, 0, 0, cv, 0, 0, 0, 0, Map.of());
     }
 
     @Test

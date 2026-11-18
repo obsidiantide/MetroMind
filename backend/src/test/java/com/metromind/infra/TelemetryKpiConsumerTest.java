@@ -9,6 +9,8 @@ import com.metromind.sim.SimulationSnapshot;
 import com.metromind.sim.TrainPhase;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Feeds the consumer the same JSON {@link KafkaSnapshotPublisher} writes, without a broker. */
@@ -32,11 +34,11 @@ class TelemetryKpiConsumerTest {
         consumer.onPosition(position(28_800, "RED-1", 40));
         consumer.onPosition(position(28_830, "RED-2", 80));
         consumer.onMetrics(json(new KafkaSnapshotPublisher.NetworkMetrics(28_810,
-                new SimulationSnapshot.Metrics(60, 80, 900, 0, 0, 0, 0, 0, 0.25, 6, 0, 0, 0))));
+                new SimulationSnapshot.Metrics(60, 80, 900, 0, 0, 0, 0, 0, 0.25, 6, 0, 0, 0, Map.of()))));
         consumer.onEvent(json(new SimEvent(28_820, SimEvent.Type.DELAY_DETECTED, "RED-2", "late")));
         consumer.onPosition(position(28_900, "RED-1", 0));
         consumer.onMetrics(json(new KafkaSnapshotPublisher.NetworkMetrics(28_900,
-                new SimulationSnapshot.Metrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))));
+                new SimulationSnapshot.Metrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Map.of()))));
 
         assertThat(recorder.recent(10)).singleElement().satisfies(k -> {
             assertThat(k.clock()).isEqualTo("08:00");

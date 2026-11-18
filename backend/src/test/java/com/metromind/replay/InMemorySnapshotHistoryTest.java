@@ -4,6 +4,7 @@ import com.metromind.sim.SimulationSnapshot;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,7 +12,7 @@ class InMemorySnapshotHistoryTest {
 
     private static SimulationSnapshot at(double simTime) {
         return new SimulationSnapshot(simTime, "", "NO_CONTROL", List.of(), List.of(), List.of(),
-                new SimulationSnapshot.Metrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), List.of(), List.of());
+                new SimulationSnapshot.Metrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Map.of()), List.of(), List.of());
     }
 
     @Test
