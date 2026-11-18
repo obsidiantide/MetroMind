@@ -47,6 +47,10 @@ Mark items `[x]` when merged.
       per-pattern CV in metrics, what-if and benchmark results (today trunk bunching only shows up in waiting)
 - [x] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
       other way for the crossing time (today branch and main tracks never conflict)
+- [ ] Time-of-day fleet plan: fewer trains in service off-peak, with scheduled runs to and from the depot (today the
+      fleet is constant all day and only adaptive dispatching changes it)
+- [ ] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
+      benchmarks reflect everyday irregularity while staying reproducible
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -71,6 +75,8 @@ Mark items `[x]` when merged.
       (today spare trains always join the main route)
 - [x] Short-turning and skip-stop on a shared trunk judge the follower by the platform headway, so a train of the
       other pattern close behind can take over the stations a late train gives up
+- [ ] Door-fault incident: a train held at its platform for an extra dwell, in the incident API, what-if and
+      benchmark scenarios
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
@@ -86,6 +92,8 @@ Mark items `[x]` when merged.
 - [x] Persist finished benchmark jobs in PostgreSQL so results survive restarts
 - [x] Service patterns in `GET /api/network` (stations, run times and trains of each) and the pattern of each train
       in the snapshot
+- [ ] Versioned snapshot payloads in Redis and Kafka telemetry, so replay and the KPI consumer read entries written
+      before a snapshot field was added or renamed
 
 ### Frontend
 - [x] Charts: delay and waiting over time
@@ -99,3 +107,5 @@ Mark items `[x]` when merged.
 - [x] Line legend with ring direction arrows on the map
 - [x] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
 - [x] Highlight the stations of a train's service pattern on the map when its detail drawer is open
+- [ ] Browser smoke test of the what-if flow: run a delay analysis from the control panel and see the heat layer
+- [ ] Pan and zoom the map (wheel, drag, keyboard) for networks larger than Baku
