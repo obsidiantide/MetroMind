@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MetroMap, pointsAlong, projection } from "@/components/MetroMap";
 import type { MetroNetwork } from "@/lib/types";
-import { network, snapshot, stationView } from "@/test/fixtures";
+import { network, snapshot, stationView, trainView } from "@/test/fixtures";
 
 describe("projection", () => {
   it("keeps distances to scale at the network's latitude and centres it", () => {
@@ -127,6 +127,25 @@ describe("MetroMap", () => {
 
     expect(points).toHaveLength(3);
     expect(y(40.05)).toBeGreaterThanOrEqual(50);
+  });
+
+  it("labels trains bound for a branch terminal and says where every train is heading", () => {
+    const branched: MetroNetwork = { ...network, lines: [{ ...network.lines[0], branches: [
+      { junctionStationId: "C", stationIds: ["N"], runSeconds: [150], share: 0.5 },
+    ] }] };
+    const snap = snapshot({ trains: [
+      trainView("RED-1", { patternId: "RED/N", towardsStationId: "N" }),
+      trainView("RED-2", { patternId: "RED/N", towardsStationId: "A", fromStationId: "C", toStationId: "A" }),
+      trainView("RED-3", { towardsStationId: "B" }),
+    ] });
+    const { container } = render(<MetroMap network={branched} snapshot={snap} />);
+    const labels = [...container.querySelectorAll("[data-bound-for]")];
+    const titles = [...container.querySelectorAll("rect > title")].map((t) => t.textContent);
+
+    expect(labels.map((l) => l.textContent)).toEqual(["to North"]);
+    expect(titles[0]).toMatch(/^RED-1 to North \(branch\) · /);
+    expect(titles[1]).toMatch(/^RED-2 to Alpha · /);
+    expect(titles[2]).toMatch(/^RED-3 to Bravo · /);
   });
 
   it("selects a station by click or keyboard and marks the selected one", () => {

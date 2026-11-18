@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineSections, lineStationIds, ringTurn } from "@/lib/lines";
+import { boundFor, isBranchTerminal, lineSections, lineStationIds, ringTurn } from "@/lib/lines";
 import type { Line, Station } from "@/lib/types";
 
 const red: Line = {
@@ -55,5 +55,18 @@ describe("ringTurn", () => {
 
   it("is null for a line that is not a ring", () => {
     expect(ringTurn({ ...ring, ring: false }, station)).toBeNull();
+  });
+});
+
+describe("boundFor", () => {
+  it("names a branch terminal as such", () => {
+    expect(isBranchTerminal(branched, "Y")).toBe(true);
+    expect(isBranchTerminal(branched, "X")).toBe(false);
+    expect(boundFor(branched, "Yonder", "Y")).toBe("to Yonder (branch)");
+    expect(boundFor(branched, "Cee", "C")).toBe("to Cee");
+  });
+
+  it("signs a ring train by its next station", () => {
+    expect(boundFor({ ...red, ring: true }, "Bee", "B")).toBe("next Bee");
   });
 });
