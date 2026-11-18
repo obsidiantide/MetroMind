@@ -153,7 +153,18 @@ both patterns exclude each other on the shared trunk and at the junction platfor
 On a trunk platform everyone for a trunk station boards the first train, while passengers for the branch (or
 for the far end of the main route) wait for a train going there; travelling from a branch to the far end of the
 main route means changing trains at the junction. Track closures may be on the trunk, which stops both
-patterns, or on a branch. Under `ADAPTIVE_DISPATCH` a spare train from the depot runs the pattern whose
+patterns, or on a branch.
+
+**Trunk regularity.** The overall headway CV judges each pattern on its own, so two trains of different patterns
+running as a pair on the trunk look perfectly regular. The engine therefore also logs the last 8 departures, of
+any pattern, from the trunk's last station (the junction) in each direction and reports the coefficient of
+variation of their gaps, averaged over both directions, per branched line: `metrics.trunkHeadwayCv` in the
+snapshot (`{"M1": 0.11}`; unbranched lines have no entry, and a line reads 0 until its trains have left the
+junction three times), `trunkHeadwayCvAtHorizon` in each what-if outcome, `meanTrunkHeadwayCv` (mean over the
+scenarios) in each benchmark ranking, and the `metromind.headway.trunk.cv` gauge. The dashboard shows it next to
+the headway CV, and the what-if and benchmark tables add a "Trunk CV" column when the network has a branch.
+
+Under `ADAPTIVE_DISPATCH` a spare train from the depot runs the pattern whose
 passengers (those its trains would board) have the worst forecast, the main route on a tie. The dashboard draws each branch in
 its line's colour from the junction (along its `path` when given) and offers branch sections for closures;
 PostGIS keeps each branch's track in `line_branch`.
@@ -444,7 +455,9 @@ boarding in each run. Strategies are ranked by the mean of that over the scenari
 
 `meanRecoverySeconds` averages the headway recovery time (as in the what-if analysis) over the scenarios the
 strategy recovered from within the horizon, and `unrecoveredScenarios` counts the rest; recovery is reported
-alongside the ranking and does not change it.
+alongside the ranking and does not change it. On a network with branches `meanTrunkHeadwayCv` gives each branched
+line's trunk regularity at the horizon, averaged over the scenarios (see *Trunk regularity*); the CSV export adds a
+`trunk_cv_<line>` column for each.
 
 Wait per boarding only sees time on platforms, so a strategy that holds trains longer or carries passengers past
 skipped stops can look better than it is. `?metric=TRAVEL_TIME` ranks by `meanTravelMinutes` instead (total
@@ -598,6 +611,7 @@ The backend publishes Micrometer meters at `/actuator/metrics` and in Prometheus
 | `metromind.trains.delay.average`, `.max` | gauges | Lateness of trains in service, in seconds |
 | `metromind.trains.in.service` | gauge | Trains running on the lines |
 | `metromind.headway.cv` | gauge | Headway coefficient of variation (0 is perfectly regular) |
+| `metromind.headway.trunk.cv` | gauge, tag `line` | Headway CV of a branched line's patterns together on their shared trunk |
 
 Gauges read the latest published snapshot, so a scrape never waits for the engine lock. A tick that takes longer
 than `metromind.sim.tick-millis` means the simulation is falling behind its configured speed.
