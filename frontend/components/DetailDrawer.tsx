@@ -60,6 +60,9 @@ function StationDetail({ stationId, network, snapshot }: {
   const line = (id: string) => network.lines.find((l) => l.id === id);
   const lines = network.lines.filter((l) => lineStationIds(l).includes(stationId));
   const st = snapshot?.stations.find((s) => s.id === stationId);
+  const flatJunctions = network.lines.flatMap((l) => (l.branches ?? [])
+    .filter((b) => b.junctionStationId === stationId && (b.crossingSeconds ?? 0) > 0)
+    .map((b) => ({ line: l, branch: b })));
 
   return (
     <>
@@ -69,6 +72,12 @@ function StationDetail({ stationId, network, snapshot }: {
         {lines.map((l) => <span key={l.id} className="chip" style={{ borderColor: l.color }}>{l.name}</span>)}
         {st?.closed && <span className="chip" style={{ borderColor: "var(--bad)" }}>closed</span>}
       </div>
+      {flatJunctions.map(({ line: l, branch: b }) => (
+        <p key={`${l.id}-${b.stationIds[0]}`} className="muted">
+          Flat junction: {l.name} trains to {name(b.stationIds[b.stationIds.length - 1])} cross the opposite track
+          for {b.crossingSeconds} s, holding trains running the other way.
+        </p>
+      ))}
       {st && (
         <dl className="facts">
           <dt>Waiting now</dt><dd>{Math.round(st.waiting)}{station.platformCapacity ? ` / ${station.platformCapacity}` : ""}</dd>

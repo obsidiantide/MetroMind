@@ -27,6 +27,11 @@ export interface Branch {
   share: number;
   /** Track alignment as [lon, lat] pairs from the junction to the branch terminal; empty when only stations are known. */
   path?: [number, number][];
+  /**
+   * Flat junction: seconds a train leaving for the branch occupies the crossing with the opposite main track, which
+   * main-route trains running back into the junction must wait for. 0 or absent for a grade-separated junction.
+   */
+  crossingSeconds?: number;
 }
 export interface MetroNetwork {
   city: string; stations: Station[]; lines: Line[]; odWeights?: Record<string, Record<string, number>>;
