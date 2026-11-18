@@ -30,6 +30,24 @@ class BakuNetworkTest {
     }
 
     @Test
+    void someRedLineTrainsBranchOffToBakmilAtNarimanov() throws Exception {
+        Line red = baku().line("M1");
+        assertThat(red.branches()).singleElement().satisfies(b -> {
+            assertThat(b.junctionStationId()).isEqualTo("narimanov");
+            assertThat(b.stationIds()).containsExactly("bakmil");
+            assertThat(b.hasPath()).isTrue();
+        });
+        assertThat(red.patterns()).extracting(p -> p.id() + ":" + p.trainCount())
+                .containsExactly("M1:8", "M1/bakmil:2");
+        assertThat(red.patterns().get(1).stationIds()).startsWith("icherisheher").endsWith("narimanov", "bakmil");
+
+        SimulationEngine engine = new SimulationEngine(baku(), MORNING, HeadwayStrategy.BALANCED);
+        engine.run(3600, 1);
+        assertThat(engine.stationDelivered("bakmil")).isPositive();
+        assertThat(engine.route("bakmil", "aslanov")).containsExactly("M1", "M1");
+    }
+
+    @Test
     void derivedRunTimesAreThoseOfARealMetro() throws Exception {
         for (Line line : baku().lines()) {
             // Baku's inter-station spacing is roughly 1–3.5 km: two to six and a half minutes at metro pace.
