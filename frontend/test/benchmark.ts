@@ -3,7 +3,8 @@ import type { BenchmarkJob, BenchmarkReport, StrategyRanking } from "@/lib/types
 export function ranking(rank: number, strategy: string, over: Partial<StrategyRanking> = {}): StrategyRanking {
   return {
     rank, strategy, meanWaitSeconds: 100 + rank, p95WaitSeconds: 150 + rank, meanTravelMinutes: 9000 + rank,
-    p95TravelMinutes: 9500 + rank, meanRecoverySeconds: 600, unrecoveredScenarios: 0, meanShortTurns: 0,
+    p95TravelMinutes: 9500 + rank, meanRecoverySeconds: 600, unrecoveredScenarios: 0, meanTrunkHeadwayCv: {},
+    meanShortTurns: 0,
     shortTurnsByStation: {}, meanStopsSkipped: 0, meanPassengersCarriedPast: 0, stopsSkippedByStation: {},
     waitSecondsPerScenario: [100, 102], ...over,
   };

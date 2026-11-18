@@ -38,7 +38,7 @@ export function snapshot(over: Partial<Snapshot> = {}): Snapshot {
     metrics: {
       averageDelaySeconds: 0, maxDelaySeconds: 0, totalWaiting: 0, passengersServed: 0, passengersDelivered: 0,
       transfers: 0, passengersLeftBehind: 0, passengersHeldAtEntrance: 0, headwayCoefficientOfVariation: 0,
-      trainsInService: 0, trainsInDepot: 0, stopsSkipped: 0, passengersCarriedPast: 0,
+      trainsInService: 0, trainsInDepot: 0, stopsSkipped: 0, passengersCarriedPast: 0, trunkHeadwayCv: {},
     },
     ...over,
   };
