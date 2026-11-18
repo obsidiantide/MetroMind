@@ -49,6 +49,8 @@ public final class SimulationEngine {
     static final int MAX_SHORT_TURN_LOG = 1000;
     /** Skipped stops kept in {@link #skippedStops()}; older ones are only counted. */
     static final int MAX_SKIPPED_STOP_LOG = 1000;
+    /** Departures from the end of a shared trunk kept per direction to measure {@link #trunkHeadwayCv()}. */
+    static final int TRUNK_SAMPLE_DEPARTURES = 8;
     /** How often strategies that dispatch from the depot review each line's fleet, in simulated seconds. */
     static final double DISPATCH_INTERVAL_SECONDS = 60;
     /** Horizon of the overload forecast that triggers dispatching. */
@@ -119,6 +121,10 @@ public final class SimulationEngine {
     private final Deque<ShortTurn> shortTurnLog = new ArrayDeque<>();
     /** Most recent skipped stops, oldest first, at most {@link #MAX_SKIPPED_STOP_LOG}. */
     private final Deque<SkippedStop> skippedStopLog = new ArrayDeque<>();
+    /** Last station of each branched line's shared trunk: the first junction along its main route. */
+    private final Map<String, String> trunkEnds = new LinkedHashMap<>();
+    /** Recent departure times from each trunk end, keyed by line and direction (see {@link #trunkKey}). */
+    private final Map<String, Deque<Double>> trunkDepartures = new LinkedHashMap<>();
 
     public SimulationEngine(MetroNetwork network, double startTime, HeadwayStrategy strategy) {
         this.network = network;
@@ -127,6 +133,9 @@ public final class SimulationEngine {
         for (Line line : network.lines()) {
             lines.put(line.id(), line);
             patternsByLine.put(line.id(), line.patterns());
+            line.stationIds().stream()
+                    .filter(id -> line.branches().stream().anyMatch(b -> b.junctionStationId().equals(id)))
+                    .findFirst().ifPresent(junction -> trunkEnds.put(line.id(), junction));
             for (ServicePattern p : line.patterns()) {
                 patterns.put(p.id(), p);
                 double[] cum = new double[p.loopLength() + 1];
@@ -213,6 +222,8 @@ public final class SimulationEngine {
         this.stopsSkipped = other.stopsSkipped;
         this.shortTurnLog.addAll(other.shortTurnLog);
         this.skippedStopLog.addAll(other.skippedStopLog);
+        this.trunkEnds.putAll(other.trunkEnds);
+        other.trunkDepartures.forEach((k, v) -> this.trunkDepartures.put(k, new ArrayDeque<>(v)));
     }
 
     /** Deep copy, used for counterfactual ("what-if") runs. */
@@ -521,6 +532,7 @@ public final class SimulationEngine {
         t.phase = TrainPhase.RUNNING;
         t.segmentElapsed = 0;
         t.segmentDuration = p.runSecondsFromStop(t.stop);
+        recordTrunkDeparture(t, p);
     }
 
     private void arrive(TrainState t) {
@@ -1617,6 +1629,63 @@ public final class SimulationEngine {
             cvs.add(mean == 0 ? 0 : Math.sqrt(var) / mean);
         }
         return cvs.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+    }
+
+    /**
+     * Regularity of the combined service on each branched line's shared trunk: the coefficient of variation of the
+     * gaps between the last {@link #TRUNK_SAMPLE_DEPARTURES} departures, by trains of any pattern, from the trunk's
+     * last station (the first junction), averaged over both directions. {@link #headwayCv()} looks at each pattern
+     * on its own, so trains of two patterns running as a pair on the trunk do not show there; they do here. A
+     * direction with fewer than three departures so far does not count; unbranched lines have no entry.
+     */
+    public Map<String, Double> trunkHeadwayCv() {
+        Map<String, Double> result = new LinkedHashMap<>();
+        for (Line line : network.lines()) {
+            if (line.branches().isEmpty()) {
+                continue;
+            }
+            double sum = 0;
+            int directions = 0;
+            for (int direction : new int[] {1, -1}) {
+                Deque<Double> departures = trunkDepartures.get(trunkKey(line.id(), direction));
+                if (departures == null || departures.size() < 3) {
+                    continue;
+                }
+                double[] gaps = new double[departures.size() - 1];
+                Double previous = null;
+                int i = 0;
+                for (double at : departures) {
+                    if (previous != null) {
+                        gaps[i++] = at - previous;
+                    }
+                    previous = at;
+                }
+                double mean = java.util.Arrays.stream(gaps).average().orElse(0);
+                double var = java.util.Arrays.stream(gaps).map(g -> (g - mean) * (g - mean)).average().orElse(0);
+                sum += mean == 0 ? 0 : Math.sqrt(var) / mean;
+                directions++;
+            }
+            result.put(line.id(), directions == 0 ? 0 : sum / directions);
+        }
+        return result;
+    }
+
+    private static String trunkKey(String lineId, int direction) {
+        return lineId + (direction > 0 ? "+" : "-");
+    }
+
+    /** Logs a departure from the last station of a branched line's trunk for {@link #trunkHeadwayCv()}. */
+    private void recordTrunkDeparture(TrainState t, ServicePattern p) {
+        String trunkEnd = trunkEnds.get(t.lineId);
+        if (trunkEnd == null || !p.stationAtStop(t.stop).equals(trunkEnd)) {
+            return;
+        }
+        Deque<Double> departures = trunkDepartures.computeIfAbsent(
+                trunkKey(t.lineId, p.directionAtStop(t.stop)), k -> new ArrayDeque<>());
+        departures.addLast(simTime);
+        while (departures.size() > TRUNK_SAMPLE_DEPARTURES) {
+            departures.removeFirst();
+        }
     }
 
     static String clock(double simTime) {
