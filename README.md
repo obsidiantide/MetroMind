@@ -189,8 +189,8 @@ are started once and shared by every integration test.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/network` | Stations and lines |
-| GET | `/api/state` | Latest simulation snapshot |
+| GET | `/api/network` | Stations and lines, each line with its service `patterns` (stations, run times, trains) |
+| GET | `/api/state` | Latest simulation snapshot; each train names the `patternId` it follows |
 | GET | `/api/stations/{id}/departures?horizonSeconds=1800` | Departure board: planned vs expected departures |
 | GET | `/api/stations/nearest?lat=40.375&lon=49.82&limit=3` | Stations closest to a point, nearest first |
 | GET | `/api/stations/within?lat=40.375&lon=49.82&radiusMeters=1500` | Stations within a radius, nearest first |
