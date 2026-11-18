@@ -191,11 +191,19 @@ and fleet sizes are illustrative.
 cd backend && mvn verify            # unit + API tests, then integration tests (needs Docker)
 cd backend && mvn verify -DskipITs  # without Docker
 cd frontend && npm test             # component tests (Vitest + Testing Library, jsdom)
+cd frontend && npm run test:e2e     # browser smoke test (Playwright; package the backend and build first)
 ```
 
 Frontend component tests sit next to the components (`*.test.tsx`) and run against a mocked `api`, with shared
 network and snapshot fixtures in `frontend/test/`. They cover the KPI charts, the station and train drawer, the
 map's projection and selection, and the benchmark page's submit, poll, cancel, ranking and CSV export flow.
+
+The browser smoke test (`frontend/e2e/`) runs the production build of the dashboard in Chromium against the
+backend jar on the `standalone` profile, both started by Playwright: it checks that the map draws every line and
+branch, that trains arrive over the live WebSocket feed, and that clicking a station opens its drawer with a
+departure board. Run `mvn -B -DskipTests package` in `backend/` and `npm run build` in `frontend/` first; servers
+already listening on ports 8080 and 3000 are reused outside CI. CI runs it as its own job and keeps the Playwright
+traces of a failed run.
 
 Unit and API tests run on the `standalone` profile with no infrastructure. The `*IT` classes in
 `backend/src/test/java/com/metromind/it` start the application against the same images as `docker-compose.yml`
