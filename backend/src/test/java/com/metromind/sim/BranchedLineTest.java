@@ -47,6 +47,28 @@ class BranchedLineTest {
     }
 
     @Test
+    void eachTrainIsSignedTowardsTheTerminalOfItsPatternInItsDirection() {
+        SimulationEngine engine = engine(HeadwayStrategy.BALANCED);
+        Set<String> branchTowards = new HashSet<>();
+        Set<String> mainTowards = new HashSet<>();
+        for (int i = 0; i < 3600; i++) {
+            engine.step(1);
+            for (var t : engine.snapshot().trains()) {
+                boolean branch = t.patternId().equals("L/Y");
+                (branch ? branchTowards : mainTowards).add(t.towardsStationId());
+                // Heading for the branch terminal Y exactly while running out along the pattern's stations.
+                TrainState state = engine.train(t.id());
+                var pattern = engine.network().line("L").patterns().stream()
+                        .filter(p -> p.id().equals(t.patternId())).findFirst().orElseThrow();
+                String expected = pattern.directionAtStop(state.stop()) > 0 ? (branch ? "Y" : "D") : "A";
+                assertThat(t.towardsStationId()).as("%s at stop %d", t.id(), state.stop()).isEqualTo(expected);
+            }
+        }
+        assertThat(branchTowards).containsExactlyInAnyOrder("Y", "A");
+        assertThat(mainTowards).containsExactlyInAnyOrder("D", "A");
+    }
+
+    @Test
     void trainsOfBothPatternsNeverShareAPlatformOrATrackSection() {
         SimulationEngine engine = engine(HeadwayStrategy.NO_CONTROL);
         engine.injectDelay("L-1", 240); // bunch the service up so trains queue for the trunk

@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
@@ -52,6 +54,16 @@ class NetworkApiTest {
                 .andExpect(jsonPath("$.trains[?(@.patternId == 'M1/bakmil')]", hasSize(2)))
                 .andExpect(jsonPath("$.trains[?(@.lineId == 'M2')].patternId", org.hamcrest.Matchers.everyItem(
                         org.hamcrest.Matchers.is("M2"))));
+    }
+
+    @Test
+    void signsEachTrainTowardsATerminalOfItsPattern() throws Exception {
+        mvc.perform(get("/api/state"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trains[?(@.patternId == 'M1/bakmil')].towardsStationId",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.in(List.of("bakmil", "icherisheher")))))
+                .andExpect(jsonPath("$.trains[?(@.patternId == 'M1')].towardsStationId",
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not("bakmil"))));
     }
 
     @Test
