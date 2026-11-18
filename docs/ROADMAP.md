@@ -39,6 +39,10 @@ Mark items `[x]` when merged.
 - [x] Cross-platform interchange: changing between the two directions of a ring (or lines sharing an island
       platform) costs no walk, unlike the default 120 s transfer
 - [x] Configurable timing points per line (today: terminals, or a ring's first station) for holding to timetable
+- [ ] Headway control on a shared trunk: regulate the combined headway of a branched line's patterns where they
+      run together (today each pattern is regulated on its own, so trains of two patterns can bunch on the trunk)
+- [ ] Overload forecast on branched lines: count only the free space of trains whose pattern serves each waiting
+      passenger's destination (today every train of the line calling at the platform relieves the queue)
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -59,6 +63,8 @@ Mark items `[x]` when merged.
 - [x] What-if analysis for track-section and station closures, not only train delays
 - [x] Benchmark ranking metric selectable: platform wait per boarding or total passenger travel time
 - [x] Strategy combining short-turning and skip-stop, with short turns taking precedence for very late trains
+- [ ] Adaptive dispatching on branched lines: send a spare train to the pattern with the worst overload forecast
+      (today spare trains always join the main route)
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
@@ -72,6 +78,8 @@ Mark items `[x]` when merged.
       when every topic has passed it (today a backlog on positions lets metrics close minutes early and drops samples)
 - [x] Cancel a queued or running benchmark job (`DELETE /api/analysis/benchmark/jobs/{id}`)
 - [x] Persist finished benchmark jobs in PostgreSQL so results survive restarts
+- [ ] Service patterns in `GET /api/network` (stations, run times and trains of each) and the pattern of each train
+      in the snapshot
 
 ### Frontend
 - [x] Charts: delay and waiting over time
@@ -83,3 +91,4 @@ Mark items `[x]` when merged.
 - [ ] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
 - [x] Export a benchmark report as CSV
 - [ ] Line legend with ring direction arrows on the map
+- [ ] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
