@@ -198,6 +198,29 @@ class DelayPropagationAnalyzerTest {
     }
 
     @Test
+    void reportsTheRegularityOfTheCombinedServiceOnABranchedLinesTrunk() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.branched(), 7 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(1800, 1);
+        SimulationEngine undisturbed = live.copy();
+        undisturbed.run(900, 1);
+
+        DelayImpactReport report = new DelayPropagationAnalyzer().analyze(live, live.trains().get(0).id(), 600, 900,
+                List.of(HeadwayStrategy.NO_CONTROL));
+
+        Double trunkCv = report.outcomes().get(0).trunkHeadwayCvAtHorizon().get("L");
+        assertThat(trunkCv).isGreaterThan(undisturbed.trunkHeadwayCv().get("L") + 0.2);
+    }
+
+    @Test
+    void anUnbranchedNetworkHasNoTrunkToReport() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(300, 1);
+        DelayImpactReport report = new DelayPropagationAnalyzer()
+                .analyze(live, "L1-1", 240, 900, List.of(HeadwayStrategy.NO_CONTROL));
+        assertThat(report.outcomes().get(0).trunkHeadwayCvAtHorizon()).isEmpty();
+    }
+
+    @Test
     void analysisDoesNotMutateLiveEngine() {
         SimulationEngine live = new SimulationEngine(TestNetworks.singleLine(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
         live.run(300, 1);
