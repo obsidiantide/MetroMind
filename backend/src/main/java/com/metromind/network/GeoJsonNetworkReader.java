@@ -23,6 +23,11 @@ import java.util.Map;
  *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains} and {@code timingStationIds},
  *       and optionally either {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
+ *   <li>A {@code LineString} feature with a {@code branchOf} property is a branch of that line, its geometry drawn
+ *       from the junction to the branch terminal. Properties: {@code id}, {@code branchOf},
+ *       {@code junctionStationId}, {@code stationIds} (the branch stations after the junction, in track order),
+ *       {@code share} (fraction of the line's trains that run to the branch), and optionally either
+ *       {@code runSeconds} (junction to first branch station, then between them) or {@code averageSpeedKmh}.</li>
  *   <li>The collection's own {@code properties} may hold {@code city}, {@code odWeights} and
  *       {@code crossPlatform} (as in the native format).</li>
  * </ul>
@@ -60,11 +65,13 @@ public class GeoJsonNetworkReader {
 
         List<Station> stations = new ArrayList<>();
         List<JsonNode> lineFeatures = new ArrayList<>();
+        List<JsonNode> branchFeatures = new ArrayList<>();
         for (JsonNode feature : root.path("features")) {
             String geometry = feature.path("geometry").path("type").asText();
             switch (geometry) {
                 case "Point" -> stations.add(station(feature));
-                case "LineString" -> lineFeatures.add(feature);
+                case "LineString" -> (feature.path("properties").has("branchOf") ? branchFeatures : lineFeatures)
+                        .add(feature);
                 default -> throw new IllegalArgumentException(
                         "Unsupported geometry '" + geometry + "' in feature " + featureId(feature)
                                 + ": use Point for stations and LineString for lines");
@@ -76,7 +83,16 @@ public class GeoJsonNetworkReader {
                 throw new IllegalArgumentException("Duplicate station " + s.id());
             }
         }
-        List<Line> lines = lineFeatures.stream().map(f -> line(f, byId)).toList();
+        Map<String, List<Branch>> branches = new LinkedHashMap<>();
+        for (JsonNode f : branchFeatures) {
+            String of = f.path("properties").path("branchOf").asText();
+            if (lineFeatures.stream().noneMatch(l -> featureId(l).equals(of))) {
+                throw new IllegalArgumentException("Branch " + featureId(f) + " is a branch of unknown line " + of);
+            }
+            branches.computeIfAbsent(of, k -> new ArrayList<>()).add(branch(f, byId));
+        }
+        List<Line> lines = lineFeatures.stream()
+                .map(f -> line(f, byId, branches.getOrDefault(featureId(f), List.of()))).toList();
 
         Map<String, Map<String, Double>> od = meta.has("odWeights")
                 ? mapper.convertValue(meta.get("odWeights"), new TypeReference<>() { })
@@ -100,7 +116,46 @@ public class GeoJsonNetworkReader {
                 p.get("baseArrivalsPerMinute").asDouble(), capacity);
     }
 
-    private Line line(JsonNode feature, Map<String, Station> stations) {
+    private Branch branch(JsonNode feature, Map<String, Station> stations) {
+        JsonNode p = feature.path("properties");
+        String id = featureId(feature);
+        List<double[]> track = new ArrayList<>();
+        for (JsonNode c : feature.path("geometry").path("coordinates")) {
+            track.add(point(c, id));
+        }
+        String junction = p.path("junctionStationId").asText(null);
+        if (junction == null || !stations.containsKey(junction)) {
+            throw new IllegalArgumentException("Branch " + id + ": junctionStationId must name a station");
+        }
+        List<String> stationIds = new ArrayList<>();
+        p.path("stationIds").forEach(n -> stationIds.add(n.asText()));
+        for (String sid : stationIds) {
+            if (!stations.containsKey(sid)) {
+                throw new IllegalArgumentException("Branch " + id + " references unknown station " + sid);
+            }
+        }
+        if (!p.path("share").isNumber()) {
+            throw new IllegalArgumentException("Branch " + id + ": share is required");
+        }
+        List<Integer> runSeconds;
+        if (p.has("runSeconds")) {
+            runSeconds = new ArrayList<>();
+            p.get("runSeconds").forEach(n -> runSeconds.add(n.asInt()));
+        } else {
+            double speedKmh = p.path("averageSpeedKmh").asDouble(DEFAULT_AVERAGE_SPEED_KMH);
+            if (!(speedKmh > 0)) {
+                throw new IllegalArgumentException("Branch " + id + ": averageSpeedKmh must be positive");
+            }
+            List<String> alongTrack = new ArrayList<>();
+            alongTrack.add(junction);
+            alongTrack.addAll(stationIds);
+            runSeconds = deriveRunSeconds(id, new TrackGeometry(track), alongTrack, stations, speedKmh / 3.6, false);
+        }
+        List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
+        return new Branch(junction, stationIds, runSeconds, p.get("share").asDouble(), path);
+    }
+
+    private Line line(JsonNode feature, Map<String, Station> stations, List<Branch> branches) {
         JsonNode p = feature.path("properties");
         String id = featureId(feature);
         List<double[]> track = new ArrayList<>();
@@ -146,7 +201,7 @@ public class GeoJsonNetworkReader {
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
                 p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring,
-                timingStationIds);
+                timingStationIds, branches);
     }
 
     /**
