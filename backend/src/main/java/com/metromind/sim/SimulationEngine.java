@@ -122,9 +122,6 @@ public final class SimulationEngine {
         this.simTime = startTime;
         this.strategy = strategy;
         for (Line line : network.lines()) {
-            if (!line.branches().isEmpty()) {
-                throw new IllegalArgumentException("Line " + line.id() + ": branched lines are not simulated yet");
-            }
             lines.put(line.id(), line);
             patternsByLine.put(line.id(), line.patterns());
             for (ServicePattern p : line.patterns()) {
@@ -228,35 +225,50 @@ public final class SimulationEngine {
      */
     private void placeTrains() {
         for (Line line : network.lines()) {
+            List<ServicePattern> own = patternsByLine.get(line.id());
+            java.util.Set<String> taken = new java.util.HashSet<>();
+            Map<String, String> fedFrom = new java.util.HashMap<>();
             int number = 0;
-            for (ServicePattern p : patternsByLine.get(line.id())) {
-                number = placeTrains(line, p, number);
+            for (int q = 0; q < own.size(); q++) {
+                number = placeTrains(line, own.get(q), (double) q / own.size(), taken, fedFrom, number);
             }
         }
     }
 
-    /** Places the trains of one service pattern; returns the last train number used on the line. */
-    private int placeTrains(Line line, ServicePattern p, int number) {
+    /**
+     * Places the trains of one service pattern; returns the last train number used on the line. A branched line's
+     * patterns are staggered by {@code phase} of their own headway, so their trains alternate on the trunk.
+     *
+     * @param taken   blocks (station and direction of departure) already holding a train of the line
+     * @param fedFrom for each platform holding a train or with one running into it, the station that train
+     *                comes from; where a branch joins the trunk no second train may approach from the other side
+     */
+    private int placeTrains(Line line, ServicePattern p, double phase, java.util.Set<String> taken,
+                            Map<String, String> fedFrom, int number) {
         double[] cum = cumulativeStopSeconds.get(p.id());
         double loop = cum[p.loopLength()];
-        int used = -1;
         for (int i = 0; i < p.trainCount(); i++) {
-            double target = i * loop / p.trainCount();
+            double target = (i + phase) * loop / p.trainCount();
             int stop = 0;
             while (stop + 1 < p.loopLength() && cum[stop + 1] <= target) {
                 stop++;
             }
             double offset = target - cum[stop];
             // Fixed-block signalling allows one train per platform-plus-segment block: if the even position
-            // falls in an occupied block (headway shorter than a long block), start at the next platform.
-            if (stop <= used) {
-                stop = used + 1;
+            // falls in an occupied block (headway shorter than a long block, or a train of another pattern on the
+            // shared trunk), start at the next free platform, going on round the loop if need be.
+            int tries = 0;
+            while (taken.contains(blockKey(p, stop))
+                    || !approachFree(p, offset >= NOMINAL_DWELL ? stop + 1 : stop, fedFrom)) {
+                if (++tries >= p.loopLength()) {
+                    throw new IllegalStateException("Too many trains for line " + line.id());
+                }
+                stop = (stop + 1) % p.loopLength();
                 offset = 0;
             }
-            if (stop >= p.loopLength()) {
-                throw new IllegalStateException("Too many trains for line " + line.id());
-            }
-            used = stop;
+            taken.add(blockKey(p, stop));
+            int platform = offset >= NOMINAL_DWELL ? stop + 1 : stop;
+            fedFrom.put(blockKey(p, platform), approachFrom(p, platform));
             TrainState t = new TrainState(line.id() + "-" + (++number), line.id(), p.id(),
                     line.trainCapacity(), network.stations().size());
             t.stop = stop;
@@ -272,6 +284,23 @@ public final class SimulationEngine {
             trains.add(t);
         }
         return number;
+    }
+
+    /** Whether no train of another approach holds or is heading for the platform of stop {@code k} of {@code p}. */
+    private static boolean approachFree(ServicePattern p, int k, Map<String, String> fedFrom) {
+        String from = fedFrom.get(blockKey(p, k));
+        return from == null || from.equals(approachFrom(p, k));
+    }
+
+    /** Station a train of {@code p} comes from when it arrives at loop stop {@code k}. */
+    private static String approachFrom(ServicePattern p, int k) {
+        return p.stationAtStop(Math.floorMod(k - 1, p.loopLength()));
+    }
+
+    /** The block a train at loop stop {@code k} of {@code p} holds: its platform and the track leaving it. */
+    private static String blockKey(ServicePattern p, int k) {
+        k %= p.loopLength();
+        return p.stationAtStop(k) + "|" + p.directionAtStop(k);
     }
 
     private ServicePattern pattern(TrainState t) {
@@ -686,14 +715,17 @@ public final class SimulationEngine {
      */
 
     /**
-     * Whether a train of line {@code lineId} other than {@code self} stands at the platform of {@code stationId}
-     * from which trains leave in {@code direction} (at a terminal: the platform trains reverse at).
+     * Whether a train of line {@code lineId} other than {@code self} stands at, or is running into, the platform
+     * of {@code stationId} from which trains leave in {@code direction} (at a terminal: the platform trains
+     * reverse at). Where a branch joins the trunk two sections lead into the same platform, so a train already on
+     * its way in from the other one holds it too.
      */
     private boolean platformTaken(TrainState self, String lineId, String stationId, int direction) {
         for (TrainState o : trains) {
-            if (o != self && o.phase != TrainPhase.RUNNING && o.lineId.equals(lineId)) {
+            if (o != self && o.lineId.equals(lineId)) {
                 ServicePattern op = pattern(o);
-                if (op.stationAtStop(o.stop).equals(stationId) && op.directionAtStop(o.stop) == direction) {
+                int k = o.phase == TrainPhase.RUNNING ? (o.stop + 1) % op.loopLength() : o.stop;
+                if (op.stationAtStop(k).equals(stationId) && op.directionAtStop(k) == direction) {
                     return true;
                 }
             }
@@ -1230,6 +1262,20 @@ public final class SimulationEngine {
         return remaining;
     }
 
+    /**
+     * Terminal the trains boarding queue {@code key} at {@code stationId} are signed towards: that of the first
+     * service pattern of the line leaving the station in the queue's direction.
+     */
+    private String towards(StationState.QueueKey key, String stationId) {
+        for (ServicePattern p : patternsByLine.get(key.lineId())) {
+            int pos = p.stationIds().indexOf(stationId);
+            if (pos >= 0 && p.nextPosition(pos, key.direction()) >= 0) {
+                return p.towardsStationId(pos, key.direction());
+            }
+        }
+        throw new IllegalStateException("No train of line " + key.lineId() + " leaves " + stationId);
+    }
+
     private void updateOverloadAlerts() {
         for (String sid : stations.keySet()) {
             String risk = riskLevel(predictWaiting(sid, 900));
@@ -1259,7 +1305,7 @@ public final class SimulationEngine {
             Station to = network.station(p.stationAtStop((t.stop + 1) % p.loopLength()));
             double progress = t.phase == TrainPhase.RUNNING ? Math.min(1, t.segmentElapsed / t.segmentDuration) : 0;
             LineTrack track = tracks.get(t.lineId);
-            double[] latLon = track != null
+            double[] latLon = track != null && track.covers(from.id(), to.id())
                     ? track.position(from.id(), to.id(), progress)
                     : new double[]{from.lat() + (to.lat() - from.lat()) * progress,
                                    from.lon() + (to.lon() - from.lon()) * progress};
@@ -1272,8 +1318,7 @@ public final class SimulationEngine {
             double predicted = predictWaiting(st.id, 900);
             List<SimulationSnapshot.QueueView> queues = new ArrayList<>();
             st.waiting.forEach((key, waiting) -> {
-                Line line = lines.get(key.lineId());
-                String towards = line.towardsStationId(line.stationIds().indexOf(st.id), key.direction());
+                String towards = towards(key, st.id);
                 queues.add(new SimulationSnapshot.QueueView(key.lineId(), towards, StationState.sum(waiting)));
             });
             stationViews.add(new SimulationSnapshot.StationView(st.id, st.totalWaiting(), predicted,

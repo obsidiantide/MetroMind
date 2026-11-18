@@ -49,6 +49,14 @@ public final class LineTrack {
         return new double[]{lonLat[1], lonLat[0]};
     }
 
+    /**
+     * Whether both stations lie on this track, so {@link #position} can place a train between them. The run from a
+     * branch's junction onto the branch does not: the line's path only follows its main route.
+     */
+    public boolean covers(String fromId, String toId) {
+        return stationIds.contains(fromId) && stationIds.contains(toId);
+    }
+
     private int index(String stationId) {
         int i = stationIds.indexOf(stationId);
         if (i < 0) {
