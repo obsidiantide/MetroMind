@@ -586,6 +586,10 @@ GET /api/kpis?limit=1
 The dashboard charts the last hour of these minutes, refreshed every 6 s: average and worst train delay, and
 average and peak passengers waiting network-wide. Hover a column to read every value for that minute.
 
+The map's legend lists every line in its colour. A ring line is marked ↻ or ↺ for the way its trains turn on the
+north-up map, and arrows along its track point the way they run, so the two directions of a ring sharing one
+track (Ringtown's) can be told apart.
+
 Click a station or train on the map (or focus it with Tab and press Enter) to open a detail drawer. A station
 shows its lines, passengers waiting now and predicted in 15 minutes with the overload risk, the queue on each
 platform and its live departure board with lateness. A train shows where it is, what it is doing (running,
