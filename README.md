@@ -114,6 +114,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
 | Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
 When a line gives no `runSeconds`, each is derived from the distance between its stations *along the track*
@@ -130,6 +131,27 @@ served in both directions is two ring lines over the same stations, one listing 
 platforms and fleet. With no terminal to lay over at, the ring's first station is its timing point, where early
 trains wait for the timetable. Nothing can turn back on a ring, so short-turning strategies and `TURN_BACK`
 closures leave its trains waiting instead; a closed ring station sends its passengers to the stations either side.
+
+**Branched lines.** Some lines split: past a junction, part of the fleet runs to a branch instead of the end of
+the main route. A line lists its branches under `branches`, each with the `junctionStationId` (an intermediate
+station of the main route), the branch `stationIds` in order away from the junction, `runSeconds` (junction to
+the first branch station, then between them), the `share` of the line's trains that run there and an optional
+`path` from the junction:
+
+```json
+{ "id": "RED", "stationIds": ["R1", "R2", "R3", "R4"], "runSeconds": [100, 110, 120], "trainCount": 6, ...,
+  "branches": [ { "junctionStationId": "R2", "stationIds": ["B1", "B2"], "runSeconds": [90, 80], "share": 0.33 } ] }
+```
+
+The engine runs each way through the network as a *service pattern*: the main route, and for each branch the
+trunk from the first terminal to the junction followed by the branch. A branch gets its share of the trains
+(rounded), the main route the rest, and each pattern keeps its own timetable and headway control. Signalling
+blocks are physical track (a station's platform in one direction, or the run to the next station), so trains of
+both patterns exclude each other on the shared trunk and at the junction platform where the branch merges back.
+On a trunk platform everyone for a trunk station boards the first train, while passengers for the branch (or
+for the far end of the main route) wait for a train going there; travelling from a branch to the far end of the
+main route means changing trains at the junction. Track closures may be on the trunk, which stops both
+patterns, or on a branch. Spare trains from the depot join the main route.
 
 The bundled Ringtown network is a small fictional city built this way: two diameters crossing at Cathedral
 Square and an eight-station ring, run in both directions, that they meet at its four gates.
