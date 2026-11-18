@@ -777,7 +777,8 @@ public final class SimulationEngine {
     }
 
     /**
-     * Closes the track between two adjacent stations of a line, in both directions, for {@code seconds}. Trains
+     * Closes the track between two adjacent stations of a line, in both directions, for {@code seconds}. The
+     * stations may be on a branch; a section of the trunk is closed for trains of every service pattern. Trains
      * due to enter the section wait at the platform before it (their signal stays red) until it reopens; a train
      * already inside the section completes its run.
      */
@@ -792,33 +793,40 @@ public final class SimulationEngine {
      */
     public void closeSection(String lineId, String fromStationId, String toStationId, double seconds,
                              ClosureResponse response) {
-        Line line = lines.get(lineId);
-        if (line == null) {
+        if (!lines.containsKey(lineId)) {
             throw new IllegalArgumentException("Unknown line " + lineId);
         }
-        int lower = line.sectionBetween(line.stationIds().indexOf(fromStationId),
-                line.stationIds().indexOf(toStationId));
-        if (lower < 0) {
+        String[] ends = null;
+        for (ServicePattern p : patternsByLine.get(lineId)) {
+            int lower = p.sectionBetween(p.stationIds().indexOf(fromStationId), p.stationIds().indexOf(toStationId));
+            if (lower >= 0) {
+                ends = new String[] {p.stationIds().get(lower), p.stationIds().get(p.sectionEnd(lower))};
+                break;
+            }
+        }
+        if (ends == null) {
             throw new IllegalArgumentException(
                     "Stations %s and %s are not adjacent on line %s".formatted(fromStationId, toStationId, lineId));
         }
         if (seconds <= 0) {
             throw new IllegalArgumentException("Closure duration must be positive");
         }
+        String from = ends[0];
+        String to = ends[1];
         SectionClosure existing = closures.stream()
-                .filter(c -> c.lineId.equals(lineId) && c.lowerPosition == lower).findFirst().orElse(null);
+                .filter(c -> c.covers(lineId, from, to)).findFirst().orElse(null);
         if (existing != null) {
             existing.remainingSeconds = Math.max(existing.remainingSeconds, seconds);
             existing.response = response;
         } else {
-            closures.add(new SectionClosure(lineId, lower, response, seconds, simTime));
+            closures.add(new SectionClosure(lineId, from, to, response, seconds, simTime));
         }
         emit(SimEvent.Type.INCIDENT, lineId, "Track %s–%s on line %s closed for %.0f s".formatted(
-                sectionName(line, lower), sectionName(line, line.sectionEnd(lower)), lineId, seconds));
+                stationName(from), stationName(to), lineId, seconds));
     }
 
-    private String sectionName(Line line, int position) {
-        return network.station(line.stationIds().get(position)).name();
+    private String stationName(String stationId) {
+        return network.station(stationId).name();
     }
 
     /** Whether the segment a train of the line's main pattern takes when leaving loop stop {@code stop} is closed. */
@@ -836,9 +844,10 @@ public final class SimulationEngine {
         if (closures.isEmpty()) {
             return null;
         }
-        int lower = p.sectionFromStop(stop);
+        String from = p.stationAtStop(stop);
+        String to = p.stationAtStop((stop + 1) % p.loopLength());
         for (SectionClosure c : closures) {
-            if (c.lineId.equals(p.lineId()) && c.lowerPosition == lower) {
+            if (c.covers(p.lineId(), from, to)) {
                 return c;
             }
         }
@@ -851,9 +860,8 @@ public final class SimulationEngine {
             c.remainingSeconds -= dt;
             if (c.remainingSeconds <= 1e-9) {
                 it.remove();
-                Line line = lines.get(c.lineId);
                 emit(SimEvent.Type.INCIDENT_CLEARED, c.lineId, "Track %s–%s on line %s reopened".formatted(
-                        sectionName(line, c.lowerPosition), sectionName(line, line.sectionEnd(c.lowerPosition)), c.lineId));
+                        stationName(c.fromStationId), stationName(c.toStationId), c.lineId));
             }
         }
         for (var it = closedStations.entrySet().iterator(); it.hasNext(); ) {
@@ -1279,10 +1287,9 @@ public final class SimulationEngine {
             }
         }
         for (SectionClosure c : closures) {
-            Line line = lines.get(c.lineId);
             views.add(incidentView(SimulationSnapshot.IncidentKind.SECTION_CLOSURE, c.lineId,
-                    "Track %s–%s on line %s closed".formatted(sectionName(line, c.lowerPosition),
-                            sectionName(line, line.sectionEnd(c.lowerPosition)), c.lineId),
+                    "Track %s–%s on line %s closed".formatted(stationName(c.fromStationId),
+                            stationName(c.toStationId), c.lineId),
                     c.startedAt, c.remainingSeconds));
         }
         closedStations.forEach((id, remaining) -> views.add(incidentView(
@@ -1302,9 +1309,8 @@ public final class SimulationEngine {
     private List<SimulationSnapshot.ClosedSectionView> closedSections() {
         List<SimulationSnapshot.ClosedSectionView> views = new ArrayList<>();
         for (SectionClosure c : closures) {
-            Line line = lines.get(c.lineId);
-            views.add(new SimulationSnapshot.ClosedSectionView(c.lineId, line.stationIds().get(c.lowerPosition),
-                    line.stationIds().get(line.sectionEnd(c.lowerPosition)), c.response, c.remainingSeconds));
+            views.add(new SimulationSnapshot.ClosedSectionView(c.lineId, c.fromStationId, c.toStationId, c.response,
+                    c.remainingSeconds));
         }
         return views;
     }
