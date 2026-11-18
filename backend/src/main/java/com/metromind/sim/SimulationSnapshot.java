@@ -6,9 +6,12 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
                                  List<StationView> stations, List<SimEvent> recentEvents, Metrics metrics,
                                  List<ClosedSectionView> closedSections, List<ActiveIncidentView> activeIncidents) {
 
-    public record TrainView(String id, String lineId, String fromStationId, String toStationId, double progress,
-                            double lat, double lon, TrainPhase phase, double delaySeconds, double load,
-                            int capacity, boolean failed) {
+    /**
+     * @param patternId service pattern the train follows: the line id, or {@code line/branch-terminal} on a branch
+     */
+    public record TrainView(String id, String lineId, String patternId, String fromStationId, String toStationId,
+                            double progress, double lat, double lon, TrainPhase phase, double delaySeconds,
+                            double load, int capacity, boolean failed) {
     }
 
     /**
