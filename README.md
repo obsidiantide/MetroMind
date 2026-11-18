@@ -598,7 +598,9 @@ concerning it.
 
 On a branched line, a train bound for the branch terminal carries a label on the map ("to Bakmil") until it turns
 back; every train's tooltip names its destination (on a ring, the next station, as on the platform signs), and
-departure board rows bound for a branch terminal are marked as such.
+departure board rows bound for a branch terminal are marked as such. While a train's drawer is open, the map rings the stations
+its service pattern calls at in the line colour and fades the other stations and lines, so a Bakmil train shows
+the trunk and the branch it serves rather than the whole Red line.
 
 A what-if result is also drawn on the map: each station is ringed by the extra passenger-minutes of waiting the
 incident causes under the best strategy, red where waiting grows and blue where it falls, scaled to the worst
