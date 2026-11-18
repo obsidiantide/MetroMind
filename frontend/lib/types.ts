@@ -66,6 +66,11 @@ export interface Snapshot {
     headwayCoefficientOfVariation: number; trainsInService: number; trainsInDepot: number;
     /** Stops run through under SKIP_STOP, and passengers who had to ride back to a skipped station. */
     stopsSkipped: number; passengersCarriedPast: number;
+    /**
+     * Per branched line id, headway CV of the combined service of its patterns on the shared trunk; the overall
+     * CV judges each pattern on its own. Unbranched lines have no entry.
+     */
+    trunkHeadwayCv: Record<string, number>;
   };
 }
 export interface ShortTurn {
@@ -79,6 +84,8 @@ export interface StrategyOutcome {
   strategy: string; trainsAffected: number; maxTrainDelaySeconds: number; totalExtraPassengerWaitMinutes: number;
   totalPassengerWaitMinutes: number; totalExtraRideMinutes: number; totalExtraTravelMinutes: number;
   totalPassengerTravelMinutes: number; headwayCvAtHorizon: number;
+  /** Per branched line id, headway CV of the combined service on its shared trunk at the horizon. */
+  trunkHeadwayCvAtHorizon: Record<string, number>;
   /** Seconds until headways were back to baseline regularity; null if still disrupted at the horizon. */
   headwayRecoverySeconds: number | null; peakHeadwayCvExcess: number;
   /** Trains the strategy reversed early during the incident run, oldest first. */
@@ -127,6 +134,8 @@ export interface StrategyRanking {
   meanTravelMinutes: number; p95TravelMinutes: number;
   /** Mean headway recovery over the scenarios recovered from; null if none recovered within the horizon. */
   meanRecoverySeconds: number | null; unrecoveredScenarios: number;
+  /** Per branched line id, mean over the scenarios of the trunk headway CV at the horizon. */
+  meanTrunkHeadwayCv: Record<string, number>;
   meanShortTurns: number; shortTurnsByStation: Record<string, number>;
   meanStopsSkipped: number; meanPassengersCarriedPast: number; stopsSkippedByStation: Record<string, number>;
   waitSecondsPerScenario: number[];
