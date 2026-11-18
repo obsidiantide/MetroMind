@@ -97,5 +97,5 @@ Mark items `[x]` when merged.
 - [x] Browser smoke test in CI: dashboard renders the map and opens a station drawer against the standalone backend
 - [x] Export a benchmark report as CSV
 - [x] Line legend with ring direction arrows on the map
-- [ ] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
+- [x] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
 - [ ] Highlight the stations of a train's service pattern on the map when its detail drawer is open
