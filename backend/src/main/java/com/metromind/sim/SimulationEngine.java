@@ -3,6 +3,7 @@ package com.metromind.sim;
 import com.metromind.network.Line;
 import com.metromind.network.LineTrack;
 import com.metromind.network.MetroNetwork;
+import com.metromind.network.ServicePattern;
 import com.metromind.network.Station;
 
 import java.util.ArrayDeque;
@@ -77,6 +78,10 @@ public final class SimulationEngine {
 
     private final MetroNetwork network;
     private final Map<String, Line> lines = new LinkedHashMap<>();
+    /** Service patterns by id, in network order; a train's loop stops index the pattern it follows. */
+    private final Map<String, ServicePattern> patterns = new LinkedHashMap<>();
+    private final Map<String, List<ServicePattern>> patternsByLine = new LinkedHashMap<>();
+    /** Per service pattern: nominal seconds from loop stop 0 to each stop, run plus dwell (last = whole loop). */
     private final Map<String, double[]> cumulativeStopSeconds = new LinkedHashMap<>();
     /** Track alignment of lines whose network file gives one; others run on the chord between stations. */
     private final Map<String, LineTrack> tracks = new LinkedHashMap<>();
@@ -121,27 +126,30 @@ public final class SimulationEngine {
                 throw new IllegalArgumentException("Line " + line.id() + ": branched lines are not simulated yet");
             }
             lines.put(line.id(), line);
-            double[] cum = new double[line.loopLength() + 1];
-            for (int k = 0; k < line.loopLength(); k++) {
-                cum[k + 1] = cum[k] + line.runSecondsFromStop(k) + NOMINAL_DWELL;
+            patternsByLine.put(line.id(), line.patterns());
+            for (ServicePattern p : line.patterns()) {
+                patterns.put(p.id(), p);
+                double[] cum = new double[p.loopLength() + 1];
+                for (int k = 0; k < p.loopLength(); k++) {
+                    cum[k + 1] = cum[k] + p.runSecondsFromStop(k) + NOMINAL_DWELL;
+                }
+                cumulativeStopSeconds.put(p.id(), cum);
             }
-            cumulativeStopSeconds.put(line.id(), cum);
             LineTrack track = LineTrack.of(line, network);
             if (track != null) {
                 tracks.put(line.id(), track);
             }
             depot.put(line.id(), line.spareTrains());
             dispatchedCount.put(line.id(), 0);
-            for (String sid : line.stationIds()) {
+            for (String sid : line.allStationIds()) {
                 linesByStation.computeIfAbsent(sid, k -> new ArrayList<>()).add(line.id());
             }
         }
         for (Station s : network.stations()) {
             List<String> adjacent = new ArrayList<>();
             for (Station other : network.stations()) {
-                boolean next = network.lines().stream().anyMatch(l -> {
-                    return l.sectionBetween(l.stationIds().indexOf(s.id()), l.stationIds().indexOf(other.id())) >= 0;
-                });
+                boolean next = patterns.values().stream().anyMatch(p ->
+                        p.sectionBetween(p.stationIds().indexOf(s.id()), p.stationIds().indexOf(other.id())) >= 0);
                 if (next) {
                     adjacent.add(other.id());
                 }
@@ -156,13 +164,13 @@ public final class SimulationEngine {
             StationState st = new StationState(s.id());
             // A platform queue for every direction a train can leave in (a terminal only has one per line).
             for (String lid : linesByStation.getOrDefault(s.id(), List.of())) {
-                Line line = lines.get(lid);
-                int pos = line.stationIds().indexOf(s.id());
-                if (line.nextPosition(pos, 1) >= 0) {
-                    st.waiting.put(new StationState.QueueKey(lid, 1), new double[n]);
-                }
-                if (line.nextPosition(pos, -1) >= 0) {
-                    st.waiting.put(new StationState.QueueKey(lid, -1), new double[n]);
+                for (int dir : new int[] {1, -1}) {
+                    for (ServicePattern p : patternsByLine.get(lid)) {
+                        int pos = p.stationIds().indexOf(s.id());
+                        if (pos >= 0 && p.nextPosition(pos, dir) >= 0) {
+                            st.waiting.putIfAbsent(new StationState.QueueKey(lid, dir), new double[n]);
+                        }
+                    }
                 }
             }
             for (int d = 0; d < n; d++) {
@@ -180,6 +188,8 @@ public final class SimulationEngine {
     private SimulationEngine(SimulationEngine other) {
         this.network = other.network;
         this.lines.putAll(other.lines);
+        this.patterns.putAll(other.patterns);
+        this.patternsByLine.putAll(other.patternsByLine);
         this.cumulativeStopSeconds.putAll(other.cumulativeStopSeconds);
         this.tracks.putAll(other.tracks);
         this.linesByStation.putAll(other.linesByStation);
@@ -218,41 +228,54 @@ public final class SimulationEngine {
      */
     private void placeTrains() {
         for (Line line : network.lines()) {
-            double[] cum = cumulativeStopSeconds.get(line.id());
-            double loop = cum[line.loopLength()];
-            int used = -1;
-            for (int i = 0; i < line.trainCount(); i++) {
-                double target = i * loop / line.trainCount();
-                int stop = 0;
-                while (stop + 1 < line.loopLength() && cum[stop + 1] <= target) {
-                    stop++;
-                }
-                double offset = target - cum[stop];
-                // Fixed-block signalling allows one train per platform-plus-segment block: if the even position
-                // falls in an occupied block (headway shorter than a long block), start at the next platform.
-                if (stop <= used) {
-                    stop = used + 1;
-                    offset = 0;
-                }
-                if (stop >= line.loopLength()) {
-                    throw new IllegalStateException("Too many trains for line " + line.id());
-                }
-                used = stop;
-                TrainState t = new TrainState(line.id() + "-" + (i + 1), line.id(), line.trainCapacity(),
-                        network.stations().size());
-                t.stop = stop;
-                t.scheduledArrival = simTime - offset;
-                if (offset < NOMINAL_DWELL) {
-                    t.phase = TrainPhase.DWELLING;
-                    t.phaseRemaining = NOMINAL_DWELL - offset;
-                } else {
-                    t.phase = TrainPhase.RUNNING;
-                    t.segmentDuration = line.runSecondsFromStop(stop);
-                    t.segmentElapsed = offset - NOMINAL_DWELL;
-                }
-                trains.add(t);
+            int number = 0;
+            for (ServicePattern p : patternsByLine.get(line.id())) {
+                number = placeTrains(line, p, number);
             }
         }
+    }
+
+    /** Places the trains of one service pattern; returns the last train number used on the line. */
+    private int placeTrains(Line line, ServicePattern p, int number) {
+        double[] cum = cumulativeStopSeconds.get(p.id());
+        double loop = cum[p.loopLength()];
+        int used = -1;
+        for (int i = 0; i < p.trainCount(); i++) {
+            double target = i * loop / p.trainCount();
+            int stop = 0;
+            while (stop + 1 < p.loopLength() && cum[stop + 1] <= target) {
+                stop++;
+            }
+            double offset = target - cum[stop];
+            // Fixed-block signalling allows one train per platform-plus-segment block: if the even position
+            // falls in an occupied block (headway shorter than a long block), start at the next platform.
+            if (stop <= used) {
+                stop = used + 1;
+                offset = 0;
+            }
+            if (stop >= p.loopLength()) {
+                throw new IllegalStateException("Too many trains for line " + line.id());
+            }
+            used = stop;
+            TrainState t = new TrainState(line.id() + "-" + (++number), line.id(), p.id(),
+                    line.trainCapacity(), network.stations().size());
+            t.stop = stop;
+            t.scheduledArrival = simTime - offset;
+            if (offset < NOMINAL_DWELL) {
+                t.phase = TrainPhase.DWELLING;
+                t.phaseRemaining = NOMINAL_DWELL - offset;
+            } else {
+                t.phase = TrainPhase.RUNNING;
+                t.segmentDuration = p.runSecondsFromStop(stop);
+                t.segmentElapsed = offset - NOMINAL_DWELL;
+            }
+            trains.add(t);
+        }
+        return number;
+    }
+
+    private ServicePattern pattern(TrainState t) {
+        return patterns.get(t.patternId);
     }
 
     // ------------------------------------------------------------------ stepping
@@ -350,20 +373,20 @@ public final class SimulationEngine {
      * its planned departure (the layover gives recovery time), so earliness never carries over into the next trip.
      */
     private void decideHoldOrDepart(TrainState t) {
-        Line line = lines.get(t.lineId);
-        if (!line.isTerminalStop(t.stop) && closedStations.containsKey(line.stationAtStop(t.stop))) {
+        ServicePattern p = pattern(t);
+        if (!p.isTerminalStop(t.stop) && closedStations.containsKey(p.stationAtStop(t.stop))) {
             t.holdDecided = true; // never hold a train at a closed station it is running through
         }
         if (!t.holdDecided) {
             t.holdDecided = true;
-            double target = cumulativeStopSeconds.get(line.id())[line.loopLength()] / trainsInService(line.id());
-            if (shouldShortTurn(t, line, target)) {
-                String stationId = line.stationAtStop(t.stop);
+            double target = loopTotal(p) / trainsOnPattern(p.id());
+            if (shouldShortTurn(t, p, target)) {
+                String stationId = p.stationAtStop(t.stop);
                 double lateness = t.delaySeconds;
-                if (tryTurnBack(t, line)) {
+                if (tryTurnBack(t, p)) {
                     emit(SimEvent.Type.TRAIN_SHORT_TURNED, t.id, "Train %s, %.0f s late, short-turned at %s"
                             .formatted(t.id, lateness, network.station(stationId).name()));
-                    shortTurnLog.addLast(new ShortTurn(t.id, line.id(), stationId, simTime, lateness));
+                    shortTurnLog.addLast(new ShortTurn(t.id, t.lineId, stationId, simTime, lateness));
                     while (shortTurnLog.size() > MAX_SHORT_TURN_LOG) {
                         shortTurnLog.removeFirst();
                     }
@@ -373,7 +396,7 @@ public final class SimulationEngine {
             double demand = DemandProfile.multiplier(simTime + HOLD_DEMAND_FORECAST_SECONDS);
             double hold = strategy.holdSeconds(forwardHeadway(t), backwardHeadway(t),
                     strategy.targetHeadway(target, demand));
-            if (line.isTimingStop(t.stop)) {
+            if (p.isTimingStop(t.stop)) {
                 hold = Math.max(hold, plannedDeparture(t) - simTime);
             }
             if (hold > 0.5) {
@@ -390,13 +413,13 @@ public final class SimulationEngine {
      * at least {@link #SHORT_TURN_LATENESS_SECONDS} late, the station is open and the train behind is bunched up
      * close enough to serve the stations this one gives up.
      */
-    private boolean shouldShortTurn(TrainState t, Line line, double targetHeadway) {
+    private boolean shouldShortTurn(TrainState t, ServicePattern p, double targetHeadway) {
         return strategy.shortTurnsLateTrains()
-                && !line.ring()
-                && !line.isTerminalStop(t.stop)
+                && !p.ring()
+                && !p.isTerminalStop(t.stop)
                 && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS
-                && !closedStations.containsKey(line.stationAtStop(t.stop))
-                && trainsInService(line.id()) > 1
+                && !closedStations.containsKey(p.stationAtStop(t.stop))
+                && trainsOnPattern(p.id()) > 1
                 && backwardHeadway(t) < SHORT_TURN_FOLLOWER_FRACTION * targetHeadway;
     }
 
@@ -409,28 +432,28 @@ public final class SimulationEngine {
      * short-turns, a train late enough to be short-turned never skips: it calls so it can turn back here (except
      * on a ring, where nothing turns back).
      */
-    private boolean shouldSkipStop(TrainState t, Line line, StationState st) {
+    private boolean shouldSkipStop(TrainState t, ServicePattern p, StationState st) {
         if (!strategy.skipsStopsForLateTrains()
                 || t.delaySeconds < SKIP_STOP_LATENESS_SECONDS
-                || (strategy.shortTurnsLateTrains() && !line.ring()
+                || (strategy.shortTurnsLateTrains() && !p.ring()
                     && t.delaySeconds >= SHORT_TURN_LATENESS_SECONDS)
                 || t.skippedLastStop
-                || line.isTerminalStop(t.stop)
+                || p.isTerminalStop(t.stop)
                 || linesByStation.get(st.id).size() > 1
-                || trainsInService(line.id()) < 2) {
+                || trainsOnPattern(p.id()) < 2) {
             return false;
         }
         if (backwardHeadway(t) >= SKIP_STOP_FOLLOWER_FRACTION * forwardHeadway(t)) {
             return false;
         }
-        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, p.directionAtStop(t.stop)));
         double boarding = queue == null ? 0 : StationState.sum(queue);
-        return boarding + alightingAt(t, line) < SKIP_STOP_MAX_PASSENGERS;
+        return boarding + alightingAt(t) < SKIP_STOP_MAX_PASSENGERS;
     }
 
     /** Passengers on {@code t} who would leave the train if it called at its current stop. */
-    private double alightingAt(TrainState t, Line line) {
-        boolean[] stays = routes.staysAboard(routes.lineIndex(line.id()), t.stop);
+    private double alightingAt(TrainState t) {
+        boolean[] stays = routes.staysAboard(routes.lineIndex(t.lineId), t.stop);
         double alighting = 0;
         for (int d = 0; d < t.onboard.length; d++) {
             if (!stays[d]) {
@@ -446,17 +469,17 @@ public final class SimulationEngine {
     }
 
     private void tryDepart(TrainState t) {
-        Line line = lines.get(t.lineId);
-        SectionClosure closure = closureAhead(line, t.stop);
+        ServicePattern p = pattern(t);
+        SectionClosure closure = closureAhead(p, t.stop);
         if (closure != null) {
-            if (closure.response != ClosureResponse.TURN_BACK || !tryTurnBack(t, line)) {
+            if (closure.response != ClosureResponse.TURN_BACK || !tryTurnBack(t, p)) {
                 t.phase = TrainPhase.WAITING_SIGNAL;
             }
             return;
         }
-        int next = (t.stop + 1) % line.loopLength();
+        int next = (t.stop + 1) % p.loopLength();
         for (TrainState o : trains) {
-            if (o == t || !o.lineId.equals(t.lineId)) {
+            if (o == t || !o.patternId.equals(t.patternId)) {
                 continue;
             }
             boolean inSegment = o.phase == TrainPhase.RUNNING && o.stop == t.stop;
@@ -468,20 +491,20 @@ public final class SimulationEngine {
         }
         t.phase = TrainPhase.RUNNING;
         t.segmentElapsed = 0;
-        t.segmentDuration = line.runSecondsFromStop(t.stop);
+        t.segmentDuration = p.runSecondsFromStop(t.stop);
     }
 
     private void arrive(TrainState t) {
-        Line line = lines.get(t.lineId);
-        t.scheduledArrival += line.runSecondsFromStop(t.stop) + NOMINAL_DWELL;
-        t.stop = (t.stop + 1) % line.loopLength();
+        ServicePattern p = pattern(t);
+        t.scheduledArrival += p.runSecondsFromStop(t.stop) + NOMINAL_DWELL;
+        t.stop = (t.stop + 1) % p.loopLength();
         t.delaySeconds = Math.max(0, simTime - t.scheduledArrival);
         if (recordArrivals) {
             t.arrivals.add(simTime);
         }
         detectDelay(t);
 
-        String stationId = line.stationAtStop(t.stop);
+        String stationId = p.stationAtStop(t.stop);
         t.phase = TrainPhase.DWELLING;
         t.holdDecided = false;
         if (closedStations.containsKey(stationId)) {
@@ -490,13 +513,13 @@ public final class SimulationEngine {
             return;
         }
         StationState st = stations.get(stationId);
-        if (shouldSkipStop(t, line, st)) {
+        if (shouldSkipStop(t, p, st)) {
             t.phaseRemaining = 0;
             t.holdDecided = true; // the point is to catch up, so no headway hold either
             t.skippedLastStop = true;
             stopsSkipped++;
-            skippedStopLog.addLast(new SkippedStop(t.id, line.id(), stationId, simTime, t.delaySeconds,
-                    alightingAt(t, line)));
+            skippedStopLog.addLast(new SkippedStop(t.id, t.lineId, stationId, simTime, t.delaySeconds,
+                    alightingAt(t)));
             while (skippedStopLog.size() > MAX_SKIPPED_STOP_LOG) {
                 skippedStopLog.removeFirst();
             }
@@ -505,8 +528,8 @@ public final class SimulationEngine {
             return;
         }
         t.skippedLastStop = false;
-        double alight = alight(t, line, st);
-        double board = board(t, line, st);
+        double alight = alight(t, st);
+        double board = board(t, p, st);
 
         t.phaseRemaining = Math.max(MIN_DWELL,
                 Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
@@ -517,8 +540,8 @@ public final class SimulationEngine {
      * here join the queue for their next line. Everyone else stays aboard. Passengers for a closed station that
      * the train has run through get off at the first open station after it and finish their trip on foot.
      */
-    private double alight(TrainState t, Line line, StationState st) {
-        int lineIdx = routes.lineIndex(line.id());
+    private double alight(TrainState t, StationState st) {
+        int lineIdx = routes.lineIndex(t.lineId);
         int here = routes.index(st.id);
         boolean[] stays = routes.staysAboard(lineIdx, t.stop);
         double alight = 0;
@@ -537,7 +560,7 @@ public final class SimulationEngine {
             } else {
                 st.waiting.get(next)[d] += amount;
                 // Going back along the same line only happens after being carried past a skipped stop.
-                if (next.lineId().equals(line.id())) {
+                if (next.lineId().equals(t.lineId)) {
                     st.carriedPast += amount;
                 } else {
                     st.transfers += amount;
@@ -553,12 +576,12 @@ public final class SimulationEngine {
      * Boards the queue for the train's direction; if it does not fit, every destination boards pro rata. Nobody
      * boards a train that is about to turn back short of a closed section.
      */
-    private double board(TrainState t, Line line, StationState st) {
-        SectionClosure closure = closureAhead(line, t.stop);
+    private double board(TrainState t, ServicePattern p, StationState st) {
+        SectionClosure closure = closureAhead(p, t.stop);
         if (closure != null && closure.response == ClosureResponse.TURN_BACK) {
             return 0; // the train will reverse here; passengers keep waiting for the line to reopen
         }
-        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, p.directionAtStop(t.stop)));
         if (queue == null) {
             return 0;
         }
@@ -600,9 +623,9 @@ public final class SimulationEngine {
 
     // ------------------------------------------------------------------ headways
 
-    /** Position of a train along its line's loop, in nominal seconds since stop 0. */
+    /** Position of a train along its pattern's loop, in nominal seconds since stop 0. */
     double loopPosition(TrainState t) {
-        double[] cum = cumulativeStopSeconds.get(t.lineId);
+        double[] cum = cumulativeStopSeconds.get(t.patternId);
         double base = cum[t.stop];
         if (t.phase == TrainPhase.RUNNING) {
             return base + NOMINAL_DWELL + t.segmentElapsed;
@@ -610,17 +633,18 @@ public final class SimulationEngine {
         return base;
     }
 
-    private double loopTotal(String lineId) {
-        Line line = lines.get(lineId);
-        return cumulativeStopSeconds.get(lineId)[line.loopLength()];
+    /** Nominal time round a pattern's loop, dwells included. */
+    private double loopTotal(ServicePattern p) {
+        return cumulativeStopSeconds.get(p.id())[p.loopLength()];
     }
 
+    /** Nominal gap to the train ahead on the same service pattern (the whole loop if there is none). */
     double forwardHeadway(TrainState t) {
-        double total = loopTotal(t.lineId);
+        double total = loopTotal(pattern(t));
         double pos = loopPosition(t);
         double best = total;
         for (TrainState o : trains) {
-            if (o != t && o.lineId.equals(t.lineId)) {
+            if (o != t && o.patternId.equals(t.patternId)) {
                 double d = Math.floorMod((long) Math.round((loopPosition(o) - pos) * 1000), (long) (total * 1000)) / 1000.0;
                 if (d > 0 && d < best) {
                     best = d;
@@ -630,12 +654,13 @@ public final class SimulationEngine {
         return best;
     }
 
+    /** Nominal gap to the train behind on the same service pattern (the whole loop if there is none). */
     double backwardHeadway(TrainState t) {
-        double total = loopTotal(t.lineId);
+        double total = loopTotal(pattern(t));
         double pos = loopPosition(t);
         double best = total;
         for (TrainState o : trains) {
-            if (o != t && o.lineId.equals(t.lineId)) {
+            if (o != t && o.patternId.equals(t.patternId)) {
                 double d = Math.floorMod((long) Math.round((pos - loopPosition(o)) * 1000), (long) (total * 1000)) / 1000.0;
                 if (d > 0 && d < best) {
                     best = d;
@@ -678,41 +703,41 @@ public final class SimulationEngine {
      * direction board. Not possible at a terminal, on a ring (its trains only run one way) or while the opposite
      * platform (or the track into it) is taken.
      */
-    private boolean tryTurnBack(TrainState t, Line line) {
-        if (line.ring() || line.isTerminalStop(t.stop)) {
+    private boolean tryTurnBack(TrainState t, ServicePattern p) {
+        if (p.ring() || p.isTerminalStop(t.stop)) {
             return false;
         }
-        int mirror = line.loopLength() - t.stop;
-        if (sectionClosed(line, mirror)) {
+        int mirror = p.loopLength() - t.stop;
+        if (sectionClosed(p, mirror)) {
             return false; // closed on both sides: nowhere to go
         }
-        int before = (mirror - 1 + line.loopLength()) % line.loopLength();
+        int before = (mirror - 1 + p.loopLength()) % p.loopLength();
         for (TrainState o : trains) {
-            if (o != t && o.lineId.equals(t.lineId)
+            if (o != t && o.patternId.equals(t.patternId)
                     && ((o.stop == mirror && o.phase != TrainPhase.RUNNING)
                     || (o.stop == before && o.phase == TrainPhase.RUNNING))) {
                 return false;
             }
         }
-        StationState st = stations.get(line.stationAtStop(t.stop));
-        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, line.directionAtStop(t.stop)));
+        StationState st = stations.get(p.stationAtStop(t.stop));
+        double[] queue = st.waiting.get(new StationState.QueueKey(t.lineId, p.directionAtStop(t.stop)));
         double alight = t.passengers;
         for (int d = 0; d < t.onboard.length; d++) {
             queue[d] += t.onboard[d];
             t.onboard[d] = 0;
         }
         t.passengers = 0;
-        double[] cum = cumulativeStopSeconds.get(line.id());
+        double[] cum = cumulativeStopSeconds.get(p.id());
         // Take over the timetable slot of the mirror stop; the train is now early, never later than before. Turning
         // back from the inbound half the mirror stop belongs to the next trip round the loop, not the last one.
         double ahead = cum[mirror] - cum[t.stop];
         if (ahead < 0) {
-            ahead += cum[line.loopLength()];
+            ahead += cum[p.loopLength()];
         }
         t.scheduledArrival += ahead;
         t.stop = mirror;
         t.delaySeconds = Math.max(0, simTime - t.scheduledArrival);
-        double board = board(t, line, st);
+        double board = board(t, p, st);
         t.phase = TrainPhase.DWELLING;
         t.holdDecided = false;
         t.phaseRemaining = Math.max(MIN_DWELL,
@@ -765,19 +790,24 @@ public final class SimulationEngine {
         return network.station(line.stationIds().get(position)).name();
     }
 
-    /** Whether the segment a train takes when leaving loop stop {@code stop} is closed. */
+    /** Whether the segment a train of the line's main pattern takes when leaving loop stop {@code stop} is closed. */
     boolean sectionClosed(Line line, int stop) {
-        return closureAhead(line, stop) != null;
+        return sectionClosed(patternsByLine.get(line.id()).get(0), stop);
+    }
+
+    /** Whether the segment a train of pattern {@code p} takes when leaving loop stop {@code stop} is closed. */
+    boolean sectionClosed(ServicePattern p, int stop) {
+        return closureAhead(p, stop) != null;
     }
 
     /** Closure of the segment a train takes when leaving loop stop {@code stop}, or null if it is open. */
-    private SectionClosure closureAhead(Line line, int stop) {
+    private SectionClosure closureAhead(ServicePattern p, int stop) {
         if (closures.isEmpty()) {
             return null;
         }
-        int lower = line.sectionFromStop(stop);
+        int lower = p.sectionFromStop(stop);
         for (SectionClosure c : closures) {
-            if (c.lineId.equals(line.id()) && c.lowerPosition == lower) {
+            if (c.lineId.equals(p.lineId()) && c.lowerPosition == lower) {
                 return c;
             }
         }
@@ -905,7 +935,7 @@ public final class SimulationEngine {
     double lineForecast(Line line) {
         double mult = DemandProfile.multiplier(simTime + DISPATCH_FORECAST_SECONDS / 2);
         double worst = 0;
-        for (String sid : line.stationIds()) {
+        for (String sid : line.allStationIds()) {
             if (closedStations.containsKey(sid)) {
                 continue;
             }
@@ -925,8 +955,8 @@ public final class SimulationEngine {
         if (closedStations.containsKey(line.stationIds().get(0))) {
             return false;
         }
-        int last = line.loopLength() - 1;
         for (TrainState o : trains) {
+            int last = pattern(o).loopLength() - 1;
             if (o.lineId.equals(line.id()) && ((o.stop == 0 && o.phase != TrainPhase.RUNNING)
                     || (o.stop == last && o.phase == TrainPhase.RUNNING))) {
                 return false;
@@ -935,15 +965,19 @@ public final class SimulationEngine {
         return true;
     }
 
-    /** Puts a spare train on the first terminal's platform, with its own timetable starting now. */
+    /**
+     * Puts a spare train on the first terminal's platform, with its own timetable starting now. It runs the line's
+     * main service pattern.
+     */
     private void dispatch(Line line) {
         int number = line.trainCount() + dispatchedCount.merge(line.id(), 1, Integer::sum);
-        TrainState t = new TrainState(line.id() + "-" + number, line.id(), line.trainCapacity(),
+        ServicePattern main = patternsByLine.get(line.id()).get(0);
+        TrainState t = new TrainState(line.id() + "-" + number, line.id(), main.id(), line.trainCapacity(),
                 network.stations().size());
         t.stop = 0;
         t.scheduledArrival = simTime;
         t.phase = TrainPhase.DWELLING;
-        double board = board(t, line, stations.get(line.stationIds().get(0)));
+        double board = board(t, main, stations.get(line.stationIds().get(0)));
         t.phaseRemaining = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * board));
         trains.add(t);
         depot.merge(line.id(), -1, Integer::sum);
@@ -956,6 +990,17 @@ public final class SimulationEngine {
         int n = 0;
         for (TrainState t : trains) {
             if (t.lineId.equals(lineId)) {
+                n++;
+            }
+        }
+        return Math.max(1, n);
+    }
+
+    /** Trains currently following a service pattern (at least 1, so it can divide a loop time). */
+    int trainsOnPattern(String patternId) {
+        int n = 0;
+        for (TrainState t : trains) {
+            if (t.patternId.equals(patternId)) {
                 n++;
             }
         }
@@ -991,7 +1036,7 @@ public final class SimulationEngine {
         Line line = lines.get(key.lineId());
         double rate = boardingRate(st, key, mult);
         double lineRate = 0;
-        for (String sid : line.stationIds()) {
+        for (String sid : line.allStationIds()) {
             lineRate += boardingRate(stations.get(sid), key, mult);
         }
         // A train's spare room is shared by every station it serves in this direction, roughly in proportion
@@ -1002,9 +1047,10 @@ public final class SimulationEngine {
             if (!t.lineId.equals(key.lineId())) {
                 continue;
             }
-            int stop = nextCallStop(t, line, st.id, key.direction());
-            if (stop >= 0 && secondsUntilStop(t, line, stop) <= horizon) {
-                double residual = Math.max(0, t.capacity - passengersAboardAfter(t, line, stop));
+            ServicePattern p = pattern(t);
+            int stop = nextCallStop(t, p, st.id, key.direction());
+            if (stop >= 0 && secondsUntilStop(t, p, stop) <= horizon) {
+                double residual = Math.max(0, t.capacity - passengersAboardAfter(t, p, stop));
                 expected -= residual * share;
             }
         }
@@ -1023,14 +1069,14 @@ public final class SimulationEngine {
     }
 
     /** Loop stop at which {@code t} next calls at {@code stationId} ready to leave in {@code direction}. */
-    private int nextCallStop(TrainState t, Line line, String stationId, int direction) {
-        double[] cum = cumulativeStopSeconds.get(line.id());
-        double total = cum[line.loopLength()];
+    private int nextCallStop(TrainState t, ServicePattern p, String stationId, int direction) {
+        double[] cum = cumulativeStopSeconds.get(p.id());
+        double total = cum[p.loopLength()];
         double pos = loopPosition(t);
         double best = Double.MAX_VALUE;
         int bestStop = -1;
-        for (int k = 0; k < line.loopLength(); k++) {
-            if (line.stationAtStop(k).equals(stationId) && line.directionAtStop(k) == direction) {
+        for (int k = 0; k < p.loopLength(); k++) {
+            if (p.stationAtStop(k).equals(stationId) && p.directionAtStop(k) == direction) {
                 double d = cum[k] - pos;
                 if (d <= 0) {
                     d += total;
@@ -1045,11 +1091,11 @@ public final class SimulationEngine {
     }
 
     /** Nominal seconds until {@code t} reaches loop stop {@code stop}, plus any time it is blocked. */
-    private double secondsUntilStop(TrainState t, Line line, int stop) {
-        double[] cum = cumulativeStopSeconds.get(line.id());
+    private double secondsUntilStop(TrainState t, ServicePattern p, int stop) {
+        double[] cum = cumulativeStopSeconds.get(p.id());
         double d = cum[stop] - loopPosition(t);
         if (d <= 0) {
-            d += cum[line.loopLength()];
+            d += cum[p.loopLength()];
         }
         return d + Math.max(0, t.blockedRemaining);
     }
@@ -1058,13 +1104,13 @@ public final class SimulationEngine {
      * Passengers currently on {@code t} who will still be aboard after it has called at loop stop {@code stop}
      * (everyone alighting at or before that stop frees their place).
      */
-    double passengersAboardAfter(TrainState t, Line line, int stop) {
-        int lineIdx = routes.lineIndex(line.id());
+    double passengersAboardAfter(TrainState t, ServicePattern p, int stop) {
+        int lineIdx = routes.lineIndex(t.lineId);
         boolean[] aboard = new boolean[t.onboard.length];
         java.util.Arrays.fill(aboard, true);
         int k = t.stop;
         do {
-            k = (k + 1) % line.loopLength();
+            k = (k + 1) % p.loopLength();
             boolean[] stays = routes.staysAboard(lineIdx, k);
             for (int d = 0; d < aboard.length; d++) {
                 aboard[d] &= stays[d];
@@ -1093,13 +1139,13 @@ public final class SimulationEngine {
             return board; // trains run through without stopping
         }
         for (TrainState t : trains) {
-            Line line = lines.get(t.lineId);
-            double[] cum = cumulativeStopSeconds.get(line.id());
-            double loop = cum[line.loopLength()];
+            ServicePattern p = pattern(t);
+            double[] cum = cumulativeStopSeconds.get(p.id());
+            double loop = cum[p.loopLength()];
             int best = -1;
             double bestAhead = Double.MAX_VALUE;
-            for (int k = 0; k < line.loopLength(); k++) {
-                if (!line.stationAtStop(k).equals(stationId)) {
+            for (int k = 0; k < p.loopLength(); k++) {
+                if (!p.stationAtStop(k).equals(stationId)) {
                     continue;
                 }
                 double ahead = cum[k] - cum[t.stop];
@@ -1118,12 +1164,12 @@ public final class SimulationEngine {
             double planned = plannedDeparture(t) + bestAhead;
             double expected = bestAhead == 0
                     ? simTime + Math.max(0, t.blockedRemaining) + remainingAtPlatform(t)
-                    : simTime + secondsUntilStop(t, line, best) + NOMINAL_DWELL;
+                    : simTime + secondsUntilStop(t, p, best) + NOMINAL_DWELL;
             if (expected - simTime > horizon) {
                 continue;
             }
-            String towards = line.towardsStationId(line.positionAtStop(best), line.directionAtStop(best));
-            board.add(new Departure(t.id, line.id(), towards, planned, clock(planned), expected, expected - planned));
+            String towards = p.towardsStationId(p.positionAtStop(best), p.directionAtStop(best));
+            board.add(new Departure(t.id, t.lineId, towards, planned, clock(planned), expected, expected - planned));
         }
         board.sort(Comparator.comparingDouble(Departure::expectedTime));
         return board;
@@ -1132,7 +1178,7 @@ public final class SimulationEngine {
     /** Seconds before a train standing at a platform is free to leave (ignoring signals). */
     private double remainingAtPlatform(TrainState t) {
         double remaining = t.phase == TrainPhase.WAITING_SIGNAL ? 0 : Math.max(0, t.phaseRemaining);
-        if (!t.holdDecided && lines.get(t.lineId).isTimingStop(t.stop)) {
+        if (!t.holdDecided && pattern(t).isTimingStop(t.stop)) {
             remaining = Math.max(remaining, plannedDeparture(t) - simTime);
         }
         return remaining;
@@ -1162,9 +1208,9 @@ public final class SimulationEngine {
         updateOverloadAlerts();
         List<SimulationSnapshot.TrainView> trainViews = new ArrayList<>();
         for (TrainState t : trains) {
-            Line line = lines.get(t.lineId);
-            Station from = network.station(line.stationAtStop(t.stop));
-            Station to = network.station(line.stationAtStop((t.stop + 1) % line.loopLength()));
+            ServicePattern p = pattern(t);
+            Station from = network.station(p.stationAtStop(t.stop));
+            Station to = network.station(p.stationAtStop((t.stop + 1) % p.loopLength()));
             double progress = t.phase == TrainPhase.RUNNING ? Math.min(1, t.segmentElapsed / t.segmentDuration) : 0;
             LineTrack track = tracks.get(t.lineId);
             double[] latLon = track != null
@@ -1252,11 +1298,14 @@ public final class SimulationEngine {
                 headwayCv(), trains.size(), inDepot, stopsSkipped, carriedPast);
     }
 
-    /** Coefficient of variation of headways across all lines: 0 = perfectly even, higher = bunching. */
+    /**
+     * Coefficient of variation of headways across all service patterns (each line, or each route of a branched
+     * line): 0 = perfectly even, higher = bunching.
+     */
     public double headwayCv() {
         List<Double> cvs = new ArrayList<>();
-        for (Line line : lines.values()) {
-            List<TrainState> lt = trains.stream().filter(t -> t.lineId.equals(line.id()))
+        for (ServicePattern p : patterns.values()) {
+            List<TrainState> lt = trains.stream().filter(t -> t.patternId.equals(p.id()))
                     .sorted(Comparator.comparingDouble(this::loopPosition)).toList();
             if (lt.size() < 2) {
                 continue;
