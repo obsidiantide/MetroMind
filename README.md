@@ -156,8 +156,9 @@ patterns, or on a branch. Spare trains from the depot join the main route.
 The bundled Ringtown network is a small fictional city built this way: two diameters crossing at Cathedral
 Square and an eight-station ring, run in both directions, that they meet at its four gates.
 
-The bundled Baku network has the Red, Green and Purple lines with 24 stations at approximate real locations and
-interchanges at 28 May and Memar Əcəmi; its track is simplified to straight runs between stations, and demand
+The bundled Baku network has the Red, Green and Purple lines with 25 stations at approximate real locations and
+interchanges at 28 May and Memar Əcəmi; two of the Red line's ten trains branch off at Nəriman Nərimanov to
+Bakmil; its track is simplified to straight runs between stations, and demand
 and fleet sizes are illustrative.
 
 ### Tests
