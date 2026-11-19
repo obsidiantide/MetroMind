@@ -239,6 +239,9 @@ are started once and shared by every integration test.
 | POST | `/api/analysis/benchmark/jobs` | Same benchmark as a background job: `202 Accepted`, poll `Location` |
 | GET | `/api/analysis/benchmark/jobs/{id}` | Job status, progress and, once done, its report |
 | DELETE | `/api/analysis/benchmark/jobs/{id}` | Cancel a queued or running job (`409` if it had already finished) |
+| POST | `/api/analysis/benchmark/day/jobs?startTimes=08:00,22:30` | Benchmark across times of day as a background job |
+| GET | `/api/analysis/benchmark/day/jobs/{id}` | Day job status, progress over all periods and, once done, its report |
+| DELETE | `/api/analysis/benchmark/day/jobs/{id}` | Cancel a queued or running day job |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
@@ -620,7 +623,7 @@ into service and the queues match its demand. It takes the same `scenarios` (at 
 Day means average the per-period means, so each time of day weighs the same however busy it is; `worstStartClock`
 is where the strategy ranked lowest. Warm-ups draw run times and dwells from the seed too, so the report is
 reproducible and independent of the live engine's state. The benchmark page's *Across the day* panel runs it with
-the page's settings.
+the page's settings, as a background job (below) with a progress bar and a cancel button.
 
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
@@ -647,6 +650,15 @@ With persistence enabled, every job that succeeds, fails or is cancelled is also
 table (the report as JSONB). Lookups and the job list fall back to it, so finished jobs and their reports stay
 available after they drop out of the 20 kept in memory and after a restart. Jobs still queued or running when the
 backend stops are lost. In the `standalone` profile jobs live in memory only.
+
+The benchmark across times of day runs as a job too: `POST /api/analysis/benchmark/day/jobs` takes the parameters
+of `/benchmark/day` (up to 50 scenarios per period) and answers `202 Accepted` like the strategy benchmark's jobs,
+or `400` straight away for a bad start time. Its `totalRuns` counts every period, `periods × strategies ×
+(scenarios + 1)`, so `progress` moves once from the first period's baseline to the last scenario; the report, once
+`SUCCEEDED`, is the same day report as the synchronous endpoint's. `GET` and `DELETE` on
+`/api/analysis/benchmark/day/jobs/{id}` poll and cancel it, and `GET /api/analysis/benchmark/day/jobs` lists recent
+ones. Day jobs share the single benchmark thread, so they queue behind strategy benchmark jobs and the other way
+round, and finished ones are kept in their own `day_benchmark_job` table.
 
 The dashboard's benchmark page (`/benchmark`) runs these jobs and shows their ranking; **Export CSV** saves the
 ranking with one row per strategy in rank order and raw numbers (`mean_wait_s`, `p95_wait_s`, `mean_travel_min`,
