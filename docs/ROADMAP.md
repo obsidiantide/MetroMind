@@ -83,7 +83,7 @@ Mark items `[x]` when merged.
       other pattern close behind can take over the stations a late train gives up
 - [x] Door-fault incident: a train held at its platform for an extra dwell, in the incident API, what-if and
       benchmark scenarios
-- [ ] Benchmark across times of day: run the same scenarios from several start times (morning peak, midday, late
+- [x] Benchmark across times of day: run the same scenarios from several start times (morning peak, midday, late
       evening) so strategies are ranked over the fleet plan's thin and full periods, not just the current moment
 
 ### Platform
