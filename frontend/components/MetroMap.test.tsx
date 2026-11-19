@@ -70,6 +70,26 @@ describe("MetroMap", () => {
     expect(container.querySelectorAll("polyline[data-track]")).toHaveLength(2); // the swatches are not tracks
   });
 
+  it("shows running against planned trains for lines with a fleet plan", () => {
+    const planned: MetroNetwork = { ...square, lines: [
+      square.lines[0],
+      { ...square.lines[1], trainCount: 3, fleetPlan: [{ from: "06:00", trains: 1 }, { from: "07:30", trains: 3 }] },
+    ] };
+    const running = snapshot({ simTime: 8 * 3600, clock: "08:00:00", trains: [
+      trainView("LINE-1", { lineId: "LINE", patternId: "LINE" }),
+      trainView("LINE-2", { lineId: "LINE", patternId: "LINE" }),
+    ] });
+    render(<MetroMap network={planned} snapshot={running} />);
+    const legend = screen.getByLabelText("Line legend");
+
+    const fleet = legend.querySelector('[data-legend="LINE"] [data-fleet]');
+    expect(fleet?.textContent).toBe(" · 2/3 trains");
+    expect(fleet?.getAttribute("fill")).toBe("#d29922"); // one short of the plan
+    expect(legend.querySelector('[data-legend="LINE"] title')?.textContent)
+      .toBe("Straight: 2 trains running, 3 planned at 08:00");
+    expect(legend.querySelector('[data-legend="CW"] [data-fleet]')).toBeNull(); // no plan
+  });
+
   it("points one arrow per run along a ring the way its trains go, and none along other lines", () => {
     const { container } = render(<MetroMap network={square} snapshot={null} />);
     const arrows = [...container.querySelectorAll('[data-ring-arrows="CW"] path')];

@@ -1,7 +1,7 @@
 "use client";
 import type { Selection } from "@/components/DetailDrawer";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { boundFor, isBranchTerminal, patternStationIds, ringTurn } from "@/lib/lines";
+import { boundFor, isBranchTerminal, patternStationIds, plannedTrains, ringTurn } from "@/lib/lines";
 import type { Branch, Line, MetroNetwork, Snapshot, Station } from "@/lib/types";
 
 const W = 900;
@@ -227,11 +227,26 @@ export function MetroMap({ network, snapshot, selected = null, onSelect = () => 
       <g transform={`translate(${PAD - 30},16)`} aria-label="Line legend">
         {network.lines.map((l, i) => {
           const turn = turns.get(l.id);
+          // Lines with a fleet plan show how many trains run against how many the plan calls for right now, so
+          // scheduled runs to and from the depot (and any shortfall) can be followed on the map.
+          const fleet = snapshot && l.fleetPlan?.length
+            ? { running: snapshot.trains.filter((t) => t.lineId === l.id).length, planned: plannedTrains(l, snapshot.simTime) }
+            : null;
           return (
             <g key={l.id} transform={`translate(0,${i * 16})`} data-legend={l.id}>
               <line x1={0} y1={-3} x2={18} y2={-3} stroke={l.color} strokeWidth={5} strokeLinecap="round" />
-              <text x={26} y={0}>{turn ? `${l.name} ${TURN_ARROW[turn]}` : l.name}</text>
+              <text x={26} y={0}>
+                {turn ? `${l.name} ${TURN_ARROW[turn]}` : l.name}
+                {fleet && (
+                  <tspan data-fleet fill={fleet.running < fleet.planned ? RISK_COLOR.MEDIUM : undefined}>
+                    {` · ${fleet.running}/${fleet.planned} trains`}
+                  </tspan>
+                )}
+              </text>
               {turn && <title>{`${l.name}: trains run ${turn} round the ring`}</title>}
+              {fleet && !turn && (
+                <title>{`${l.name}: ${fleet.running} trains running, ${fleet.planned} planned at ${snapshot!.clock.slice(0, 5)}`}</title>
+              )}
             </g>
           );
         })}
