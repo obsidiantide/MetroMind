@@ -1,5 +1,6 @@
 import type {
-  BenchmarkJob, BenchmarkRequest, ClosureResponse, DelayImpactReport, Departure, IncidentImpactReport, MetroNetwork,
+  BenchmarkJob, BenchmarkRequest, ClosureResponse, DayBenchmarkJob, DelayImpactReport, Departure, IncidentImpactReport,
+  MetroNetwork,
   MinuteKpi, TimeOfDayReport,
 } from "./types";
 
@@ -84,9 +85,23 @@ export const api = {
    * Cancels a queued or running benchmark job and returns it as it now stands. A job that had already finished is
    * returned unchanged (the server answers 409 with it), so the caller can simply show whatever comes back.
    */
-  cancelBenchmarkJob: async (id: string): Promise<BenchmarkJob> => {
-    const res = await fetch(`${API_URL}/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (!res.ok && res.status !== 409) throw new Error(`${res.status} ${await res.text()}`);
-    return (await res.json()) as BenchmarkJob;
+  cancelBenchmarkJob: (id: string) => cancelJob<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),
+  /** Queues a benchmark across the given times of day (HH:mm); poll `dayBenchmarkJob` until it has finished. */
+  submitDayBenchmark: (r: BenchmarkRequest, startTimes: string[]) => {
+    const q = benchmarkQuery(r);
+    q.set("startTimes", startTimes.join(","));
+    return call<DayBenchmarkJob>(`/api/analysis/benchmark/day/jobs?${q}`, { method: "POST" });
   },
+  dayBenchmarkJob: (id: string) =>
+    call<DayBenchmarkJob>(`/api/analysis/benchmark/day/jobs/${encodeURIComponent(id)}`),
+  /** As `cancelBenchmarkJob`, for a benchmark across times of day. */
+  cancelDayBenchmarkJob: (id: string) =>
+    cancelJob<DayBenchmarkJob>(`/api/analysis/benchmark/day/jobs/${encodeURIComponent(id)}`),
 };
+
+/** DELETE on a job: the job as it now stands, also when it had already finished (409). */
+async function cancelJob<J>(path: string): Promise<J> {
+  const res = await fetch(`${API_URL}${path}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 409) throw new Error(`${res.status} ${await res.text()}`);
+  return (await res.json()) as J;
+}
