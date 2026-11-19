@@ -53,6 +53,31 @@ class LineTest {
     }
 
     @Test
+    void dwellVariabilityIsOptionalInJson() throws Exception {
+        Line plain = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800}
+                """, Line.class);
+        assertThat(plain.dwellVariability()).isNull();
+
+        Line crowded = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "dwellVariability": 0.18}
+                """, Line.class);
+        assertThat(crowded.dwellVariability()).isEqualTo(0.18);
+    }
+
+    @Test
+    void rejectsADwellVariabilityOutsideTheSupportedRange() {
+        for (double spread : new double[] {-0.01, 0.3, Double.NaN}) {
+            assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(),
+                    false, List.of(), List.of(), List.of(), null, 0, spread))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("dwellVariability");
+        }
+    }
+
+    @Test
     void depotAccessTimeIsOptionalInJsonAndMustNotBeNegative() throws Exception {
         Line plain = mapper.readValue("""
                 {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],

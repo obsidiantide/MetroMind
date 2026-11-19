@@ -34,12 +34,28 @@ import java.util.List;
  *                       for an older line with less even running; {@code null} to use the engine-wide spread
  * @param depotAccessSeconds time a train runs empty between the depot and the first terminal, each way, when it
  *                       enters or leaves service; 0 (the default) when the depot opens straight onto the platform
+ * @param dwellVariability the line's own spread of dwells around the one its passengers set (log-standard deviation,
+ *                       0 to {@value #MAX_DWELL_VARIABILITY}), overriding the engine-wide spread for its trains, e.g.
+ *                       for a crowded central line that loses more time at the doors; {@code null} to use the
+ *                       engine-wide spread
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
                    List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
-                   Double runTimeVariability, int depotAccessSeconds)
+                   Double runTimeVariability, int depotAccessSeconds, Double dwellVariability)
         implements LoopTopology {
+
+    /** Largest dwell spread a line may declare, as for the engine-wide one. */
+    public static final double MAX_DWELL_VARIABILITY = 0.25;
+
+    /** Line dwelling at the engine-wide dwell spread. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
+                Double runTimeVariability, int depotAccessSeconds) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, fleetPlan, runTimeVariability, depotAccessSeconds, null);
+    }
 
     /** Line whose depot opens straight onto the first terminal's platform. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -161,6 +177,11 @@ public record Line(String id, String name, String color, List<String> stationIds
         }
         if (depotAccessSeconds < 0) {
             throw new IllegalArgumentException("Line " + id + ": depotAccessSeconds must not be negative");
+        }
+        if (dwellVariability != null
+                && !(dwellVariability >= 0 && dwellVariability <= MAX_DWELL_VARIABILITY)) {
+            throw new IllegalArgumentException("Line " + id + ": dwellVariability must be between 0 and "
+                    + MAX_DWELL_VARIABILITY);
         }
     }
 
