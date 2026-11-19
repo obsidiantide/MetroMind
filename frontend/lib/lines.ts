@@ -62,3 +62,25 @@ export function ringTurn(line: Line, station: (id: string) => Station): RingTurn
   }, 0);
   return area < 0 ? "clockwise" : "anticlockwise";
 }
+
+/** Seconds since midnight of an HH:mm time of day. */
+function clockSeconds(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 3600 + m * 60;
+}
+
+/**
+ * Trains a line should run at simulated time `simTime` (seconds since midnight of the first day): the fleet plan's
+ * period in force, the last one carrying on past midnight, or the line's trainCount when it has no plan. Mirrors
+ * Line.plannedTrains on the backend.
+ */
+export function plannedTrains(line: Line, simTime: number): number {
+  const plan = line.fleetPlan ?? [];
+  if (plan.length === 0) return line.trainCount;
+  const timeOfDay = ((simTime % 86_400) + 86_400) % 86_400;
+  let current = plan[plan.length - 1];
+  for (const period of plan) {
+    if (clockSeconds(period.from) <= timeOfDay) current = period;
+  }
+  return current.trains;
+}

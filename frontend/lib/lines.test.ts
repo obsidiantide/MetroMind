@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  boundFor, isBranchTerminal, lineSections, lineStationIds, patternStationIds, ringTurn,
+  boundFor, isBranchTerminal, lineSections, lineStationIds, patternStationIds, plannedTrains, ringTurn,
 } from "@/lib/lines";
 import type { Line, Station } from "@/lib/types";
 
@@ -83,5 +83,29 @@ describe("patternStationIds", () => {
     const listed: Line = { ...branched, patterns: [{ id: "RED/Y", lineId: "RED", stationIds: ["B", "X", "Y"],
       runSeconds: [90, 80], ring: false, timingStationIds: ["B", "Y"], trainCount: 1 }] };
     expect(patternStationIds(listed, "RED/Y")).toEqual(["B", "X", "Y"]);
+  });
+});
+
+describe("plannedTrains", () => {
+  const planned: Line = {
+    ...red,
+    fleetPlan: [{ from: "06:00", trains: 2 }, { from: "07:00", trains: 6 }, { from: "23:00", trains: 1 }],
+  };
+
+  it("is the trainCount for a line without a plan", () => {
+    expect(plannedTrains(red, 3 * 3600)).toBe(4);
+    expect(plannedTrains({ ...red, fleetPlan: [] }, 8 * 3600)).toBe(4);
+  });
+
+  it("follows the period in force", () => {
+    expect(plannedTrains(planned, 6 * 3600)).toBe(2);
+    expect(plannedTrains(planned, 7 * 3600 - 1)).toBe(2);
+    expect(plannedTrains(planned, 7 * 3600)).toBe(6);
+    expect(plannedTrains(planned, 23.5 * 3600)).toBe(1);
+  });
+
+  it("carries the last period on past midnight and repeats the plan the next day", () => {
+    expect(plannedTrains(planned, 3 * 3600)).toBe(1);
+    expect(plannedTrains(planned, 24 * 3600 + 8 * 3600)).toBe(6);
   });
 });
