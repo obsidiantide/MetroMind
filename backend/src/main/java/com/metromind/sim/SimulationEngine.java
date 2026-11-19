@@ -658,7 +658,16 @@ public final class SimulationEngine {
      */
     private double dwell(TrainState t, double passengersMoved) {
         double byPassengers = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * passengersMoved));
-        return Math.max(MIN_DWELL, byPassengers * dwellVariability.factor(t.id, t.callsMade++));
+        return Math.max(MIN_DWELL, byPassengers * dwellVariability(t).factor(t.id, t.callsMade++));
+    }
+
+    /**
+     * Dwell variability a train's dwells are drawn with: its line's own spread when the line declares one, with the
+     * engine's seed, otherwise the engine-wide variability.
+     */
+    private DwellVariability dwellVariability(TrainState t) {
+        Double own = network.line(t.lineId).dwellVariability();
+        return own == null ? dwellVariability : dwellVariability.withSigma(own);
     }
 
     /**
@@ -2084,7 +2093,8 @@ public final class SimulationEngine {
 
     /**
      * Draws every dwell started from now on around the one its passengers set (see {@link DwellVariability});
-     * copies made afterwards inherit it. Dwells already under way keep their length.
+     * copies made afterwards inherit it. Dwells already under way keep their length. A line that declares its own
+     * {@link com.metromind.network.Line#dwellVariability() spread} keeps it, drawn from this seed.
      */
     public void setDwellVariability(DwellVariability variability) { this.dwellVariability = variability; }
     public MetroNetwork network() { return network; }
