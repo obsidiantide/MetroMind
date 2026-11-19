@@ -40,6 +40,8 @@ public final class TrainState {
     double doorFaultSince;
     /** Runs between stations the train has started; numbers its run-time variability draws. */
     long runsStarted;
+    /** Platform calls the train has made (dwells started); numbers its dwell variability draws. */
+    long callsMade;
     final List<Double> arrivals = new ArrayList<>();
 
     TrainState(String id, String lineId, String patternId, int capacity, int stationCount) {
@@ -68,6 +70,7 @@ public final class TrainState {
         t.delayAlertActive = delayAlertActive;
         t.skippedLastStop = skippedLastStop;
         t.runsStarted = runsStarted;
+        t.callsMade = callsMade;
         t.doorFaultPending = doorFaultPending;
         t.doorFaultActive = doorFaultActive;
         t.doorFaultSince = doorFaultSince;
