@@ -113,6 +113,7 @@ public final class SimulationEngine {
     private double nextDispatchCheck;
     private HeadwayStrategy strategy;
     private RunTimeVariability variability = RunTimeVariability.NONE;
+    private DwellVariability dwellVariability = DwellVariability.NONE;
     private double simTime;
     private boolean recordArrivals;
     /** Integral of passengers on board over time, all trains (passenger-seconds). */
@@ -245,6 +246,7 @@ public final class SimulationEngine {
         this.nextDispatchCheck = other.nextDispatchCheck;
         this.strategy = other.strategy;
         this.variability = other.variability;
+        this.dwellVariability = other.dwellVariability;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
         this.rideSeconds = other.rideSeconds;
@@ -629,11 +631,20 @@ public final class SimulationEngine {
         double alight = alight(t, st);
         double board = board(t, p, st);
 
-        t.phaseRemaining = Math.max(MIN_DWELL,
-                Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
+        t.phaseRemaining = dwell(t, alight + board);
         if (t.doorFaultPending > 0) {
             applyDoorFault(t);
         }
+    }
+
+    /**
+     * Dwell of a train calling at a platform where {@code passengersMoved} get off or on: set by the passengers
+     * (between {@link #MIN_DWELL} and {@link #MAX_DWELL}), then drawn around that by the dwell variability, never
+     * below the minimum. Each call draws the next number of the train's dwell stream.
+     */
+    private double dwell(TrainState t, double passengersMoved) {
+        double byPassengers = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * passengersMoved));
+        return Math.max(MIN_DWELL, byPassengers * dwellVariability.factor(t.id, t.callsMade++));
     }
 
     /**
@@ -1061,8 +1072,7 @@ public final class SimulationEngine {
         double board = board(t, p, st);
         t.phase = TrainPhase.DWELLING;
         t.holdDecided = false;
-        t.phaseRemaining = Math.max(MIN_DWELL,
-                Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
+        t.phaseRemaining = dwell(t, alight + board);
         return true;
     }
 
@@ -1424,7 +1434,7 @@ public final class SimulationEngine {
         t.scheduledArrival = simTime;
         t.phase = TrainPhase.DWELLING;
         double board = board(t, pattern, stations.get(line.stationIds().get(0)));
-        t.phaseRemaining = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * board));
+        t.phaseRemaining = dwell(t, board);
         trains.add(t);
         depot.merge(line.id(), -1, Integer::sum);
         emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train " + t.id + " " + reason);
@@ -1959,6 +1969,13 @@ public final class SimulationEngine {
      * afterwards inherit it. Runs already under way keep their duration.
      */
     public void setRunTimeVariability(RunTimeVariability variability) { this.variability = variability; }
+    public DwellVariability dwellVariability() { return dwellVariability; }
+
+    /**
+     * Draws every dwell started from now on around the one its passengers set (see {@link DwellVariability});
+     * copies made afterwards inherit it. Dwells already under way keep their length.
+     */
+    public void setDwellVariability(DwellVariability variability) { this.dwellVariability = variability; }
     public MetroNetwork network() { return network; }
     public void setRecordArrivals(boolean record) { this.recordArrivals = record; }
     public List<TrainState> trains() { return List.copyOf(trains); }
