@@ -2,7 +2,7 @@
  "type": "FeatureCollection",
  "properties": {
   "city": "Baku",
-  "source": "Approximate public station locations of the Baku Metro; track simplified to straight runs between stations. Demand and fleet figures are illustrative."
+  "source": "Approximate public station locations of the Baku Metro; track simplified to straight runs between stations. Demand and fleet figures (including the time-of-day fleet plans) are illustrative."
  },
  "features": [
   {
@@ -334,7 +334,15 @@
     "stationIds": ["icherisheher", "sahil", "28may", "ganjlik", "narimanov", "ulduz", "koroglu", "garayev", "neftchilar", "khalglar", "ahmadli", "aslanov"],
     "trainCount": 10,
     "trainCapacity": 1000,
-    "spareTrains": 2
+    "spareTrains": 2,
+    "fleetPlan": [
+     {"from": "06:00", "trains": 6},
+     {"from": "07:00", "trains": 10},
+     {"from": "10:00", "trains": 7},
+     {"from": "16:30", "trains": 10},
+     {"from": "20:00", "trains": 6},
+     {"from": "23:00", "trains": 4}
+    ]
    }
   },
   {
@@ -376,7 +384,15 @@
     "stationIds": ["darnagul", "azadlig", "nasimi", "ajami", "20yanvar", "inshaatchilar", "elmlar", "nizami", "28may", "khatai"],
     "trainCount": 7,
     "trainCapacity": 1000,
-    "spareTrains": 1
+    "spareTrains": 1,
+    "fleetPlan": [
+     {"from": "06:00", "trains": 4},
+     {"from": "07:00", "trains": 7},
+     {"from": "10:00", "trains": 5},
+     {"from": "16:30", "trains": 7},
+     {"from": "20:00", "trains": 4},
+     {"from": "23:00", "trains": 3}
+    ]
    }
   },
   {
@@ -396,7 +412,12 @@
     "color": "#8e24aa",
     "stationIds": ["khojasan", "avtovaghzal", "ajami", "8noyabr"],
     "trainCount": 3,
-    "trainCapacity": 800
+    "trainCapacity": 800,
+    "fleetPlan": [
+     {"from": "06:00", "trains": 2},
+     {"from": "07:00", "trains": 3},
+     {"from": "20:00", "trains": 2}
+    ]
    }
   }
  ]

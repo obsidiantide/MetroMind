@@ -12,6 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +39,15 @@ class NetworkApiTest {
                 .andExpect(jsonPath("$.lines[0].patterns[1].stationIds[0]").value("icherisheher"))
                 .andExpect(jsonPath("$.lines[0].patterns[1].stationIds[-1]").value("bakmil"))
                 .andExpect(jsonPath("$.lines[0].patterns[1].runSeconds").isArray());
+    }
+
+    @Test
+    void listsEachLinesFleetPlan() throws Exception {
+        mvc.perform(get("/api/network"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lines[0].fleetPlan[0].from").value("06:00"))
+                .andExpect(jsonPath("$.lines[0].fleetPlan[0].trains").value(6))
+                .andExpect(jsonPath("$.lines[0].fleetPlan[*].from", hasItem("16:30")));
     }
 
     @Test
