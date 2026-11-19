@@ -32,6 +32,12 @@ public final class TrainState {
     boolean delayAlertActive;
     /** Whether the train ran through its last stop without calling (skip-stop); it never skips two in a row. */
     boolean skippedLastStop;
+    /** Door-fault dwell still to be added at the next platform the train calls at (it was running when it failed). */
+    double doorFaultPending;
+    /** Whether the train is standing at a platform held by a door fault; cleared when it leaves. */
+    boolean doorFaultActive;
+    /** Simulated time the current door fault was reported. */
+    double doorFaultSince;
     /** Runs between stations the train has started; numbers its run-time variability draws. */
     long runsStarted;
     final List<Double> arrivals = new ArrayList<>();
@@ -62,6 +68,9 @@ public final class TrainState {
         t.delayAlertActive = delayAlertActive;
         t.skippedLastStop = skippedLastStop;
         t.runsStarted = runsStarted;
+        t.doorFaultPending = doorFaultPending;
+        t.doorFaultActive = doorFaultActive;
+        t.doorFaultSince = doorFaultSince;
         t.arrivals.addAll(arrivals);
         return t;
     }
