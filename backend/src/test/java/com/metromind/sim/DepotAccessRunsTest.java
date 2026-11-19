@@ -33,10 +33,15 @@ class DepotAccessRunsTest {
         assertThat(engine.trains()).as("07:32: still on its way").hasSize(2);
         assertThat(engine.trainsOnDepotRuns("L1")).isEqualTo(1);
         assertThat(engine.depotTrains("L1")).as("it has left the depot").isZero();
+        SimulationSnapshot.Metrics metrics = engine.snapshot().metrics();
+        assertThat(metrics.trainsOnDepotRuns()).isEqualTo(1);
+        assertThat(metrics.trainsInService()).isEqualTo(2);
+        assertThat(metrics.trainsInDepot()).isZero();
 
         engine.run(5 * 60, 1);
         assertThat(engine.trains()).extracting(TrainState::id).containsExactly("L1-1", "L1-2", "L1-3");
         assertThat(engine.trainsOnDepotRuns("L1")).isZero();
+        assertThat(engine.snapshot().metrics().trainsOnDepotRuns()).isZero();
         List<SimEvent> dispatched = events(engine, SimEvent.Type.TRAIN_DISPATCHED);
         assertThat(dispatched).hasSize(1);
         assertThat(dispatched.get(0).simTime()).isGreaterThanOrEqualTo(7 * 3600 + 34 * 60);
