@@ -49,7 +49,7 @@ public class SimulationService {
     /** One benchmark job at a time: each already keeps a core busy, and jobs queue behind it. */
     private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
             .name("benchmark-job").daemon(true).factory());
-    private final BenchmarkJobs benchmarkJobs;
+    private final BenchmarkJobs<BenchmarkReport> benchmarkJobs;
     private final Timer tickTimer;
     private final MeterRegistry meters;
     private volatile boolean paused;
@@ -57,10 +57,10 @@ public class SimulationService {
 
     public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners,
                              IncidentHistory history, MeterRegistry meters,
-                             ObjectProvider<BenchmarkJobStore> jobStore) {
+                             ObjectProvider<BenchmarkJobStore<BenchmarkReport>> jobStore) {
         this.props = props;
-        this.benchmarkJobs = new BenchmarkJobs(benchmarkExecutor, 20, Clock.systemUTC(),
-                jobStore.getIfAvailable(() -> BenchmarkJobStore.NONE));
+        this.benchmarkJobs = new BenchmarkJobs<>(benchmarkExecutor, 20, Clock.systemUTC(),
+                jobStore.getIfAvailable(BenchmarkJobStore::none));
         this.listeners = listeners;
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
@@ -271,7 +271,7 @@ public class SimulationService {
      *
      * @throws BenchmarkJobs.QueueFullException if too many jobs are already queued or running
      */
-    public BenchmarkJobs.Job submitBenchmark(int scenarios, long seed, double horizonSeconds,
+    public BenchmarkJobs.Job<BenchmarkReport> submitBenchmark(int scenarios, long seed, double horizonSeconds,
                                              Set<BenchmarkReport.IncidentKind> kinds,
                                              BenchmarkReport.RankingMetric metric, double runTimeVariability,
                                              double dwellVariability) {
@@ -286,17 +286,17 @@ public class SimulationService {
                         dwellVariability, progress)));
     }
 
-    public Optional<BenchmarkJobs.Job> benchmarkJob(String id) {
+    public Optional<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJob(String id) {
         return benchmarkJobs.get(id);
     }
 
     /** Cancels a queued or running benchmark job; see {@link BenchmarkJobs#cancel}. */
-    public Optional<BenchmarkJobs.Job> cancelBenchmarkJob(String id) {
+    public Optional<BenchmarkJobs.Job<BenchmarkReport>> cancelBenchmarkJob(String id) {
         return benchmarkJobs.cancel(id);
     }
 
     /** Benchmark jobs still kept, most recently submitted first. */
-    public List<BenchmarkJobs.Job> benchmarkJobs(int limit) {
+    public List<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJobs(int limit) {
         return benchmarkJobs.recent(limit);
     }
 

@@ -68,10 +68,10 @@ class BenchmarkJobsTest {
 
     @Test
     void aJobIsQueuedThenRunsWithProgressThenKeepsItsReport() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock);
         AtomicReference<String> id = new AtomicReference<>();
-        AtomicReference<BenchmarkJobs.Job> seenWhileRunning = new AtomicReference<>();
-        BenchmarkJobs.Job queued = jobs.submit(4, progress -> {
+        AtomicReference<BenchmarkJobs.Job<BenchmarkReport>> seenWhileRunning = new AtomicReference<>();
+        BenchmarkJobs.Job<BenchmarkReport> queued = jobs.submit(4, progress -> {
             progress.onProgress(1, 4);
             progress.onProgress(2, 4);
             seenWhileRunning.set(jobs.get(id.get()).orElseThrow());
@@ -88,7 +88,7 @@ class BenchmarkJobsTest {
         assertThat(seenWhileRunning.get().status()).isEqualTo(BenchmarkJobs.Status.RUNNING);
         assertThat(seenWhileRunning.get().completedRuns()).isEqualTo(2);
         assertThat(seenWhileRunning.get().progress()).isEqualTo(0.5);
-        BenchmarkJobs.Job done = jobs.get(queued.id()).orElseThrow();
+        BenchmarkJobs.Job<BenchmarkReport> done = jobs.get(queued.id()).orElseThrow();
         assertThat(done.status()).isEqualTo(BenchmarkJobs.Status.SUCCEEDED);
         assertThat(done.progress()).isEqualTo(1.0);
         assertThat(done.report()).isEqualTo(REPORT);
@@ -98,7 +98,7 @@ class BenchmarkJobsTest {
 
     @Test
     void aFailingBenchmarkMarksTheJobFailedWithItsMessage() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock);
         String id = jobs.submit(3, progress -> {
             progress.onProgress(1, 3);
             throw new IllegalArgumentException("Unknown train: NOPE");
@@ -106,7 +106,7 @@ class BenchmarkJobsTest {
 
         executor.runNext();
 
-        BenchmarkJobs.Job failed = jobs.get(id).orElseThrow();
+        BenchmarkJobs.Job<BenchmarkReport> failed = jobs.get(id).orElseThrow();
         assertThat(failed.status()).isEqualTo(BenchmarkJobs.Status.FAILED);
         assertThat(failed.error()).isEqualTo("Unknown train: NOPE");
         assertThat(failed.completedRuns()).isEqualTo(1);
@@ -115,7 +115,7 @@ class BenchmarkJobsTest {
 
     @Test
     void forgetsTheOldestFinishedJobsBeyondTheRetainedCount() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 2, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 2, clock);
         String first = jobs.submit(1, progress -> REPORT).id();
         String second = jobs.submit(1, progress -> REPORT).id();
         executor.runNext();
@@ -131,7 +131,7 @@ class BenchmarkJobsTest {
 
     @Test
     void refusesNewJobsWhileEveryRetainedOneIsUnfinished() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 2, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 2, clock);
         jobs.submit(1, progress -> REPORT);
         jobs.submit(1, progress -> REPORT);
 
@@ -145,14 +145,14 @@ class BenchmarkJobsTest {
 
     @Test
     void aCancelledQueuedJobNeverStarts() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock);
         AtomicReference<Boolean> started = new AtomicReference<>(false);
         String id = jobs.submit(2, progress -> {
             started.set(true);
             return REPORT;
         }).id();
 
-        BenchmarkJobs.Job cancelled = jobs.cancel(id).orElseThrow();
+        BenchmarkJobs.Job<BenchmarkReport> cancelled = jobs.cancel(id).orElseThrow();
         assertThat(cancelled.status()).isEqualTo(BenchmarkJobs.Status.CANCELLED);
         assertThat(cancelled.finishedAt()).isEqualTo(clock.instant());
         assertThat(cancelled.startedAt()).isNull();
@@ -164,7 +164,7 @@ class BenchmarkJobsTest {
 
     @Test
     void aCancelledRunningJobStopsAtItsNextProgressReport() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock);
         AtomicReference<String> id = new AtomicReference<>();
         AtomicReference<Integer> lastRun = new AtomicReference<>(0);
         id.set(jobs.submit(4, progress -> {
@@ -182,7 +182,7 @@ class BenchmarkJobsTest {
 
         // Cancelled after the second run: the third run is the last one started, and its report is rejected.
         assertThat(lastRun.get()).isEqualTo(3);
-        BenchmarkJobs.Job job = jobs.get(id.get()).orElseThrow();
+        BenchmarkJobs.Job<BenchmarkReport> job = jobs.get(id.get()).orElseThrow();
         assertThat(job.status()).isEqualTo(BenchmarkJobs.Status.CANCELLED);
         assertThat(job.completedRuns()).isEqualTo(2);
         assertThat(job.report()).isNull();
@@ -191,7 +191,7 @@ class BenchmarkJobsTest {
 
     @Test
     void cancellingAFinishedJobLeavesItAsItWas() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock);
         String id = jobs.submit(1, progress -> REPORT).id();
         executor.runNext();
 
@@ -204,7 +204,7 @@ class BenchmarkJobsTest {
 
     @Test
     void aCancelledJobFreesItsPlaceForANewOne() {
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 1, clock);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 1, clock);
         String id = jobs.submit(1, progress -> REPORT).id();
         jobs.cancel(id);
         assertThat(jobs.submit(1, progress -> REPORT).status()).isEqualTo(BenchmarkJobs.Status.QUEUED);
@@ -212,22 +212,22 @@ class BenchmarkJobsTest {
     }
 
     /** A store backed by a map, standing in for PostgreSQL. */
-    private static final class MapStore implements BenchmarkJobStore {
-        final Map<String, BenchmarkJobs.Job> saved = new LinkedHashMap<>();
+    private static final class MapStore implements BenchmarkJobStore<BenchmarkReport> {
+        final Map<String, BenchmarkJobs.Job<BenchmarkReport>> saved = new LinkedHashMap<>();
 
         @Override
-        public void save(BenchmarkJobs.Job job) {
+        public void save(BenchmarkJobs.Job<BenchmarkReport> job) {
             saved.put(job.id(), job);
         }
 
         @Override
-        public Optional<BenchmarkJobs.Job> find(String id) {
+        public Optional<BenchmarkJobs.Job<BenchmarkReport>> find(String id) {
             return Optional.ofNullable(saved.get(id));
         }
 
         @Override
-        public List<BenchmarkJobs.Job> recent(int limit) {
-            return saved.values().stream().sorted(Comparator.comparing(BenchmarkJobs.Job::submittedAt).reversed())
+        public List<BenchmarkJobs.Job<BenchmarkReport>> recent(int limit) {
+            return saved.values().stream().sorted(Comparator.comparing(BenchmarkJobs.Job<BenchmarkReport>::submittedAt).reversed())
                     .limit(limit).toList();
         }
     }
@@ -235,7 +235,7 @@ class BenchmarkJobsTest {
     @Test
     void storesOnlyJobsThatReachAFinalState() {
         MapStore store = new MapStore();
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 5, clock, store);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 5, clock, store);
         String ok = jobs.submit(1, progress -> REPORT).id();
         String failed = jobs.submit(1, progress -> {
             throw new IllegalStateException("boom");
@@ -258,11 +258,11 @@ class BenchmarkJobsTest {
     @Test
     void finishedJobsOutliveARestartThroughTheStore() {
         MapStore store = new MapStore();
-        BenchmarkJobs before = new BenchmarkJobs(executor, 5, clock, store);
+        BenchmarkJobs<BenchmarkReport> before = new BenchmarkJobs<>(executor, 5, clock, store);
         String id = before.submit(2, progress -> REPORT).id();
         executor.runNext();
 
-        BenchmarkJobs after = new BenchmarkJobs(new ManualExecutor(), 5, clock, store);
+        BenchmarkJobs<BenchmarkReport> after = new BenchmarkJobs<>(new ManualExecutor(), 5, clock, store);
         assertThat(after.get(id)).hasValueSatisfying(job -> assertThat(job.report()).isEqualTo(REPORT));
         assertThat(after.recent(10)).extracting(BenchmarkJobs.Job::id).containsExactly(id);
         // Cancelling a stored job that has finished leaves it as it was.
@@ -274,10 +274,10 @@ class BenchmarkJobsTest {
     void listingsMergeHeldAndStoredJobsWithoutDuplicates() {
         MapStore store = new MapStore();
         Clock later = Clock.offset(clock, Duration.ofMinutes(5));
-        BenchmarkJobs jobs = new BenchmarkJobs(executor, 1, clock, store);
+        BenchmarkJobs<BenchmarkReport> jobs = new BenchmarkJobs<>(executor, 1, clock, store);
         String old = jobs.submit(1, progress -> REPORT).id();
         executor.runNext();
-        BenchmarkJobs restarted = new BenchmarkJobs(executor, 1, later, store);
+        BenchmarkJobs<BenchmarkReport> restarted = new BenchmarkJobs<>(executor, 1, later, store);
         String fresh = restarted.submit(1, progress -> REPORT).id();
         executor.runNext();
 
@@ -288,6 +288,6 @@ class BenchmarkJobsTest {
 
     @Test
     void anUnknownJobIsEmpty() {
-        assertThat(new BenchmarkJobs(executor, 1, clock).get("missing")).isEmpty();
+        assertThat(new BenchmarkJobs<>(executor, 1, clock).get("missing")).isEmpty();
     }
 }
