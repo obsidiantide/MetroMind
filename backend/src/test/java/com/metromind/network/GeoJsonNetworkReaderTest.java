@@ -153,6 +153,26 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsAFleetPlanAndDefaultsToNone() throws Exception {
+        MetroNetwork planned = read(network(
+                ", \"fleetPlan\": [{\"from\": \"06:00\", \"trains\": 2}, {\"from\": \"07:00\", \"trains\": 4}]",
+                "49.84"));
+        assertThat(planned.line("L1").fleetPlan())
+                .containsExactly(new FleetPlanPeriod("06:00", 2), new FleetPlanPeriod("07:00", 4));
+        assertThat(planned.line("L1").plannedTrains(6.5 * 3600)).isEqualTo(2);
+
+        assertThat(read(network("", "49.84")).line("L1").fleetPlan()).isEmpty();
+    }
+
+    @Test
+    void rejectsIncompleteFleetPlanPeriods() {
+        assertThatThrownBy(() -> read(network(", \"fleetPlan\": [{\"from\": \"06:00\"}]", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Line L1")
+                .hasMessageContaining("fleetPlan");
+    }
+
+    @Test
     void derivesRunTimesFromTrackLengthNotStraightLineDistance() throws Exception {
         Line line = read(network("", "49.84")).line("L1");
 
