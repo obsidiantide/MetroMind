@@ -170,7 +170,7 @@ public final class SimulationEngine {
                 patterns.put(p.id(), p);
                 double[] cum = new double[p.loopLength() + 1];
                 for (int k = 0; k < p.loopLength(); k++) {
-                    cum[k + 1] = cum[k] + p.runSecondsFromStop(k) + NOMINAL_DWELL;
+                    cum[k + 1] = cum[k] + nominalDwell(p, k) + p.runSecondsFromStop(k);
                 }
                 cumulativeStopSeconds.put(p.id(), cum);
             }
@@ -310,7 +310,7 @@ public final class SimulationEngine {
             // shared trunk), start at the next free platform, going on round the loop if need be.
             int tries = 0;
             while (taken.contains(blockKey(p, stop))
-                    || !approachFree(p, offset >= NOMINAL_DWELL ? stop + 1 : stop, fedFrom)) {
+                    || !approachFree(p, offset >= nominalDwell(p, stop) ? stop + 1 : stop, fedFrom)) {
                 if (++tries >= p.loopLength()) {
                     throw new IllegalStateException("Too many trains for line " + line.id());
                 }
@@ -318,19 +318,20 @@ public final class SimulationEngine {
                 offset = 0;
             }
             taken.add(blockKey(p, stop));
-            int platform = offset >= NOMINAL_DWELL ? stop + 1 : stop;
+            double stopDwell = nominalDwell(p, stop);
+            int platform = offset >= stopDwell ? stop + 1 : stop;
             fedFrom.put(blockKey(p, platform), approachFrom(p, platform));
             TrainState t = new TrainState(line.id() + "-" + (++number), line.id(), p.id(),
                     line.trainCapacity(), network.stations().size());
             t.stop = stop;
             t.scheduledArrival = simTime - offset;
-            if (offset < NOMINAL_DWELL) {
+            if (offset < stopDwell) {
                 t.phase = TrainPhase.DWELLING;
-                t.phaseRemaining = NOMINAL_DWELL - offset;
+                t.phaseRemaining = stopDwell - offset;
             } else {
                 t.phase = TrainPhase.RUNNING;
                 t.segmentDuration = p.runSecondsFromStop(stop);
-                t.segmentElapsed = offset - NOMINAL_DWELL;
+                t.segmentElapsed = offset - stopDwell;
             }
             trains.add(t);
         }
@@ -563,9 +564,17 @@ public final class SimulationEngine {
         return alighting;
     }
 
-    /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell. */
+    /** Timetabled departure from the train's current stop: planned arrival plus the nominal dwell there. */
     double plannedDeparture(TrainState t) {
-        return t.scheduledArrival + NOMINAL_DWELL;
+        return t.scheduledArrival + nominalDwell(pattern(t), t.stop);
+    }
+
+    /**
+     * Dwell the timetable allows at stop {@code k} of {@code p}: {@link #NOMINAL_DWELL}, plus the line's crew-change
+     * time where drivers swap (see {@link Line#crewChangeStationIds()}).
+     */
+    private double nominalDwell(ServicePattern p, int k) {
+        return NOMINAL_DWELL + lines.get(p.lineId()).crewChangeSecondsAt(p.stationAtStop(k));
     }
 
     private void tryDepart(TrainState t) {
@@ -610,7 +619,7 @@ public final class SimulationEngine {
 
     private void arrive(TrainState t) {
         ServicePattern p = pattern(t);
-        t.scheduledArrival += p.runSecondsFromStop(t.stop) + NOMINAL_DWELL;
+        t.scheduledArrival += nominalDwell(p, t.stop) + p.runSecondsFromStop(t.stop);
         t.stop = (t.stop + 1) % p.loopLength();
         t.delaySeconds = Math.max(0, simTime - t.scheduledArrival);
         if (recordArrivals) {
@@ -654,11 +663,14 @@ public final class SimulationEngine {
     /**
      * Dwell of a train calling at a platform where {@code passengersMoved} get off or on: set by the passengers
      * (between {@link #MIN_DWELL} and {@link #MAX_DWELL}), then drawn around that by the dwell variability, never
-     * below the minimum. Each call draws the next number of the train's dwell stream.
+     * below the minimum. Each call draws the next number of the train's dwell stream. Where drivers swap the crew
+     * change adds its fixed time on top.
      */
     private double dwell(TrainState t, double passengersMoved) {
         double byPassengers = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * passengersMoved));
-        return Math.max(MIN_DWELL, byPassengers * dwellVariability(t).factor(t.id, t.callsMade++));
+        double drawn = Math.max(MIN_DWELL, byPassengers * dwellVariability(t).factor(t.id, t.callsMade++));
+        ServicePattern p = pattern(t);
+        return drawn + lines.get(t.lineId).crewChangeSecondsAt(p.stationAtStop(t.stop));
     }
 
     /**
@@ -778,10 +790,11 @@ public final class SimulationEngine {
         double[] cum = cumulativeStopSeconds.get(t.patternId);
         double base = cum[t.stop];
         if (t.phase == TrainPhase.RUNNING) {
-            double nominal = cum[t.stop + 1] - cum[t.stop] - NOMINAL_DWELL;
+            double stopDwell = nominalDwell(pattern(t), t.stop);
+            double nominal = cum[t.stop + 1] - cum[t.stop] - stopDwell;
             double along = t.segmentDuration == nominal ? t.segmentElapsed
                     : nominal * Math.min(1, t.segmentElapsed / t.segmentDuration);
-            return base + NOMINAL_DWELL + along;
+            return base + stopDwell + along;
         }
         return base;
     }
@@ -1831,7 +1844,7 @@ public final class SimulationEngine {
             double planned = plannedDeparture(t) + bestAhead;
             double expected = bestAhead == 0
                     ? simTime + Math.max(0, t.blockedRemaining) + remainingAtPlatform(t)
-                    : simTime + secondsUntilStop(t, p, best) + NOMINAL_DWELL;
+                    : simTime + secondsUntilStop(t, p, best) + nominalDwell(p, best);
             if (expected - simTime > horizon) {
                 continue;
             }
