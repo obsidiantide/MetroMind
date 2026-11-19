@@ -34,7 +34,7 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
         assertThat(store).isInstanceOf(JdbcBenchmarkJobStore.class);
 
         String id = simulation.submitBenchmark(1, 5, 300, EnumSet.allOf(BenchmarkReport.IncidentKind.class),
-                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05).id();
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05, 0.1).id();
         await().atMost(Duration.ofSeconds(60)).until(() -> store.find(id).isPresent());
 
         BenchmarkJobs.Job stored = store.find(id).orElseThrow();

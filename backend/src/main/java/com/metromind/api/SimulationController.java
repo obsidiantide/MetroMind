@@ -224,7 +224,7 @@ public class SimulationController {
      * track-section closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
      * (default) or {@code TRAVEL_TIME}. {@code runTimeVariability} (0 to 0.25) sets how much run times between
      * stations vary around nominal in every run, drawn from {@code seed}; by default as much as on the live engine.
-     * Does not touch live state.
+     * {@code dwellVariability} (0 to 0.25) does the same for dwells at platforms. Does not touch live state.
      */
     @Tag(name = "Analysis")
     @Operation(summary = "Rank strategies over random incident scenarios")
@@ -236,9 +236,11 @@ public class SimulationController {
                                      @RequestParam(defaultValue = "WAIT_PER_BOARDING")
                                      BenchmarkReport.RankingMetric metric,
                                      @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
-                                     Double runTimeVariability) {
+                                     Double runTimeVariability,
+                                     @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
+                                     Double dwellVariability) {
         return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric,
-                spread(runTimeVariability));
+                spread(runTimeVariability), dwellSpread(dwellVariability));
     }
 
     /**
@@ -258,9 +260,10 @@ public class SimulationController {
             @RequestParam(defaultValue = "1800") @Min(300) @Max(7200) double horizonSeconds,
             @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
             @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
-            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability) {
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
         BenchmarkJobs.Job job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric,
-                spread(runTimeVariability));
+                spread(runTimeVariability), dwellSpread(dwellVariability));
         return ResponseEntity.accepted()
                 .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
                         .toUri())
@@ -309,6 +312,11 @@ public class SimulationController {
     /** The run-time spread a benchmark uses: the one requested, otherwise the live engine's. */
     private double spread(Double requested) {
         return requested != null ? requested : simulation.runTimeVariability().sigma();
+    }
+
+    /** The dwell spread a benchmark uses: the one requested, otherwise the live engine's. */
+    private double dwellSpread(Double requested) {
+        return requested != null ? requested : simulation.dwellVariability().sigma();
     }
 
     @ExceptionHandler(BenchmarkJobs.QueueFullException.class)

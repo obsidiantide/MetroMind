@@ -232,19 +232,21 @@ public class SimulationService {
 
     /**
      * Ranks every headway strategy over {@code scenarios} random incidents drawn from {@code seed}, starting from a
-     * copy of the live state, with run times varying by {@code runTimeVariability} around nominal. Like the delay
+     * copy of the live state, with run times varying by {@code runTimeVariability} around nominal and dwells by
+     * {@code dwellVariability} around the passenger-driven one. Like the delay
      * analysis it never touches the live engine.
      */
     public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds,
                                                Set<BenchmarkReport.IncidentKind> kinds,
-                                               BenchmarkReport.RankingMetric metric, double runTimeVariability) {
+                                               BenchmarkReport.RankingMetric metric, double runTimeVariability,
+                                               double dwellVariability) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
         }
         return analysisTimer("benchmark").record(
                 () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric,
-                        runTimeVariability, StrategyBenchmark.ProgressListener.NONE));
+                        runTimeVariability, dwellVariability, StrategyBenchmark.ProgressListener.NONE));
     }
 
     /**
@@ -255,7 +257,8 @@ public class SimulationService {
      */
     public BenchmarkJobs.Job submitBenchmark(int scenarios, long seed, double horizonSeconds,
                                              Set<BenchmarkReport.IncidentKind> kinds,
-                                             BenchmarkReport.RankingMetric metric, double runTimeVariability) {
+                                             BenchmarkReport.RankingMetric metric, double runTimeVariability,
+                                             double dwellVariability) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
@@ -263,7 +266,8 @@ public class SimulationService {
         List<HeadwayStrategy> strategies = HeadwayStrategy.all();
         return benchmarkJobs.submit(StrategyBenchmark.totalRuns(scenarios, strategies.size()),
                 progress -> analysisTimer("benchmark").record(() -> benchmark.run(fork, scenarios, seed,
-                        horizonSeconds, strategies, kinds, metric, runTimeVariability, progress)));
+                        horizonSeconds, strategies, kinds, metric, runTimeVariability,
+                        dwellVariability, progress)));
     }
 
     public Optional<BenchmarkJobs.Job> benchmarkJob(String id) {
