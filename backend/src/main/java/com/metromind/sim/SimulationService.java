@@ -61,6 +61,7 @@ public class SimulationService {
         this.listeners = listeners;
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
+        this.engine.setRunTimeVariability(props.variability());
         this.last = engine.snapshot();
         this.meters = meters;
         this.tickTimer = Timer.builder("metromind.sim.tick")
@@ -175,6 +176,13 @@ public class SimulationService {
     public List<Departure> departures(String stationId, double horizonSeconds) {
         synchronized (engine) {
             return engine.departures(stationId, horizonSeconds);
+        }
+    }
+
+    /** Run-time variability of the live engine, which analyses and benchmarks start from. */
+    public RunTimeVariability runTimeVariability() {
+        synchronized (engine) {
+            return engine.runTimeVariability();
         }
     }
 

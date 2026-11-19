@@ -28,6 +28,8 @@ metromind:
     tick-millis: 500
     start-clock: "07:30"
     strategy: NO_CONTROL
+    run-time-variability: 0  # spread of run times around nominal, e.g. 0.05 for ~5 %; 0 = to the timetable
+    run-time-seed: 0
   replay:
     retention-minutes: 30  # simulated minutes of snapshots kept for time travel
     interval-seconds: 10   # simulated seconds between kept snapshots
