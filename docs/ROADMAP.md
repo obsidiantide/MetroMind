@@ -57,7 +57,7 @@ Mark items `[x]` when merged.
       with more irregular running)
 - [x] Depot access runs: trains entering or leaving service spend a configurable time running empty between the depot
       and the first terminal, instead of appearing on the platform at once
-- [ ] Per-line dwell variability: a line's own `dwellVariability` overriding the engine-wide spread, like run times
+- [x] Per-line dwell variability: a line's own `dwellVariability` overriding the engine-wide spread, like run times
       (crowded central lines lose more time at the doors than quiet suburban ones)
 - [ ] Crew changes: a fixed extra dwell at the terminals or stations where drivers swap, kept in the timetable
 - [ ] Bundled Baku network: depot access times and per-line run-time spreads, so the default run shows everyday
