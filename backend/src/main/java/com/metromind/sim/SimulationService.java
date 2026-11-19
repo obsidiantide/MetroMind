@@ -144,6 +144,14 @@ public class SimulationService {
         }
     }
 
+    public void injectDoorFault(String trainId, double seconds) {
+        synchronized (engine) {
+            engine.injectDoorFault(trainId, seconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.DOOR_FAULT, trainId, seconds, "");
+            countIncident(IncidentRecord.Kind.DOOR_FAULT);
+        }
+    }
+
     public void closeSection(String lineId, String fromStationId, String toStationId, double seconds,
                              ClosureResponse response) {
         synchronized (engine) {

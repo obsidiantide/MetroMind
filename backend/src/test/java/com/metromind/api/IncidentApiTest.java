@@ -80,6 +80,33 @@ class IncidentApiTest {
     }
 
     @Test
+    void holdsATrainWithADoorFaultAndRecordsIt() throws Exception {
+        mvc.perform(post("/api/incidents/door-fault").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "GREEN-2", "seconds": 600}"""))
+                .andExpect(status().isAccepted());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.subjectId == 'GREEN-2')].kind", hasItem("DOOR_FAULT")));
+        mvc.perform(get("/api/incidents").param("limit", "1"))
+                .andExpect(jsonPath("$[0].kind").value("DOOR_FAULT"))
+                .andExpect(jsonPath("$[0].subjectId").value("GREEN-2"))
+                .andExpect(jsonPath("$[0].seconds").value(600.0));
+    }
+
+    @Test
+    void aDoorFaultOnAnUnknownTrainOrWithoutSecondsIsABadRequest() throws Exception {
+        mvc.perform(post("/api/incidents/door-fault").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "NOPE-1", "seconds": 60}"""))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/incidents/door-fault").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "GREEN-2", "seconds": 0}"""))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void closingAnUnknownStationIsABadRequest() throws Exception {
         mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
                         .content("""
