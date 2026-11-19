@@ -24,6 +24,7 @@ import java.util.Map;
  *       {@code fleetPlan} (as in the native format: {@code [{"from": "HH:mm", "trains": n}, ...]}),
  *       {@code runTimeVariability} (the line's own spread of run times, see {@link Line#runTimeVariability()}),
  *       {@code depotAccessSeconds} (see {@link Line#depotAccessSeconds()}),
+ *       {@code dwellVariability} (the line's own spread of dwells, see {@link Line#dwellVariability()}),
  *       and optionally either {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
  *   <li>A {@code LineString} feature with a {@code branchOf} property is a branch of that line, its geometry drawn
@@ -210,17 +211,24 @@ public class GeoJsonNetworkReader {
             }
             fleetPlan.add(new FleetPlanPeriod(period.get("from").asText(), period.get("trains").asInt()));
         }
-        Double runTimeVariability = null;
-        if (p.has("runTimeVariability") && !p.get("runTimeVariability").isNull()) {
-            if (!p.get("runTimeVariability").isNumber()) {
-                throw new IllegalArgumentException("Line " + id + ": runTimeVariability must be a number");
-            }
-            runTimeVariability = p.get("runTimeVariability").asDouble();
-        }
+        Double runTimeVariability = optionalNumber(p, id, "runTimeVariability");
+        Double dwellVariability = optionalNumber(p, id, "dwellVariability");
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
                 p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring,
-                timingStationIds, branches, fleetPlan, runTimeVariability, p.path("depotAccessSeconds").asInt(0));
+                timingStationIds, branches, fleetPlan, runTimeVariability, p.path("depotAccessSeconds").asInt(0),
+                dwellVariability);
+    }
+
+    /** A line's optional numeric property, {@code null} when it is left out or set to {@code null}. */
+    private static Double optionalNumber(JsonNode p, String lineId, String name) {
+        if (!p.has(name) || p.get(name).isNull()) {
+            return null;
+        }
+        if (!p.get(name).isNumber()) {
+            throw new IllegalArgumentException("Line " + lineId + ": " + name + " must be a number");
+        }
+        return p.get(name).asDouble();
     }
 
     /**
