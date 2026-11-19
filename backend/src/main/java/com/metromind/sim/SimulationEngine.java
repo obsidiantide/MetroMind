@@ -173,7 +173,9 @@ public final class SimulationEngine {
             java.util.Optional.ofNullable(LineTrack.of(line, network)).ifPresent(own::add);
             line.branches().forEach(b -> java.util.Optional.ofNullable(LineTrack.of(b, network)).ifPresent(own::add));
             tracks.put(line.id(), List.copyOf(own));
-            depot.put(line.id(), line.spareTrains());
+            // The depot holds the spares plus whatever the busiest period of the fleet plan needs on top of the
+            // trains placed at the start.
+            depot.put(line.id(), line.spareTrains() + line.peakPlannedTrains() - line.trainCount());
             dispatchedCount.put(line.id(), 0);
             for (String sid : line.allStationIds()) {
                 linesByStation.computeIfAbsent(sid, k -> new ArrayList<>()).add(line.id());
@@ -369,6 +371,7 @@ public final class SimulationEngine {
             while (simTime >= nextDispatchCheck - 1e-9) {
                 nextDispatchCheck += DISPATCH_INTERVAL_SECONDS;
             }
+            followFleetPlans();
             if (strategy.dispatchesFromDepot()) {
                 reviewFleets();
             }
@@ -1170,42 +1173,96 @@ public final class SimulationEngine {
     // ------------------------------------------------------------------ depot
 
     /**
-     * Brings a spare train into service on every line whose overload forecast is high, one train per line and
-     * review. Trains enter at the first terminal, next to the depot, once its platform and the track into it
-     * are clear. When a line running more than its base fleet is forecast below the medium level, a train that
-     * is standing at the first terminal goes back to the depot instead.
+     * Scheduled runs to and from the depot: a line with a fleet plan running fewer trains than the period in force
+     * brings one out (to the service pattern furthest below its share of the planned fleet), and one running more
+     * sends a train standing at the first terminal back. One train per line and review, under every strategy.
      */
-    private void reviewFleets() {
+    private void followFleetPlans() {
         for (Line line : lines.values()) {
-            double forecast = lineForecast(line);
-            if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && depotExitClear(line)) {
-                dispatch(line, mostOverloadedPattern(line));
-            } else if (forecast < OVERLOAD_MEDIUM && trainsInService(line.id()) > line.trainCount()) {
-                withdrawAtDepot(line);
+            if (line.fleetPlan().isEmpty()) {
+                continue;
+            }
+            int planned = line.plannedTrains(simTime);
+            int running = runningTrains(line.id());
+            if (running < planned && depot.get(line.id()) > 0 && depotExitClear(line)) {
+                ServicePattern pattern = patternShortOfShare(line, planned);
+                dispatch(line, pattern, "entered service on line %s towards %s as planned (%d trains)".formatted(
+                        line.id(), network.station(pattern.towardsStationId(0, 1)).name(), planned));
+            } else if (running > planned) {
+                withdrawAtDepot(line, planned);
             }
         }
     }
 
     /**
-     * Sends back to the depot a train standing at the first terminal, if there is one and it is free to move.
-     * Anyone already aboard for the outbound trip steps off and waits for the next train.
+     * Brings a spare train into service on every line whose overload forecast is high, one train per line and
+     * review. Trains enter at the first terminal, next to the depot, once its platform and the track into it
+     * are clear. When a line running more than its planned fleet is forecast below the medium level, a train that
+     * is standing at the first terminal goes back to the depot instead.
      */
-    private void withdrawAtDepot(Line line) {
-        for (TrainState t : trains) {
-            if (t.lineId.equals(line.id()) && t.stop == 0 && t.phase != TrainPhase.RUNNING
-                    && t.blockedRemaining <= 0) {
-                StationState st = stations.get(line.stationIds().get(0));
-                double[] queue = st.waiting.get(new StationState.QueueKey(line.id(), line.directionAtStop(0)));
-                for (int d = 0; d < t.onboard.length; d++) {
-                    queue[d] += t.onboard[d];
-                }
-                trains.remove(t);
-                depot.merge(line.id(), 1, Integer::sum);
-                emit(SimEvent.Type.TRAIN_WITHDRAWN, t.id, "Train %s returned to the depot of line %s".formatted(
-                        t.id, line.id()));
-                return;
+    private void reviewFleets() {
+        for (Line line : lines.values()) {
+            double forecast = lineForecast(line);
+            int planned = line.plannedTrains(simTime);
+            if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && depotExitClear(line)) {
+                ServicePattern pattern = mostOverloadedPattern(line);
+                dispatch(line, pattern, "left the depot to relieve line %s towards %s".formatted(line.id(),
+                        network.station(pattern.towardsStationId(0, 1)).name()));
+            } else if (forecast < OVERLOAD_MEDIUM && runningTrains(line.id()) > planned) {
+                withdrawAtDepot(line, planned);
             }
         }
+    }
+
+    /**
+     * Sends back to the depot a train standing at the first terminal, if there is one and it is free to move: of
+     * the pattern running most trains above its share of {@code planned}, and never a pattern's last train.
+     * Anyone already aboard for the outbound trip steps off and waits for the next train.
+     */
+    private void withdrawAtDepot(Line line, int planned) {
+        TrainState chosen = null;
+        double chosenSurplus = Double.NEGATIVE_INFINITY;
+        for (TrainState t : trains) {
+            if (t.lineId.equals(line.id()) && t.stop == 0 && t.phase != TrainPhase.RUNNING
+                    && t.blockedRemaining <= 0 && runningOnPattern(t.patternId) > 1) {
+                double surplus = runningOnPattern(t.patternId) - plannedShare(line, pattern(t), planned);
+                if (surplus > chosenSurplus) {
+                    chosen = t;
+                    chosenSurplus = surplus;
+                }
+            }
+        }
+        if (chosen == null) {
+            return;
+        }
+        StationState st = stations.get(line.stationIds().get(0));
+        double[] queue = st.waiting.get(new StationState.QueueKey(line.id(), line.directionAtStop(0)));
+        for (int d = 0; d < chosen.onboard.length; d++) {
+            queue[d] += chosen.onboard[d];
+        }
+        trains.remove(chosen);
+        depot.merge(line.id(), 1, Integer::sum);
+        emit(SimEvent.Type.TRAIN_WITHDRAWN, chosen.id, "Train %s returned to the depot of line %s".formatted(
+                chosen.id, line.id()));
+    }
+
+    /** Trains of {@code planned} that pattern {@code p} should run: its share of the line's base fleet. */
+    private static double plannedShare(Line line, ServicePattern p, int planned) {
+        return (double) p.trainCount() * planned / line.trainCount();
+    }
+
+    /** The service pattern furthest below its share of {@code planned}; the main route on a tie. */
+    private ServicePattern patternShortOfShare(Line line, int planned) {
+        ServicePattern best = null;
+        double worst = Double.NEGATIVE_INFINITY;
+        for (ServicePattern p : patternsByLine.get(line.id())) {
+            double deficit = plannedShare(line, p, planned) - runningOnPattern(p.id());
+            if (deficit > worst + 1e-9) {
+                worst = deficit;
+                best = p;
+            }
+        }
+        return best;
     }
 
     /**
@@ -1290,9 +1347,10 @@ public final class SimulationEngine {
 
     /**
      * Puts a spare train on the first terminal's platform, with its own timetable starting now. It runs service
-     * pattern {@code pattern}; every pattern of a line starts at its first terminal, next to the depot.
+     * pattern {@code pattern}; every pattern of a line starts at its first terminal, next to the depot. The event
+     * reads "Train <id> {@code reason}".
      */
-    private void dispatch(Line line, ServicePattern pattern) {
+    private void dispatch(Line line, ServicePattern pattern, String reason) {
         int number = line.trainCount() + dispatchedCount.merge(line.id(), 1, Integer::sum);
         TrainState t = new TrainState(line.id() + "-" + number, line.id(), pattern.id(), line.trainCapacity(),
                 network.stations().size());
@@ -1303,9 +1361,17 @@ public final class SimulationEngine {
         t.phaseRemaining = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * board));
         trains.add(t);
         depot.merge(line.id(), -1, Integer::sum);
-        String towards = network.station(pattern.towardsStationId(0, 1)).name();
-        emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train %s left the depot to relieve line %s towards %s"
-                .formatted(t.id, line.id(), towards));
+        emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train " + t.id + " " + reason);
+    }
+
+    /** Trains currently running on a line. */
+    private int runningTrains(String lineId) {
+        return (int) trains.stream().filter(t -> t.lineId.equals(lineId)).count();
+    }
+
+    /** Trains currently following a service pattern. */
+    private int runningOnPattern(String patternId) {
+        return (int) trains.stream().filter(t -> t.patternId.equals(patternId)).count();
     }
 
     /** Trains currently running on a line (at least 1, so it can divide a loop time). */
