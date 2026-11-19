@@ -13,10 +13,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScheduledDepotRunsTest {
 
     private static MetroNetwork planned(int trainCount, int spares, FleetPlanPeriod... plan) {
+        return planned(900, trainCount, spares, plan);
+    }
+
+    private static MetroNetwork planned(int capacity, int trainCount, int spares, FleetPlanPeriod... plan) {
         MetroNetwork base = TestNetworks.singleLine();
         Line line = new Line("L1", "Line 1", "#f00", List.of("A", "B", "C", "D", "E", "F"),
-                List.of(120, 120, 120, 120, 120), trainCount, 900, spares, List.of(), false, List.of(), List.of(),
-                List.of(plan));
+                List.of(120, 120, 120, 120, 120), trainCount, capacity, spares, List.of(), false, List.of(),
+                List.of(), List.of(plan));
         return new MetroNetwork("Test", base.stations(), List.of(line));
     }
 
@@ -57,6 +61,21 @@ class ScheduledDepotRunsTest {
         assertThat(count(engine, SimEvent.Type.TRAIN_WITHDRAWN)).isEqualTo(2);
         // Passengers on the withdrawn trains were put back on the platform, not lost.
         assertThat(engine.snapshot().metrics().passengersDelivered()).isPositive();
+    }
+
+    @Test
+    void adaptiveDispatchingKeepsSurplusTrainsWhileOverloadIsForecast() {
+        // Small trains in the morning peak: the line stays overloaded after the plan drops to two trains.
+        MetroNetwork network = planned(150, 4, 0, new FleetPlanPeriod("06:00", 4), new FleetPlanPeriod("08:00", 2));
+        SimulationEngine adaptive = new SimulationEngine(network, 7.75 * 3600, HeadwayStrategy.ADAPTIVE_DISPATCH);
+        SimulationEngine balanced = new SimulationEngine(network, 7.75 * 3600, HeadwayStrategy.BALANCED);
+        adaptive.run(40 * 60, 1);
+        balanced.run(40 * 60, 1);
+
+        assertThat(adaptive.lineForecast(network.line("L1"))).isGreaterThanOrEqualTo(SimulationEngine.OVERLOAD_MEDIUM);
+        assertThat(adaptive.trains()).hasSize(4);
+        assertThat(count(adaptive, SimEvent.Type.TRAIN_WITHDRAWN)).isZero();
+        assertThat(balanced.trains()).as("other strategies follow the plan").hasSize(2);
     }
 
     @Test
