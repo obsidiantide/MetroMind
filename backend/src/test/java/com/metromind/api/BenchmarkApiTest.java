@@ -73,6 +73,26 @@ class BenchmarkApiTest {
     }
 
     @Test
+    void variesDwellsWhenAskedAndLeavesThemToPassengersByDefault() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dwellVariability").value(0.0));
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300").param("dwellVariability", "0.15"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dwellVariability").value(0.15));
+    }
+
+    @Test
+    void tooMuchDwellVariabilityIsABadRequest() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("dwellVariability", "0.3"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/analysis/benchmark/jobs").param("dwellVariability", "-0.1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void tooMuchRunTimeVariabilityIsABadRequest() throws Exception {
         mvc.perform(post("/api/analysis/benchmark").param("runTimeVariability", "0.5"))
                 .andExpect(status().isBadRequest());
