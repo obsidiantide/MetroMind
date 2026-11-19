@@ -128,6 +128,19 @@ public class SimulationController {
         return ResponseEntity.accepted().build();
     }
 
+    /**
+     * Door fault: the train stays at its platform for {@code seconds} of extra dwell, or at the next platform it
+     * calls at if it is running. Unlike a delay it never stops a train between stations.
+     */
+    @Tag(name = "Incidents")
+    @Operation(summary = "Hold a train at its platform with a door fault")
+    @ApiResponse(responseCode = "202", description = "Door fault injected")
+    @PostMapping("/incidents/door-fault")
+    public ResponseEntity<Void> doorFault(@Valid @RequestBody IncidentRequest req) {
+        simulation.injectDoorFault(req.trainId(), req.seconds());
+        return ResponseEntity.accepted().build();
+    }
+
     /** @param response what trains do at the closure; defaults to {@link ClosureResponse#WAIT} */
     public record SectionClosureRequest(@NotBlank String lineId, @NotBlank String fromStationId,
                                         @NotBlank String toStationId, @Min(1) @Max(7200) double seconds,
