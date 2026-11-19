@@ -22,9 +22,17 @@ import java.util.Map;
  * @param metric     what the rankings are ordered by
  * @param scenarios  the incidents every strategy was run against
  * @param rankings   one entry per strategy, best first
+ * @param runTimeVariability spread of run times every run was drawn with (see
+ *                   {@link com.metromind.sim.RunTimeVariability}), seeded by {@code seed}; 0 for nominal run times
  */
 public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
-                              List<StrategyRanking> rankings) {
+                              List<StrategyRanking> rankings, double runTimeVariability) {
+
+    /** Report of a benchmark run to nominal run times. */
+    public BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
+                           List<StrategyRanking> rankings) {
+        this(seed, horizonSeconds, metric, scenarios, rankings, 0);
+    }
 
     /** What strategies are ranked by. */
     public enum RankingMetric {

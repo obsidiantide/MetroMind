@@ -2,6 +2,7 @@ package com.metromind.incident;
 
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.SimulationSnapshot;
 import com.metromind.sim.TestNetworks;
@@ -104,6 +105,37 @@ class StrategyBenchmarkTest {
         BenchmarkReport first = new StrategyBenchmark().run(live, 3, 7, 900, two);
         BenchmarkReport second = new StrategyBenchmark().run(live, 3, 7, 900, two);
         assertThat(second).isEqualTo(first);
+    }
+
+    @Test
+    void runTimeVariabilityIsSeededByTheBenchmarkSeed() {
+        List<HeadwayStrategy> two = List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED);
+        Set<BenchmarkReport.IncidentKind> delays = EnumSet.of(BenchmarkReport.IncidentKind.DELAY);
+        StrategyBenchmark benchmark = new StrategyBenchmark();
+        BenchmarkReport steady = benchmark.run(live(), 3, 7, 900, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, StrategyBenchmark.ProgressListener.NONE);
+        BenchmarkReport irregular = benchmark.run(live(), 3, 7, 900, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.1, StrategyBenchmark.ProgressListener.NONE);
+
+        assertThat(steady.runTimeVariability()).isZero();
+        assertThat(irregular.runTimeVariability()).isEqualTo(0.1);
+        assertThat(irregular.scenarios()).as("same incidents").isEqualTo(steady.scenarios());
+        assertThat(irregular.rankings()).extracting(BenchmarkReport.StrategyRanking::meanWaitSeconds)
+                .isNotEqualTo(steady.rankings().stream().map(BenchmarkReport.StrategyRanking::meanWaitSeconds).toList());
+
+        // Whatever the live engine's own seed, a benchmark seed gives the same report.
+        SimulationEngine otherLive = live();
+        otherLive.setRunTimeVariability(new RunTimeVariability(0.1, 999));
+        assertThat(benchmark.run(otherLive, 3, 7, 900, two, delays, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING,
+                0.1, StrategyBenchmark.ProgressListener.NONE)).isEqualTo(irregular);
+    }
+
+    @Test
+    void benchmarksInheritTheLiveEnginesSpread() {
+        SimulationEngine live = live();
+        live.setRunTimeVariability(new RunTimeVariability(0.05, 3));
+        BenchmarkReport report = new StrategyBenchmark().run(live, 2, 7, 600, List.of(HeadwayStrategy.NO_CONTROL));
+        assertThat(report.runTimeVariability()).isEqualTo(0.05);
     }
 
     @Test
