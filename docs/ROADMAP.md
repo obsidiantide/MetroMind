@@ -47,7 +47,7 @@ Mark items `[x]` when merged.
       per-pattern CV in metrics, what-if and benchmark results (today trunk bunching only shows up in waiting)
 - [x] Flat junction conflicts: a branch train crossing the opposite track at the junction blocks trains running the
       other way for the crossing time (today branch and main tracks never conflict)
-- [ ] Time-of-day fleet plan: fewer trains in service off-peak, with scheduled runs to and from the depot (today the
+- [x] Time-of-day fleet plan: fewer trains in service off-peak, with scheduled runs to and from the depot (today the
       fleet is constant all day and only adaptive dispatching changes it)
 - [ ] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
       benchmarks reflect everyday irregularity while staying reproducible
