@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DayBenchmark, parseTimes } from "@/components/DayBenchmark";
 import { api } from "@/lib/api";
-import type { BenchmarkRequest, TimeOfDayReport } from "@/lib/types";
+import type { BenchmarkRequest, DayBenchmarkJob, TimeOfDayReport } from "@/lib/types";
 import { ranking, report } from "@/test/benchmark";
 
 const request: BenchmarkRequest = {
@@ -21,23 +21,48 @@ const day: TimeOfDayReport = {
   ],
 };
 
+function dayJob(over: Partial<DayBenchmarkJob> = {}): DayBenchmarkJob {
+  return {
+    id: "day-1", status: "SUCCEEDED", completedRuns: 32, totalRuns: 32, progress: 1,
+    submittedAt: "2026-11-19T08:00:00Z", startedAt: "2026-11-19T08:00:01Z", finishedAt: "2026-11-19T08:00:30Z",
+    report: day, error: null, ...over,
+  };
+}
+
+const running = dayJob({ status: "RUNNING", completedRuns: 8, progress: 0.25, finishedAt: null, report: null });
+
 describe("DayBenchmark", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
 
   it("splits typed start times and drops blanks", () => {
     expect(parseTimes(" 07:30,12:00 , ,22:00")).toEqual(["07:30", "12:00", "22:00"]);
     expect(parseTimes(" ")).toEqual([]);
   });
 
-  it("ranks across the typed times of day with the page's settings", async () => {
-    const run = vi.spyOn(api, "benchmarkDay").mockResolvedValue(day);
+  it("queues a ranking across the typed times of day and shows it once the job is done", async () => {
+    vi.useFakeTimers();
+    const submit = vi.spyOn(api, "submitDayBenchmark").mockResolvedValue(running);
+    const poll = vi.spyOn(api, "dayBenchmarkJob").mockResolvedValue(dayJob());
     render(<DayBenchmark request={() => request} />);
 
     fireEvent.change(screen.getByLabelText("Times of day"), { target: { value: "08:00, 22:30" } });
-    fireEvent.click(screen.getByRole("button", { name: "Rank across the day" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rank across the day" }));
+    });
 
-    expect(await screen.findByText("22:30 (#2)")).toBeTruthy();
-    expect(run).toHaveBeenCalledWith(request, ["08:00", "22:30"]);
+    expect(submit).toHaveBeenCalledWith(request, ["08:00", "22:30"]);
+    expect(screen.getByText("Running: 8 of 32 runs")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Rank across the day" }) as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(poll).toHaveBeenCalledWith("day-1");
+    expect(screen.getByText("22:30 (#2)")).toBeTruthy();
     const rows = screen.getAllByRole("row");
     expect(rows[1].textContent).toContain("BALANCED");
     expect(rows[1].textContent).toContain("101.5 s");
@@ -45,8 +70,22 @@ describe("DayBenchmark", () => {
     expect(rows[2].textContent).toContain("08:00 (#2)");
   });
 
+  it("cancels a running ranking", async () => {
+    vi.spyOn(api, "submitDayBenchmark").mockResolvedValue(running);
+    const cancel = vi.spyOn(api, "cancelDayBenchmarkJob")
+      .mockResolvedValue(dayJob({ status: "CANCELLED", completedRuns: 8, progress: 0.25, report: null }));
+    render(<DayBenchmark request={() => request} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Rank across the day" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByText("Ranking cancelled after 8 of 32 runs.")).toBeTruthy();
+    expect(cancel).toHaveBeenCalledWith("day-1");
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
   it("shows the error when the backend rejects the times", async () => {
-    vi.spyOn(api, "benchmarkDay").mockRejectedValue(new Error("400: Start time 00:10 leaves no room"));
+    vi.spyOn(api, "submitDayBenchmark").mockRejectedValue(new Error("400: Start time 00:10 leaves no room"));
     render(<DayBenchmark request={() => request} />);
     fireEvent.click(screen.getByRole("button", { name: "Rank across the day" }));
     expect(await screen.findByText(/leaves no room/)).toBeTruthy();

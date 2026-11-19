@@ -1,7 +1,7 @@
 import type {
   BenchmarkJob, BenchmarkRequest, ClosureResponse, DayBenchmarkJob, DelayImpactReport, Departure, IncidentImpactReport,
   MetroNetwork,
-  MinuteKpi, TimeOfDayReport,
+  MinuteKpi,
 } from "./types";
 
 /** Query parameters of a benchmark request; spreads left out use the live engine's. */
@@ -73,12 +73,6 @@ export const api = {
   /** Queues a strategy benchmark; poll `benchmarkJob` with the returned id until it has finished. */
   submitBenchmark: (r: BenchmarkRequest) =>
     call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${benchmarkQuery(r)}`, { method: "POST" }),
-  /** Ranks strategies across the given times of day (HH:mm); answers once every period has run. */
-  benchmarkDay: (r: BenchmarkRequest, startTimes: string[]) => {
-    const q = benchmarkQuery(r);
-    q.set("startTimes", startTimes.join(","));
-    return call<TimeOfDayReport>(`/api/analysis/benchmark/day?${q}`, { method: "POST" });
-  },
   benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),
   benchmarkJobs: () => call<BenchmarkJob[]>("/api/analysis/benchmark/jobs"),
   /**
