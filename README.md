@@ -584,6 +584,25 @@ spread it used. Left out, a benchmark varies run times as much as the live engin
 run-time spread field (in percent) for it. `dwellVariability` (0–0.25) does the same for dwells, as described
 under *Dwell-time variability*, with a dwell spread field next to it.
 
+**Across the day.** A ranking from the current moment says little about a strategy at 23:00, when the fleet plan
+runs half the trains. `POST /api/analysis/benchmark/day?startTimes=08:00,13:00,18:00,22:30` (the default; up to
+four times, `HH:mm`, 00:30 or later) runs the benchmark from each start time: a fresh engine is placed on the
+network 30 simulated minutes earlier and run uncontrolled until then, so the plan has brought that period's trains
+into service and the queues match its demand. It takes the same `scenarios` (at most 20), `seed`, `horizonSeconds`,
+`kinds`, `metric` and spreads, and answers each period's report plus a day ranking:
+
+```json
+{ "seed": 1, "metric": "WAIT_PER_BOARDING",
+  "periods": [ { "startClock": "08:00", "report": { "rankings": [ … ] } }, … ],
+  "rankings": [ { "rank": 1, "strategy": "BALANCED", "meanWaitSeconds": 96.4, "meanTravelMinutes": 18234,
+                  "worstStartClock": "22:30", "worstRank": 3 }, … ] }
+```
+
+Day means average the per-period means, so each time of day weighs the same however busy it is; `worstStartClock`
+is where the strategy ranked lowest. Warm-ups draw run times and dwells from the seed too, so the report is
+reproducible and independent of the live engine's state. The benchmark page's *Across the day* panel runs it with
+the page's settings.
+
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
 `GET /api/analysis/benchmark/jobs/{id}` until `status` is `SUCCEEDED` (the job then carries the `report`) or
