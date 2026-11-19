@@ -57,6 +57,11 @@ Mark items `[x]` when merged.
       with more irregular running)
 - [x] Depot access runs: trains entering or leaving service spend a configurable time running empty between the depot
       and the first terminal, instead of appearing on the platform at once
+- [ ] Per-line dwell variability: a line's own `dwellVariability` overriding the engine-wide spread, like run times
+      (crowded central lines lose more time at the doors than quiet suburban ones)
+- [ ] Crew changes: a fixed extra dwell at the terminals or stations where drivers swap, kept in the timetable
+- [ ] Bundled Baku network: depot access times and per-line run-time spreads, so the default run shows everyday
+      irregularity out of the box
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -85,6 +90,9 @@ Mark items `[x]` when merged.
       benchmark scenarios
 - [x] Benchmark across times of day: run the same scenarios from several start times (morning peak, midday, late
       evening) so strategies are ranked over the fleet plan's thin and full periods, not just the current moment
+- [ ] Times-of-day benchmark as a background job (progress, cancel, persisted like strategy benchmark jobs), so the
+      benchmark page does not hold a request open for four periods
+- [ ] Times-of-day benchmark CSV export, one row per strategy and period
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
