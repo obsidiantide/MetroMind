@@ -3,6 +3,7 @@ package com.metromind.it;
 import com.metromind.incident.BenchmarkJobStore;
 import com.metromind.incident.BenchmarkJobs;
 import com.metromind.incident.BenchmarkReport;
+import com.metromind.incident.TimeOfDayReport;
 import com.metromind.infra.JdbcBenchmarkJobStore;
 import com.metromind.sim.SimulationService;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,10 +26,30 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
     BenchmarkJobStore<BenchmarkReport> store;
 
     @Autowired
+    BenchmarkJobStore<TimeOfDayReport> dayStore;
+
+    @Autowired
     SimulationService simulation;
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Test
+    void aFinishedDayJobIsStoredInItsOwnTable() {
+        assertThat(dayStore).isInstanceOf(JdbcBenchmarkJobStore.class);
+
+        String id = simulation.submitDayBenchmark(List.of("08:00", "21:00"), 1, 5, 300,
+                EnumSet.of(BenchmarkReport.IncidentKind.DELAY), BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0,
+                0).id();
+        await().atMost(Duration.ofSeconds(60)).until(() -> dayStore.find(id).isPresent());
+
+        BenchmarkJobs.Job<TimeOfDayReport> stored = dayStore.find(id).orElseThrow();
+        assertThat(stored.status()).isEqualTo(BenchmarkJobs.Status.SUCCEEDED);
+        assertThat(stored.report()).isEqualTo(simulation.dayBenchmarkJob(id).orElseThrow().report());
+        assertThat(jdbc.queryForObject("SELECT jsonb_array_length(report -> 'periods') FROM day_benchmark_job"
+                + " WHERE id = ?", Integer.class, id)).isEqualTo(2);
+        assertThat(store.find(id)).isEmpty();
+    }
 
     @Test
     void aFinishedJobIsStoredWithItsReportIntact() {
