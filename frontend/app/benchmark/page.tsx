@@ -1,11 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { DayBenchmark } from "@/components/DayBenchmark";
 import { api } from "@/lib/api";
 import { benchmarkCsv, benchmarkCsvName } from "@/lib/benchmarkCsv";
 import { duration, trunkCv } from "@/lib/format";
 import type {
-  BenchmarkJob, BenchmarkReport, IncidentScenario, MetroNetwork, RankingMetric, ScenarioKind, StrategyRanking,
+  BenchmarkJob, BenchmarkReport, BenchmarkRequest, IncidentScenario, MetroNetwork, RankingMetric, ScenarioKind, StrategyRanking,
 } from "@/lib/types";
 
 const KINDS: { kind: ScenarioKind; label: string }[] = [
@@ -74,14 +75,15 @@ export default function BenchmarkPage() {
     return () => clearInterval(timer);
   }, [running, job?.id, refreshHistory]);
 
+  const request = (): BenchmarkRequest => ({
+    scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric,
+    runTimeVariability: percent(spread), dwellVariability: percent(dwellSpread),
+  });
+
   const submit = async () => {
     setError(null);
     try {
-      const runTimeVariability = percent(spread);
-      const dwellVariability = percent(dwellSpread);
-      setJob(await api.submitBenchmark({
-        scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric, runTimeVariability, dwellVariability,
-      }));
+      setJob(await api.submitBenchmark(request()));
       refreshHistory();
     } catch (e) {
       setError(String(e));
@@ -159,6 +161,8 @@ export default function BenchmarkPage() {
       </section>
 
       {job?.report && <Results report={job.report} name={name} />}
+
+      <DayBenchmark request={request} disabled={kinds.length === 0} />
 
       {history.length > 0 && (
         <section className="panel">
