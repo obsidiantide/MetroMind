@@ -12,7 +12,11 @@ export interface Line {
   branches?: Branch[];
   /** Station sequences the line's trains follow: the main route, then one per branch (trunk plus branch). */
   patterns?: ServicePattern[];
+  /** Time-of-day fleet plan, periods in order of their start; empty or absent when trainCount runs all day. */
+  fleetPlan?: FleetPlanPeriod[];
 }
+/** From `from` (HH:mm) until the next period starts the line runs `trains` trains; the last period runs past midnight. */
+export interface FleetPlanPeriod { from: string; trains: number }
 /** One way a line's trains run; `id` is the line id for the main route, `line/branch-terminal` for a branch. */
 export interface ServicePattern {
   id: string; lineId: string; stationIds: string[]; runSeconds: number[]; ring: boolean;
