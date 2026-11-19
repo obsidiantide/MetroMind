@@ -186,6 +186,16 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsADepotAccessTimeAndDefaultsToNone() throws Exception {
+        assertThat(read(network(", \"depotAccessSeconds\": 180", "49.84")).line("L1").depotAccessSeconds())
+                .isEqualTo(180);
+        assertThat(read(network("", "49.84")).line("L1").depotAccessSeconds()).isZero();
+        assertThatThrownBy(() -> read(network(", \"depotAccessSeconds\": -30", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("depotAccessSeconds");
+    }
+
+    @Test
     void derivesRunTimesFromTrackLengthNotStraightLineDistance() throws Exception {
         Line line = read(network("", "49.84")).line("L1");
 
