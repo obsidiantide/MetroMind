@@ -186,6 +186,19 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsALinesDwellVariabilityAndDefaultsToTheEngineWideOne() throws Exception {
+        assertThat(read(network(", \"dwellVariability\": 0.15", "49.84")).line("L1").dwellVariability())
+                .isEqualTo(0.15);
+        assertThat(read(network("", "49.84")).line("L1").dwellVariability()).isNull();
+        assertThatThrownBy(() -> read(network(", \"dwellVariability\": true", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dwellVariability");
+        assertThatThrownBy(() -> read(network(", \"dwellVariability\": 0.5", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dwellVariability");
+    }
+
+    @Test
     void readsADepotAccessTimeAndDefaultsToNone() throws Exception {
         assertThat(read(network(", \"depotAccessSeconds\": 180", "49.84")).line("L1").depotAccessSeconds())
                 .isEqualTo(180);
