@@ -70,15 +70,29 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      * @param trunkHeadwayCv     per branched line, headway CV of the combined service of all its patterns where they
      *                           share the trunk (see {@link SimulationEngine#trunkHeadwayCv()}); the overall
      *                           {@code headwayCoefficientOfVariation} looks at each pattern on its own
+     * @param trainsOnDepotRuns  trains running empty between a depot and its line's first terminal, in or out of
+     *                           service (neither in service nor in a depot)
      */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
                           double passengersServed, double passengersDelivered, double transfers,
                           double passengersLeftBehind, double passengersHeldAtEntrance,
                           double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
-                          int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv) {
+                          int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv,
+                          int trainsOnDepotRuns) {
 
         public Metrics {
             trunkHeadwayCv = trunkHeadwayCv == null ? Map.of() : Map.copyOf(trunkHeadwayCv);
+        }
+
+        /** Metrics of a network with no train on a depot run. */
+        public Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
+                       double passengersServed, double passengersDelivered, double transfers,
+                       double passengersLeftBehind, double passengersHeldAtEntrance,
+                       double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
+                       int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv) {
+            this(averageDelaySeconds, maxDelaySeconds, totalWaiting, passengersServed, passengersDelivered, transfers,
+                    passengersLeftBehind, passengersHeldAtEntrance, headwayCoefficientOfVariation, trainsInService,
+                    trainsInDepot, stopsSkipped, passengersCarriedPast, trunkHeadwayCv, 0);
         }
     }
 }
