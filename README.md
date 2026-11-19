@@ -183,7 +183,10 @@ Square and an eight-station ring, run in both directions, that they meet at its 
 The bundled Baku network has the Red, Green and Purple lines with 25 stations at approximate real locations and
 interchanges at 28 May and Memar Əcəmi; two of the Red line's ten trains branch off at Nəriman Nərimanov to
 Bakmil; its track is simplified to straight runs between stations, and demand
-and fleet sizes are illustrative.
+and fleet sizes are illustrative. Its lines also carry everyday irregularity out of the box: trains reach the
+Red line from a depot five minutes down the track (two to two and a half on the Green and Purple lines), and each
+line has its own run-time and dwell spread, largest on the 1967 Red line (8 % and 12 %) and smallest on the 2016
+Purple line (3 % and 5 %), drawn from `metromind.sim.run-time-seed` even with the engine-wide spreads at 0.
 
 ### Tests
 
