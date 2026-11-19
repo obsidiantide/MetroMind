@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { benchmarkCsv, benchmarkCsvName } from "@/lib/benchmarkCsv";
+import { benchmarkCsv, benchmarkCsvName, dayBenchmarkCsv, dayBenchmarkCsvName } from "@/lib/benchmarkCsv";
+import type { TimeOfDayReport } from "@/lib/types";
 import { ranking, report } from "@/test/benchmark";
 
 describe("benchmarkCsv", () => {
@@ -36,5 +37,37 @@ describe("benchmarkCsv", () => {
   it("names the file after the seed and ranking metric", () => {
     expect(benchmarkCsvName(report)).toBe("benchmark-seed7-wait-per-boarding.csv");
     expect(benchmarkCsvName({ ...report, seed: 3, metric: "TRAVEL_TIME" })).toBe("benchmark-seed3-travel-time.csv");
+  });
+});
+
+describe("dayBenchmarkCsv", () => {
+  const day: TimeOfDayReport = {
+    seed: 7, horizonSeconds: 1800, metric: "TRAVEL_TIME",
+    periods: [
+      { startClock: "08:00", report: { ...report, rankings: [ranking(1, "BALANCED"), ranking(2, "SHORT_TURN")] } },
+      { startClock: "22:30", report: { ...report, rankings: [
+        ranking(1, "SHORT_TURN", { meanRecoverySeconds: null, unrecoveredScenarios: 1 }), ranking(2, "BALANCED")] } },
+    ],
+    rankings: [
+      { rank: 1, strategy: "SHORT_TURN", meanWaitSeconds: 101.5, meanTravelMinutes: 9001.5, worstStartClock: "08:00", worstRank: 2 },
+      { rank: 2, strategy: "BALANCED", meanWaitSeconds: 101.5, meanTravelMinutes: 9001.5, worstStartClock: "22:30", worstRank: 2 },
+    ],
+  };
+
+  it("writes one row per period and strategy, in run order and period rank, with the day rank", () => {
+    const lines = dayBenchmarkCsv(day).split("\r\n");
+
+    expect(lines[0]).toBe("start_clock,period_rank,strategy,mean_wait_s,p95_wait_s,mean_travel_min,p95_travel_min,"
+      + "mean_recovery_s,unrecovered_scenarios,day_rank");
+    expect(lines[1]).toBe("08:00,1,BALANCED,101,151,9001,9501,600,0,2");
+    expect(lines[2]).toBe("08:00,2,SHORT_TURN,102,152,9002,9502,600,0,1");
+    expect(lines[3]).toBe("22:30,1,SHORT_TURN,101,151,9001,9501,,1,1");
+    expect(lines[4]).toBe("22:30,2,BALANCED,102,152,9002,9502,600,0,2");
+    expect(lines).toHaveLength(6);
+    expect(lines[5]).toBe("");
+  });
+
+  it("names the file after the seed and ranking metric", () => {
+    expect(dayBenchmarkCsvName(day)).toBe("benchmark-day-seed7-travel-time.csv");
   });
 });
