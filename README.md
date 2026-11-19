@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `depotAccessSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -450,6 +450,16 @@ once the line's forecast drops below the medium level, so a plan cut never fight
 leave at least one train per service pattern. GeoJSON lines take the same `fleetPlan` property, the bundled Baku
 lines have one (full peaks, a thinner midday and evening, a late-night service), `GET /api/network` lists it,
 and the dashboard's line legend shows running against planned trains, in amber while a line is short.
+
+**Depot access runs.** Most depots are not beside the platform. A line may set `depotAccessSeconds` (native JSON
+or GeoJSON, default `0`): a train brought out of the depot, by the plan or by adaptive dispatching, first runs
+empty for that long and only then enters service at the first terminal, waiting at the signal if the platform
+or the track into it is taken; a train sent back leaves service at once but only rejoins the depot's spares at
+the end of its run back. A plan short of trains counts those already on their way out, so it never sends two for
+one gap, and `ADAPTIVE_DISPATCH` sends one spare at a time down the access track, since the forecast cannot see
+a train that is still on its way. Snapshot metrics report `trainsOnDepotRuns`, and the dashboard shows them next
+to the trains in the depot. A peak period starting at 07:30 on a line with a four-minute access run therefore
+has its extra trains in service from about 07:34: start the plan's period earlier to have them there on time.
 
 ### Short-turning for recovery
 
