@@ -49,7 +49,7 @@ Mark items `[x]` when merged.
       other way for the crossing time (today branch and main tracks never conflict)
 - [x] Time-of-day fleet plan: fewer trains in service off-peak, with scheduled runs to and from the depot (today the
       fleet is constant all day and only adaptive dispatching changes it)
-- [ ] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
+- [x] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
       benchmarks reflect everyday irregularity while staying reproducible
 
 ### Incidents
