@@ -53,7 +53,7 @@ Mark items `[x]` when merged.
       benchmarks reflect everyday irregularity while staying reproducible
 - [x] Dwell-time variability: seeded noise on each stop's dwell (door reopenings, a slow boarding), drawn like run
       times so what-if copies share it
-- [ ] Per-line run-time variability: a line's own `runTimeVariability` overriding the engine-wide spread (older lines
+- [x] Per-line run-time variability: a line's own `runTimeVariability` overriding the engine-wide spread (older lines
       with more irregular running)
 - [ ] Depot access runs: trains entering or leaving service spend a configurable time running empty between the depot
       and the first terminal, instead of appearing on the platform at once
