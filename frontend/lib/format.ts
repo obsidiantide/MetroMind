@@ -24,3 +24,13 @@ export function lateness(seconds: number) {
   if (Math.abs(seconds) < 0.5) return "on time";
   return (seconds > 0 ? "+" : "-") + duration(Math.abs(seconds));
 }
+
+/**
+ * Where the fleet is besides the trains in service, as " · 2 on depot runs · 3 in depot" (empty when every train is
+ * in service). Trains on depot runs are running empty to or from a line's first terminal.
+ */
+export function fleetBesidesService(m: { trainsInDepot: number; trainsOnDepotRuns?: number }) {
+  const onRuns = m.trainsOnDepotRuns ?? 0;
+  return (onRuns > 0 ? ` · ${onRuns} on depot run${onRuns === 1 ? "" : "s"}` : "")
+    + (m.trainsInDepot > 0 ? ` · ${m.trainsInDepot} in depot` : "");
+}
