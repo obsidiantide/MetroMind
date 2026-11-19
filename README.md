@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `depotAccessSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `dwellVariability`, optional `depotAccessSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -334,6 +334,11 @@ log-normal factor drawn like run times (median 1, that log-standard deviation, c
 deviations, at most `0.25`), and never lets the doors close before the 15 s minimum, so on quiet stops the noise
 only ever lengthens a dwell. The draws use `metromind.sim.run-time-seed` from a stream of their own, keyed by the
 train and the number of its call, so run times and dwells are independent and copies of the engine share both.
+
+Crowded central lines lose more time at the doors than quiet suburban ones. A line may set its own
+`dwellVariability` (0–0.25, in the native JSON and as a GeoJSON line property), which its trains use instead of the
+engine-wide spread, drawn from the same seed; `0` keeps a line's dwells to what its passengers set. Benchmarks keep
+line spreads too: their `dwellVariability` applies to the lines that do not set one.
 
 ### Platform capacity and crowding
 
