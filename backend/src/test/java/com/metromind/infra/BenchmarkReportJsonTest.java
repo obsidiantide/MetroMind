@@ -3,12 +3,15 @@ package com.metromind.infra;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.StrategyBenchmark;
+import com.metromind.incident.TimeOfDayBenchmark;
+import com.metromind.incident.TimeOfDayReport;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
 import java.util.EnumSet;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,6 +30,18 @@ class BenchmarkReportJsonTest {
         String json = mapper.writeValueAsString(report);
 
         assertThat(mapper.readValue(json, BenchmarkReport.class)).isEqualTo(report);
+    }
+
+    @Test
+    void aTimeOfDayReportSurvivesTheJsonRoundTrip() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        TimeOfDayReport report = new TimeOfDayBenchmark().run(TestNetworks.singleLine(), List.of("08:00", "21:30"),
+                2, 7, 600, HeadwayStrategy.all(), EnumSet.of(BenchmarkReport.IncidentKind.DELAY),
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05, 0.1);
+
+        String json = mapper.writeValueAsString(report);
+
+        assertThat(mapper.readValue(json, TimeOfDayReport.class)).isEqualTo(report);
     }
 
     @Test

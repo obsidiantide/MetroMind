@@ -3,6 +3,7 @@ package com.metromind.infra;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metromind.incident.BenchmarkJobStore;
 import com.metromind.incident.BenchmarkReport;
+import com.metromind.incident.TimeOfDayReport;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,5 +18,11 @@ public class BenchmarkJobStores {
     @Bean
     public BenchmarkJobStore<BenchmarkReport> strategyBenchmarkJobStore(JdbcTemplate jdbc, ObjectMapper mapper) {
         return new JdbcBenchmarkJobStore<>(jdbc, mapper, "benchmark_job", BenchmarkReport.class);
+    }
+
+    /** Benchmark jobs across times of day ({@code day_benchmark_job}). */
+    @Bean
+    public BenchmarkJobStore<TimeOfDayReport> dayBenchmarkJobStore(JdbcTemplate jdbc, ObjectMapper mapper) {
+        return new JdbcBenchmarkJobStore<>(jdbc, mapper, "day_benchmark_job", TimeOfDayReport.class);
     }
 }
