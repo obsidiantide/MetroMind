@@ -11,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,8 @@ public final class SimulationEngine {
     private final Map<String, Integer> depot = new LinkedHashMap<>();
     /** Trains each line has brought out of its depot so far; numbers new trains so ids are never reused. */
     private final Map<String, Integer> dispatchedCount = new LinkedHashMap<>();
+    /** Trains running empty between a depot and its first terminal, in the order they set off. */
+    private final List<DepotRun> depotRuns = new ArrayList<>();
     private double nextDispatchCheck;
     private HeadwayStrategy strategy;
     private RunTimeVariability variability = RunTimeVariability.NONE;
@@ -243,6 +246,7 @@ public final class SimulationEngine {
         this.stationClosedSince.putAll(other.stationClosedSince);
         this.depot.putAll(other.depot);
         this.dispatchedCount.putAll(other.dispatchedCount);
+        other.depotRuns.forEach(r -> this.depotRuns.add(r.copy()));
         this.nextDispatchCheck = other.nextDispatchCheck;
         this.strategy = other.strategy;
         this.variability = other.variability;
@@ -371,6 +375,7 @@ public final class SimulationEngine {
             rideSeconds += t.passengers * dt;
             advance(t, dt);
         }
+        advanceDepotRuns(dt);
         returnSurplusTrains();
         if (simTime >= nextDispatchCheck - 1e-9) {
             while (simTime >= nextDispatchCheck - 1e-9) {
@@ -1248,10 +1253,10 @@ public final class SimulationEngine {
                 continue;
             }
             int planned = line.plannedTrains(simTime);
-            int running = runningTrains(line.id());
-            if (running < planned && depot.get(line.id()) > 0 && depotExitClear(line)) {
+            int running = runningTrains(line.id()) + trainsComingOut(line.id());
+            if (running < planned && depot.get(line.id()) > 0 && canLeaveDepot(line)) {
                 ServicePattern pattern = patternShortOfShare(line, planned);
-                dispatch(line, pattern, "entered service on line %s towards %s as planned (%d trains)".formatted(
+                leaveDepot(line, pattern, "entered service on line %s towards %s as planned (%d trains)".formatted(
                         line.id(), network.station(pattern.towardsStationId(0, 1)).name(), planned));
             }
         }
@@ -1281,16 +1286,18 @@ public final class SimulationEngine {
     /**
      * Brings a spare train into service on every line whose overload forecast is high, one train per line and
      * review. Trains enter at the first terminal, next to the depot, once its platform and the track into it
-     * are clear. When a line running more than its planned fleet is forecast below the medium level, a train that
-     * is standing at the first terminal goes back to the depot instead.
+     * are clear. On a line with a depot access run no other spare sets off while one is still on its way: the
+     * forecast cannot see it coming yet. When a line running more than its planned fleet is forecast below the
+     * medium level, a train that is standing at the first terminal goes back to the depot instead.
      */
     private void reviewFleets() {
         for (Line line : lines.values()) {
             double forecast = lineForecast(line);
             int planned = line.plannedTrains(simTime);
-            if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && depotExitClear(line)) {
+            if (depot.get(line.id()) > 0 && forecast >= OVERLOAD_HIGH && canLeaveDepot(line)
+                    && trainsComingOut(line.id()) == 0) {
                 ServicePattern pattern = mostOverloadedPattern(line);
-                dispatch(line, pattern, "left the depot to relieve line %s towards %s".formatted(line.id(),
+                leaveDepot(line, pattern, "left the depot to relieve line %s towards %s".formatted(line.id(),
                         network.station(pattern.towardsStationId(0, 1)).name()));
             } else if (forecast < OVERLOAD_MEDIUM && runningTrains(line.id()) > planned) {
                 withdrawAtDepot(line, planned);
@@ -1325,7 +1332,11 @@ public final class SimulationEngine {
             queue[d] += chosen.onboard[d];
         }
         trains.remove(chosen);
-        depot.merge(line.id(), 1, Integer::sum);
+        if (line.depotAccessSeconds() > 0) {
+            depotRuns.add(new DepotRun(line.id(), chosen.patternId, chosen.id, true, "", line.depotAccessSeconds()));
+        } else {
+            depot.merge(line.id(), 1, Integer::sum);
+        }
         emit(SimEvent.Type.TRAIN_WITHDRAWN, chosen.id, "Train %s returned to the depot of line %s".formatted(
                 chosen.id, line.id()));
         return true;
@@ -1431,13 +1442,75 @@ public final class SimulationEngine {
     }
 
     /**
-     * Puts a spare train on the first terminal's platform, with its own timetable starting now. It runs service
-     * pattern {@code pattern}; every pattern of a line starts at its first terminal, next to the depot. The event
-     * reads "Train <id> {@code reason}".
+     * Whether a train may set off from the line's depot now: at once when it has an access run to make first (the
+     * platform only has to be free when it gets there), otherwise only when the platform and the track into it are.
      */
-    private void dispatch(Line line, ServicePattern pattern, String reason) {
+    private boolean canLeaveDepot(Line line) {
+        return line.depotAccessSeconds() > 0 || depotExitClear(line);
+    }
+
+    /**
+     * Takes a spare train out of the depot to run service pattern {@code pattern}: straight onto the first
+     * terminal's platform, or, when the line has a depot access time, first running empty for that long. The event
+     * reads "Train <id> {@code reason}" once the train enters service.
+     */
+    private void leaveDepot(Line line, ServicePattern pattern, String reason) {
         int number = line.trainCount() + dispatchedCount.merge(line.id(), 1, Integer::sum);
-        TrainState t = new TrainState(line.id() + "-" + number, line.id(), pattern.id(), line.trainCapacity(),
+        String id = line.id() + "-" + number;
+        depot.merge(line.id(), -1, Integer::sum);
+        if (line.depotAccessSeconds() > 0) {
+            depotRuns.add(new DepotRun(line.id(), pattern.id(), id, false, reason, line.depotAccessSeconds()));
+        } else {
+            enterService(line, pattern, id, reason);
+        }
+    }
+
+    /**
+     * Moves trains along their depot access runs. A train coming out enters service once its run is over and the
+     * first terminal's platform and the track into it are clear, waiting at the signal until then; a train going
+     * in joins the depot's spares when it gets there.
+     */
+    private void advanceDepotRuns(double dt) {
+        for (Iterator<DepotRun> it = depotRuns.iterator(); it.hasNext(); ) {
+            DepotRun run = it.next();
+            run.remaining = Math.max(0, run.remaining - dt);
+            if (run.remaining > 0) {
+                continue;
+            }
+            Line line = lines.get(run.lineId);
+            if (run.inbound) {
+                depot.merge(run.lineId, 1, Integer::sum);
+                it.remove();
+            } else if (depotExitClear(line)) {
+                it.remove();
+                enterService(line, patterns.get(run.patternId), run.trainId, run.reason);
+            }
+        }
+    }
+
+    /** Trains of a line on their way out of the depot, not yet in service. */
+    private int trainsComingOut(String lineId) {
+        int n = 0;
+        for (DepotRun run : depotRuns) {
+            if (!run.inbound && run.lineId.equals(lineId)) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Trains of a line running empty between its depot and its first terminal, either way. */
+    public int trainsOnDepotRuns(String lineId) {
+        return (int) depotRuns.stream().filter(r -> r.lineId.equals(lineId)).count();
+    }
+
+    /**
+     * Puts a train on the first terminal's platform, with its own timetable starting now. It runs service pattern
+     * {@code pattern}; every pattern of a line starts at its first terminal, next to the depot. The event reads
+     * "Train <id> {@code reason}".
+     */
+    private void enterService(Line line, ServicePattern pattern, String id, String reason) {
+        TrainState t = new TrainState(id, line.id(), pattern.id(), line.trainCapacity(),
                 network.stations().size());
         t.stop = 0;
         t.scheduledArrival = simTime;
@@ -1445,8 +1518,36 @@ public final class SimulationEngine {
         double board = board(t, pattern, stations.get(line.stationIds().get(0)));
         t.phaseRemaining = dwell(t, board);
         trains.add(t);
-        depot.merge(line.id(), -1, Integer::sum);
         emit(SimEvent.Type.TRAIN_DISPATCHED, t.id, "Train " + t.id + " " + reason);
+    }
+
+    /**
+     * A train running empty between a line's depot and its first terminal.
+     *
+     * @see Line#depotAccessSeconds()
+     */
+    private static final class DepotRun {
+        final String lineId;
+        final String patternId;
+        final String trainId;
+        /** Going back into the depot; otherwise coming out to enter service. */
+        final boolean inbound;
+        /** Why the train is coming out, for the event when it enters service. */
+        final String reason;
+        double remaining;
+
+        DepotRun(String lineId, String patternId, String trainId, boolean inbound, String reason, double remaining) {
+            this.lineId = lineId;
+            this.patternId = patternId;
+            this.trainId = trainId;
+            this.inbound = inbound;
+            this.reason = reason;
+            this.remaining = remaining;
+        }
+
+        DepotRun copy() {
+            return new DepotRun(lineId, patternId, trainId, inbound, reason, remaining);
+        }
     }
 
     /** Trains currently running on a line. */
