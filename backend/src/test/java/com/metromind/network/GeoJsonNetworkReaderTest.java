@@ -173,6 +173,19 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsALinesRunTimeVariabilityAndDefaultsToTheEngineWideOne() throws Exception {
+        assertThat(read(network(", \"runTimeVariability\": 0.1", "49.84")).line("L1").runTimeVariability())
+                .isEqualTo(0.1);
+        assertThat(read(network("", "49.84")).line("L1").runTimeVariability()).isNull();
+        assertThatThrownBy(() -> read(network(", \"runTimeVariability\": \"high\"", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runTimeVariability");
+        assertThatThrownBy(() -> read(network(", \"runTimeVariability\": 0.4", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runTimeVariability");
+    }
+
+    @Test
     void derivesRunTimesFromTrackLengthNotStraightLineDistance() throws Exception {
         Line line = read(network("", "49.84")).line("L1");
 
