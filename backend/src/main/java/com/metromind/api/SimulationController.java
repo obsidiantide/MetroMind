@@ -6,6 +6,7 @@ import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.DelayImpactReport;
 import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
+import com.metromind.incident.TimeOfDayReport;
 import com.metromind.network.MetroNetwork;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.Departure;
@@ -18,6 +19,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -240,6 +242,28 @@ public class SimulationController {
                                      @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
                                      Double dwellVariability) {
         return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric,
+                spread(runTimeVariability), dwellSpread(dwellVariability));
+    }
+
+    /**
+     * Strategy benchmark across times of day: the benchmark of {@code POST /analysis/benchmark} run from each of
+     * {@code startTimes} ({@code HH:mm}, comma-separated, 00:30 or later), every one from a fresh copy of the
+     * network warmed up for 30 simulated minutes to that time, then ranked over the whole day. Scenarios, run times
+     * and dwells all come from {@code seed}; the spreads default to the live engine's. Does not touch live state.
+     */
+    @Tag(name = "Analysis")
+    @Operation(summary = "Rank strategies over random incidents at several times of day")
+    @PostMapping("/analysis/benchmark/day")
+    public TimeOfDayReport benchmarkDay(
+            @RequestParam(defaultValue = "08:00,13:00,18:00,22:30") @Size(min = 1, max = 4) List<String> startTimes,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(20) int scenarios,
+            @RequestParam(defaultValue = "1") long seed,
+            @RequestParam(defaultValue = "1800") @Min(300) @Max(3600) double horizonSeconds,
+            @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
+            @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
+        return simulation.benchmarkTimesOfDay(startTimes, scenarios, seed, horizonSeconds, drawn(kinds), metric,
                 spread(runTimeVariability), dwellSpread(dwellVariability));
     }
 
