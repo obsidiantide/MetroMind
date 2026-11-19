@@ -35,6 +35,11 @@ public record DwellVariability(double sigma, long seed) {
         return sigma > 0;
     }
 
+    /** The same seed with another spread, e.g. a line's own (see {@link com.metromind.network.Line#dwellVariability()}). */
+    public DwellVariability withSigma(double sigma) {
+        return sigma == this.sigma ? this : new DwellVariability(sigma, seed);
+    }
+
     /** Factor applied to the dwell of call number {@code callIndex} of train {@code trainId}. */
     public double factor(String trainId, long callIndex) {
         return SeededNoise.logNormalFactor(sigma, seed ^ STREAM, trainId, callIndex);
