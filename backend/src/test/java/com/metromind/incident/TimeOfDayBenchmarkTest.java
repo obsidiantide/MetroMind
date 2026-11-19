@@ -7,9 +7,11 @@ import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +50,29 @@ class TimeOfDayBenchmarkTest {
         double peakWait = peak.report().rankings().get(0).meanWaitSeconds();
         double middayWait = midday.report().rankings().get(0).meanWaitSeconds();
         assertThat(middayWait).isGreaterThan(peakWait);
+    }
+
+    @Test
+    void reportsProgressOverAllPeriods() {
+        List<int[]> seen = new ArrayList<>();
+        new TimeOfDayBenchmark().run(planned(), List.of("08:00", "13:00"), 2, 3, 600, TWO, DELAYS,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, (done, total) -> seen.add(new int[] {done, total}));
+
+        int total = TimeOfDayBenchmark.totalRuns(2, 2, TWO.size());
+        assertThat(total).isEqualTo(12);
+        assertThat(seen).extracting(p -> p[1]).containsOnly(total);
+        assertThat(seen).extracting(p -> p[0]).containsExactlyElementsOf(
+                IntStream.rangeClosed(1, total).boxed().toList());
+    }
+
+    @Test
+    void rejectsABadStartTimeBeforeRunningAnyPeriod() {
+        List<int[]> seen = new ArrayList<>();
+        assertThatThrownBy(() -> new TimeOfDayBenchmark().run(planned(), List.of("08:00", "25:00"), 2, 3, 600, TWO,
+                DELAYS, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0,
+                (done, total) -> seen.add(new int[] {done, total})))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(seen).isEmpty();
     }
 
     @Test

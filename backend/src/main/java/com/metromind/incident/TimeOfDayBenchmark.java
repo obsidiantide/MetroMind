@@ -24,18 +24,44 @@ public final class TimeOfDayBenchmark {
 
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
 
+    /**
+     * Simulated runs a benchmark of {@code periods} start times makes: each period's strategy benchmark (see
+     * {@link StrategyBenchmark#totalRuns}); warm-ups are not counted.
+     */
+    public static int totalRuns(int periods, int scenarios, int strategies) {
+        return periods * StrategyBenchmark.totalRuns(scenarios, strategies);
+    }
+
     public TimeOfDayReport run(MetroNetwork network, List<String> startClocks, int scenarioCount, long seed,
                                double horizonSeconds, List<HeadwayStrategy> strategies,
                                Set<BenchmarkReport.IncidentKind> kinds, BenchmarkReport.RankingMetric metric,
                                double runTimeVariability, double dwellVariability) {
+        return run(network, startClocks, scenarioCount, seed, horizonSeconds, strategies, kinds, metric,
+                runTimeVariability, dwellVariability, StrategyBenchmark.ProgressListener.NONE);
+    }
+
+    /**
+     * As {@link #run(MetroNetwork, List, int, long, double, List, Set, BenchmarkReport.RankingMetric, double,
+     * double)}, reporting progress to {@code progress} after every run, counted over all periods (see
+     * {@link #totalRuns}).
+     */
+    public TimeOfDayReport run(MetroNetwork network, List<String> startClocks, int scenarioCount, long seed,
+                               double horizonSeconds, List<HeadwayStrategy> strategies,
+                               Set<BenchmarkReport.IncidentKind> kinds, BenchmarkReport.RankingMetric metric,
+                               double runTimeVariability, double dwellVariability,
+                               StrategyBenchmark.ProgressListener progress) {
         if (startClocks.isEmpty()) {
             throw new IllegalArgumentException("A time-of-day benchmark needs at least one start time");
         }
         if (startClocks.stream().distinct().count() != startClocks.size()) {
             throw new IllegalArgumentException("Start times must not repeat");
         }
+        startClocks.forEach(TimeOfDayBenchmark::startSeconds); // reject a bad start time before running any period
+        int perPeriod = StrategyBenchmark.totalRuns(scenarioCount, strategies.size());
+        int total = startClocks.size() * perPeriod;
         List<TimeOfDayReport.Period> periods = new ArrayList<>();
         for (String clock : startClocks) {
+            int before = periods.size() * perPeriod;
             SimulationEngine engine = new SimulationEngine(network, startSeconds(clock) - WARM_UP_SECONDS,
                     HeadwayStrategy.NO_CONTROL);
             engine.setRunTimeVariability(new RunTimeVariability(runTimeVariability, seed));
@@ -43,7 +69,7 @@ public final class TimeOfDayBenchmark {
             engine.run(WARM_UP_SECONDS, 1);
             periods.add(new TimeOfDayReport.Period(clock, benchmark.run(engine, scenarioCount, seed, horizonSeconds,
                     strategies, kinds, metric, runTimeVariability, dwellVariability,
-                    StrategyBenchmark.ProgressListener.NONE)));
+                    (done, runs) -> progress.onProgress(before + done, total))));
         }
         return new TimeOfDayReport(seed, horizonSeconds, metric, periods, rank(strategies, periods, metric));
     }
