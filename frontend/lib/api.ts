@@ -65,6 +65,7 @@ export const api = {
     });
     if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
     if (r.runTimeVariability !== undefined) q.set("runTimeVariability", String(r.runTimeVariability));
+    if (r.dwellVariability !== undefined) q.set("dwellVariability", String(r.dwellVariability));
     return call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${q}`, { method: "POST" });
   },
   benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),

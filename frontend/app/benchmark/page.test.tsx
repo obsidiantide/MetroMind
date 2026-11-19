@@ -47,6 +47,19 @@ describe("BenchmarkPage", () => {
     expect(submit.mock.calls[0][0].runTimeVariability).toBeCloseTo(0.08);
   });
 
+  it("sends a dwell spread when one is set and shows it on the ranking", async () => {
+    const submit = vi.spyOn(api, "submitBenchmark")
+      .mockResolvedValue(job({ report: { ...job().report!, dwellVariability: 0.15 } }));
+    render(<BenchmarkPage />);
+
+    fireEvent.change(screen.getByLabelText(/Dwell spread/), { target: { value: "15" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run benchmark" }));
+
+    expect(await screen.findByText(/dwells ±15 %/)).toBeTruthy();
+    expect(submit.mock.calls[0][0].dwellVariability).toBeCloseTo(0.15);
+    expect(submit.mock.calls[0][0].runTimeVariability).toBeUndefined();
+  });
+
   it("ranks strategies with recovery, short turns and skipped stops, and names scenario places", async () => {
     vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
     render(<BenchmarkPage />);

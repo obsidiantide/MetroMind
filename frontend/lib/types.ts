@@ -157,6 +157,8 @@ export interface BenchmarkReport {
   rankings: StrategyRanking[];
   /** Spread of run times around nominal every run was drawn with (log-sd, 0.05 ≈ ±5 %); 0 or absent for nominal. */
   runTimeVariability?: number;
+  /** Spread of dwells around the passenger-driven one every run was drawn with; 0 or absent for none. */
+  dwellVariability?: number;
 }
 export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 /**
@@ -172,4 +174,6 @@ export interface BenchmarkRequest {
   scenarios: number; seed: number; horizonSeconds: number; kinds: ScenarioKind[]; metric: RankingMetric;
   /** Spread of run times (0–0.25); left out, the benchmark uses the live engine's. */
   runTimeVariability?: number;
+  /** Spread of dwells (0–0.25); left out, the benchmark uses the live engine's. */
+  dwellVariability?: number;
 }

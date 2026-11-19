@@ -17,6 +17,11 @@ const KINDS: { kind: ScenarioKind; label: string }[] = [
 ];
 const POLL_MS = 1000;
 
+/** A spread typed in percent as a fraction; empty means "as on the live engine". */
+function percent(text: string): number | undefined {
+  return text.trim() === "" ? undefined : Number(text) / 100;
+}
+
 /** Station and line names by id, falling back to the id while the network is loading. */
 type Names = (id: string | undefined) => string;
 
@@ -42,6 +47,8 @@ export default function BenchmarkPage() {
   const [metric, setMetric] = useState<RankingMetric>("WAIT_PER_BOARDING");
   // Run-time spread in percent; empty uses the live engine's.
   const [spread, setSpread] = useState("");
+  // Dwell spread in percent; empty uses the live engine's.
+  const [dwellSpread, setDwellSpread] = useState("");
   const [job, setJob] = useState<BenchmarkJob | null>(null);
   const [history, setHistory] = useState<BenchmarkJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +77,11 @@ export default function BenchmarkPage() {
   const submit = async () => {
     setError(null);
     try {
-      const runTimeVariability = spread.trim() === "" ? undefined : Number(spread) / 100;
-      setJob(await api.submitBenchmark({ scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric, runTimeVariability }));
+      const runTimeVariability = percent(spread);
+      const dwellVariability = percent(dwellSpread);
+      setJob(await api.submitBenchmark({
+        scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric, runTimeVariability, dwellVariability,
+      }));
       refreshHistory();
     } catch (e) {
       setError(String(e));
@@ -102,7 +112,7 @@ export default function BenchmarkPage() {
         <p className="muted">
           Every headway strategy is run against the same random incidents, all started from the live network&apos;s
           current state, and ranked. The same seed and starting state always give the same scenarios, and the same
-          everyday variation of run times when a run-time spread is set.
+          everyday variation of run times and dwells when a spread is set.
         </p>
         <div className="row">
           <label>Scenarios <input type="number" min={1} max={200} value={scenarios}
@@ -114,6 +124,9 @@ export default function BenchmarkPage() {
           <label title="How much each run between stations varies around its nominal time, drawn from the seed">
             Run-time spread <input type="number" min={0} max={25} step={1} value={spread} placeholder="live"
                                    onChange={(e) => setSpread(e.target.value)} style={{ width: 60 }} /> %</label>
+          <label title="How much each stop's dwell varies around the one its passengers need, drawn from the seed">
+            Dwell spread <input type="number" min={0} max={25} step={1} value={dwellSpread} placeholder="live"
+                                onChange={(e) => setDwellSpread(e.target.value)} style={{ width: 60 }} /> %</label>
           <label>Rank by{" "}
             <select value={metric} onChange={(e) => setMetric(e.target.value as RankingMetric)}>
               <option value="WAIT_PER_BOARDING">Platform wait per boarding</option>
@@ -200,6 +213,7 @@ function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
           Ranking · {n} scenarios · seed {report.seed} · {Math.round(report.horizonSeconds / 60)} min horizon · by{" "}
           {byWait ? "platform wait per boarding" : "total travel time"}
           {(report.runTimeVariability ?? 0) > 0 && ` · run times ±${Math.round((report.runTimeVariability ?? 0) * 100)} %`}
+          {(report.dwellVariability ?? 0) > 0 && ` · dwells ±${Math.round((report.dwellVariability ?? 0) * 100)} %`}
         </h2>
         <button onClick={() => downloadCsv(report)}>Export CSV</button>
       </div>
