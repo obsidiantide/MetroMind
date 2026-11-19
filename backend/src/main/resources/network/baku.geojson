@@ -336,6 +336,8 @@
     "trainCapacity": 1000,
     "spareTrains": 2,
     "depotAccessSeconds": 300,
+    "runTimeVariability": 0.08,
+    "dwellVariability": 0.12,
     "fleetPlan": [
      {"from": "06:00", "trains": 6},
      {"from": "07:00", "trains": 10},
@@ -387,6 +389,8 @@
     "trainCapacity": 1000,
     "spareTrains": 1,
     "depotAccessSeconds": 120,
+    "runTimeVariability": 0.06,
+    "dwellVariability": 0.08,
     "fleetPlan": [
      {"from": "06:00", "trains": 4},
      {"from": "07:00", "trains": 7},
@@ -416,6 +420,8 @@
     "trainCount": 3,
     "trainCapacity": 800,
     "depotAccessSeconds": 150,
+    "runTimeVariability": 0.03,
+    "dwellVariability": 0.05,
     "fleetPlan": [
      {"from": "06:00", "trains": 2},
      {"from": "07:00", "trains": 3},

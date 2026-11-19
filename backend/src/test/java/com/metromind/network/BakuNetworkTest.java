@@ -1,11 +1,16 @@
 package com.metromind.network;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.metromind.sim.DwellVariability;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.SimulationSnapshot;
+import com.metromind.sim.TrainState;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,6 +80,28 @@ class BakuNetworkTest {
         SimulationEngine engine = new SimulationEngine(baku(), 9.9 * 3600, HeadwayStrategy.BALANCED);
         engine.run(10 * 60, 1);
         assertThat(engine.snapshot().metrics().trainsOnDepotRuns()).isPositive();
+    }
+
+    @Test
+    void theDefaultRunShowsEverydayIrregularityOutOfTheBox() throws Exception {
+        MetroNetwork n = baku();
+        // The 1967 Red line runs and dwells least evenly, the Purple line opened in 2016 most evenly.
+        assertThat(n.line("M1").runTimeVariability()).isGreaterThan(n.line("M2").runTimeVariability())
+                .isGreaterThan(n.line("M3").runTimeVariability());
+        assertThat(n.line("M1").dwellVariability()).isGreaterThan(n.line("M2").dwellVariability())
+                .isGreaterThan(n.line("M3").dwellVariability());
+
+        // With the engine-wide spreads left at 0 the lines' own spreads still vary the day, reproducibly by seed.
+        assertThat(arrivals(baku(), 0)).isEqualTo(arrivals(baku(), 0)).isNotEqualTo(arrivals(baku(), 1));
+    }
+
+    private static List<List<Double>> arrivals(MetroNetwork network, long seed) {
+        SimulationEngine engine = new SimulationEngine(network, MORNING, HeadwayStrategy.NO_CONTROL);
+        engine.setRunTimeVariability(new RunTimeVariability(0, seed));
+        engine.setDwellVariability(new DwellVariability(0, seed));
+        engine.setRecordArrivals(true);
+        engine.run(1800, 1);
+        return engine.trains().stream().map(TrainState::arrivals).toList();
     }
 
     @Test
