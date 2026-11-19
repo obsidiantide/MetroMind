@@ -56,6 +56,7 @@ export const api = {
       scenarios: String(r.scenarios), seed: String(r.seed), horizonSeconds: String(r.horizonSeconds), metric: r.metric,
     });
     if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
+    if (r.runTimeVariability !== undefined) q.set("runTimeVariability", String(r.runTimeVariability));
     return call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${q}`, { method: "POST" });
   },
   benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),

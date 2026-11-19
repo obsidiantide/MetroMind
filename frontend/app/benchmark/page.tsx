@@ -38,6 +38,8 @@ export default function BenchmarkPage() {
   const [horizonMinutes, setHorizonMinutes] = useState(30);
   const [kinds, setKinds] = useState<ScenarioKind[]>(KINDS.map((k) => k.kind));
   const [metric, setMetric] = useState<RankingMetric>("WAIT_PER_BOARDING");
+  // Run-time spread in percent; empty uses the live engine's.
+  const [spread, setSpread] = useState("");
   const [job, setJob] = useState<BenchmarkJob | null>(null);
   const [history, setHistory] = useState<BenchmarkJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +68,8 @@ export default function BenchmarkPage() {
   const submit = async () => {
     setError(null);
     try {
-      setJob(await api.submitBenchmark({ scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric }));
+      const runTimeVariability = spread.trim() === "" ? undefined : Number(spread) / 100;
+      setJob(await api.submitBenchmark({ scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric, runTimeVariability }));
       refreshHistory();
     } catch (e) {
       setError(String(e));
@@ -96,7 +99,8 @@ export default function BenchmarkPage() {
         <h2>Run</h2>
         <p className="muted">
           Every headway strategy is run against the same random incidents, all started from the live network&apos;s
-          current state, and ranked. The same seed and starting state always give the same scenarios.
+          current state, and ranked. The same seed and starting state always give the same scenarios, and the same
+          everyday variation of run times when a run-time spread is set.
         </p>
         <div className="row">
           <label>Scenarios <input type="number" min={1} max={200} value={scenarios}
@@ -105,6 +109,9 @@ export default function BenchmarkPage() {
                              style={{ width: 80 }} /></label>
           <label>Horizon <input type="number" min={5} max={120} value={horizonMinutes}
                                 onChange={(e) => setHorizonMinutes(+e.target.value)} style={{ width: 60 }} /> min</label>
+          <label title="How much each run between stations varies around its nominal time, drawn from the seed">
+            Run-time spread <input type="number" min={0} max={25} step={1} value={spread} placeholder="live"
+                                   onChange={(e) => setSpread(e.target.value)} style={{ width: 60 }} /> %</label>
           <label>Rank by{" "}
             <select value={metric} onChange={(e) => setMetric(e.target.value as RankingMetric)}>
               <option value="WAIT_PER_BOARDING">Platform wait per boarding</option>
@@ -190,6 +197,7 @@ function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
         <h2>
           Ranking · {n} scenarios · seed {report.seed} · {Math.round(report.horizonSeconds / 60)} min horizon · by{" "}
           {byWait ? "platform wait per boarding" : "total travel time"}
+          {(report.runTimeVariability ?? 0) > 0 && ` · run times ±${Math.round((report.runTimeVariability ?? 0) * 100)} %`}
         </h2>
         <button onClick={() => downloadCsv(report)}>Export CSV</button>
       </div>
