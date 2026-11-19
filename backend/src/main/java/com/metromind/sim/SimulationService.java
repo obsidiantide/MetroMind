@@ -216,17 +216,19 @@ public class SimulationService {
 
     /**
      * Ranks every headway strategy over {@code scenarios} random incidents drawn from {@code seed}, starting from a
-     * copy of the live state. Like the delay analysis it never touches the live engine.
+     * copy of the live state, with run times varying by {@code runTimeVariability} around nominal. Like the delay
+     * analysis it never touches the live engine.
      */
     public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds,
                                                Set<BenchmarkReport.IncidentKind> kinds,
-                                               BenchmarkReport.RankingMetric metric) {
+                                               BenchmarkReport.RankingMetric metric, double runTimeVariability) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
         }
         return analysisTimer("benchmark").record(
-                () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric));
+                () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric,
+                        runTimeVariability, StrategyBenchmark.ProgressListener.NONE));
     }
 
     /**
@@ -237,7 +239,7 @@ public class SimulationService {
      */
     public BenchmarkJobs.Job submitBenchmark(int scenarios, long seed, double horizonSeconds,
                                              Set<BenchmarkReport.IncidentKind> kinds,
-                                             BenchmarkReport.RankingMetric metric) {
+                                             BenchmarkReport.RankingMetric metric, double runTimeVariability) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
@@ -245,7 +247,7 @@ public class SimulationService {
         List<HeadwayStrategy> strategies = HeadwayStrategy.all();
         return benchmarkJobs.submit(StrategyBenchmark.totalRuns(scenarios, strategies.size()),
                 progress -> analysisTimer("benchmark").record(() -> benchmark.run(fork, scenarios, seed,
-                        horizonSeconds, strategies, kinds, metric, progress)));
+                        horizonSeconds, strategies, kinds, metric, runTimeVariability, progress)));
     }
 
     public Optional<BenchmarkJobs.Job> benchmarkJob(String id) {

@@ -61,6 +61,26 @@ class BenchmarkApiTest {
     }
 
     @Test
+    void variesRunTimesWhenAskedAndRunsToNominalByDefault() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runTimeVariability").value(0.0));
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300").param("runTimeVariability", "0.08"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runTimeVariability").value(0.08));
+    }
+
+    @Test
+    void tooMuchRunTimeVariabilityIsABadRequest() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("runTimeVariability", "0.5"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/analysis/benchmark/jobs").param("runTimeVariability", "-0.1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void anUnknownMetricIsABadRequest() throws Exception {
         mvc.perform(post("/api/analysis/benchmark").param("metric", "VIBES"))
                 .andExpect(status().isBadRequest());
