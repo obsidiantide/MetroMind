@@ -51,7 +51,7 @@ Mark items `[x]` when merged.
       fleet is constant all day and only adaptive dispatching changes it)
 - [x] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
       benchmarks reflect everyday irregularity while staying reproducible
-- [ ] Dwell-time variability: seeded noise on each stop's dwell (door reopenings, a slow boarding), drawn like run
+- [x] Dwell-time variability: seeded noise on each stop's dwell (door reopenings, a slow boarding), drawn like run
       times so what-if copies share it
 - [ ] Per-line run-time variability: a line's own `runTimeVariability` overriding the engine-wide spread (older lines
       with more irregular running)
