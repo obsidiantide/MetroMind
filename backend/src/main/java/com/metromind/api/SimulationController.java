@@ -278,7 +278,7 @@ public class SimulationController {
     @ApiResponse(responseCode = "202", description = "Job queued; poll the Location header")
     @ApiResponse(responseCode = "429", description = "Too many benchmark jobs queued or running")
     @PostMapping("/analysis/benchmark/jobs")
-    public ResponseEntity<BenchmarkJobs.Job> submitBenchmark(
+    public ResponseEntity<BenchmarkJobs.Job<BenchmarkReport>> submitBenchmark(
             @RequestParam(defaultValue = "10") @Min(1) @Max(200) int scenarios,
             @RequestParam(defaultValue = "1") long seed,
             @RequestParam(defaultValue = "1800") @Min(300) @Max(7200) double horizonSeconds,
@@ -286,7 +286,7 @@ public class SimulationController {
             @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
             @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
             @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
-        BenchmarkJobs.Job job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric,
+        BenchmarkJobs.Job<BenchmarkReport> job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric,
                 spread(runTimeVariability), dwellSpread(dwellVariability));
         return ResponseEntity.accepted()
                 .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
@@ -299,7 +299,7 @@ public class SimulationController {
     @ApiResponse(responseCode = "200", description = "The job")
     @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
     @GetMapping("/analysis/benchmark/jobs/{id}")
-    public ResponseEntity<BenchmarkJobs.Job> benchmarkJob(@PathVariable String id) {
+    public ResponseEntity<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJob(@PathVariable String id) {
         return ResponseEntity.of(simulation.benchmarkJob(id));
     }
 
@@ -313,7 +313,7 @@ public class SimulationController {
     @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
     @ApiResponse(responseCode = "409", description = "The job had already finished; it is returned unchanged")
     @DeleteMapping("/analysis/benchmark/jobs/{id}")
-    public ResponseEntity<BenchmarkJobs.Job> cancelBenchmarkJob(@PathVariable String id) {
+    public ResponseEntity<BenchmarkJobs.Job<BenchmarkReport>> cancelBenchmarkJob(@PathVariable String id) {
         return simulation.cancelBenchmarkJob(id)
                 .map(job -> ResponseEntity.status(job.status() == BenchmarkJobs.Status.CANCELLED
                         ? HttpStatus.OK : HttpStatus.CONFLICT).body(job))
@@ -323,7 +323,7 @@ public class SimulationController {
     @Tag(name = "Analysis")
     @Operation(summary = "Benchmark jobs still kept, newest first")
     @GetMapping("/analysis/benchmark/jobs")
-    public List<BenchmarkJobs.Job> benchmarkJobs(@RequestParam(defaultValue = "20") @Min(1) @Max(20) int limit) {
+    public List<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJobs(@RequestParam(defaultValue = "20") @Min(1) @Max(20) int limit) {
         return simulation.benchmarkJobs(limit);
     }
 

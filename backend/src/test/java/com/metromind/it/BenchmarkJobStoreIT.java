@@ -21,7 +21,7 @@ import static org.awaitility.Awaitility.await;
 class BenchmarkJobStoreIT extends InfrastructureIT {
 
     @Autowired
-    BenchmarkJobStore store;
+    BenchmarkJobStore<BenchmarkReport> store;
 
     @Autowired
     SimulationService simulation;
@@ -37,7 +37,7 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
                 BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05, 0.1).id();
         await().atMost(Duration.ofSeconds(60)).until(() -> store.find(id).isPresent());
 
-        BenchmarkJobs.Job stored = store.find(id).orElseThrow();
+        BenchmarkJobs.Job<BenchmarkReport> stored = store.find(id).orElseThrow();
         assertThat(stored.status()).isEqualTo(BenchmarkJobs.Status.SUCCEEDED);
         assertThat(stored.report()).isEqualTo(simulation.benchmarkJob(id).orElseThrow().report());
         assertThat(jdbc.queryForObject("SELECT jsonb_array_length(report -> 'rankings') FROM benchmark_job"
@@ -50,12 +50,12 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
         Instant t0 = Instant.now().truncatedTo(ChronoUnit.MICROS).plus(Duration.ofDays(1));
         String older = UUID.randomUUID().toString();
         String newer = UUID.randomUUID().toString();
-        store.save(new BenchmarkJobs.Job(older, BenchmarkJobs.Status.CANCELLED, 3, 9, t0, t0, t0.plusSeconds(4),
+        store.save(new BenchmarkJobs.Job<>(older, BenchmarkJobs.Status.CANCELLED, 3, 9, t0, t0, t0.plusSeconds(4),
                 null, null));
-        BenchmarkJobs.Job failed = new BenchmarkJobs.Job(newer, BenchmarkJobs.Status.FAILED, 1, 9,
+        BenchmarkJobs.Job<BenchmarkReport> failed = new BenchmarkJobs.Job<>(newer, BenchmarkJobs.Status.FAILED, 1, 9,
                 t0.plusSeconds(60), t0.plusSeconds(60), t0.plusSeconds(61), null, "Unknown train: NOPE");
         store.save(failed);
-        BenchmarkJobs.Job cancelled = new BenchmarkJobs.Job(older, BenchmarkJobs.Status.CANCELLED, 4, 9, t0, t0,
+        BenchmarkJobs.Job<BenchmarkReport> cancelled = new BenchmarkJobs.Job<>(older, BenchmarkJobs.Status.CANCELLED, 4, 9, t0, t0,
                 t0.plusSeconds(5), null, null);
         store.save(cancelled);
 
