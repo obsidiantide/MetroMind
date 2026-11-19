@@ -177,13 +177,15 @@ export interface TimeOfDayReport {
 export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 /**
  * A background benchmark run; `report` is set once SUCCEEDED, `error` once FAILED. A CANCELLED job keeps the runs it
- * completed but no report. Times are ISO-8601.
+ * completed but no report. Times are ISO-8601. `R` is the report: a strategy benchmark's, or a `TimeOfDayReport` for
+ * a benchmark across times of day.
  */
-export interface BenchmarkJob {
+export interface BenchmarkJob<R = BenchmarkReport> {
   id: string; status: BenchmarkJobStatus; completedRuns: number; totalRuns: number; progress: number;
   submittedAt: string; startedAt: string | null; finishedAt: string | null;
-  report: BenchmarkReport | null; error: string | null;
+  report: R | null; error: string | null;
 }
+export type DayBenchmarkJob = BenchmarkJob<TimeOfDayReport>;
 export interface BenchmarkRequest {
   scenarios: number; seed: number; horizonSeconds: number; kinds: ScenarioKind[]; metric: RankingMetric;
   /** Spread of run times (0–0.25); left out, the benchmark uses the live engine's. */
