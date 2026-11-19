@@ -32,6 +32,8 @@ public final class TrainState {
     boolean delayAlertActive;
     /** Whether the train ran through its last stop without calling (skip-stop); it never skips two in a row. */
     boolean skippedLastStop;
+    /** Runs between stations the train has started; numbers its run-time variability draws. */
+    long runsStarted;
     final List<Double> arrivals = new ArrayList<>();
 
     TrainState(String id, String lineId, String patternId, int capacity, int stationCount) {
@@ -59,6 +61,7 @@ public final class TrainState {
         t.holdDecided = holdDecided;
         t.delayAlertActive = delayAlertActive;
         t.skippedLastStop = skippedLastStop;
+        t.runsStarted = runsStarted;
         t.arrivals.addAll(arrivals);
         return t;
     }
