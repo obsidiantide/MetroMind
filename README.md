@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `dwellVariability`, optional `depotAccessSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `dwellVariability`, optional `depotAccessSeconds`, optional `crewChangeStationIds` and `crewChangeSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -295,6 +295,17 @@ directions:
 
 ```json
 { "id": "RED", "stationIds": ["R1", "R2", "R3", "R4", "R5"], "timingStationIds": ["R3"], ... }
+```
+
+**Crew changes.** Drivers swap at terminals or at relief points along a long line. A line names those stations in
+`crewChangeStationIds` and the swap time in `crewChangeSeconds` (JSON or GeoJSON); every call there dwells that much
+longer on top of the dwell its passengers set, in both directions. The timetable plans the same extra time at those
+stops, as do the even placement of trains at the start, headway positions and departure boards, so a scheduled swap
+neither makes trains late nor looks like a gap opening behind them:
+
+```json
+{ "id": "RED", "stationIds": ["R1", "R2", "R3", "R4", "R5"], "crewChangeStationIds": ["R1", "R5"],
+  "crewChangeSeconds": 60, ... }
 ```
 
 `GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
