@@ -53,6 +53,26 @@ class LineTest {
     }
 
     @Test
+    void depotAccessTimeIsOptionalInJsonAndMustNotBeNegative() throws Exception {
+        Line plain = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800}
+                """, Line.class);
+        assertThat(plain.depotAccessSeconds()).isZero();
+
+        Line remote = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "depotAccessSeconds": 240}
+                """, Line.class);
+        assertThat(remote.depotAccessSeconds()).isEqualTo(240);
+
+        assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(),
+                false, List.of(), List.of(), List.of(), null, -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("depotAccessSeconds");
+    }
+
+    @Test
     void rejectsNegativeSpareTrains() {
         assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, -1))
                 .isInstanceOf(IllegalArgumentException.class)

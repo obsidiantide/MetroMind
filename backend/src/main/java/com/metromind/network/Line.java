@@ -32,12 +32,23 @@ import java.util.List;
  * @param runTimeVariability the line's own spread of run times around nominal (log-standard deviation, 0 to
  *                       {@value #MAX_RUN_TIME_VARIABILITY}), overriding the engine-wide spread for its trains, e.g.
  *                       for an older line with less even running; {@code null} to use the engine-wide spread
+ * @param depotAccessSeconds time a train runs empty between the depot and the first terminal, each way, when it
+ *                       enters or leaves service; 0 (the default) when the depot opens straight onto the platform
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
                    List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
-                   Double runTimeVariability)
+                   Double runTimeVariability, int depotAccessSeconds)
         implements LoopTopology {
+
+    /** Line whose depot opens straight onto the first terminal's platform. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
+                Double runTimeVariability) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, fleetPlan, runTimeVariability, 0);
+    }
 
     /** Largest run-time spread a line may declare, as for the engine-wide one. */
     public static final double MAX_RUN_TIME_VARIABILITY = 0.25;
@@ -147,6 +158,9 @@ public record Line(String id, String name, String color, List<String> stationIds
                 && !(runTimeVariability >= 0 && runTimeVariability <= MAX_RUN_TIME_VARIABILITY)) {
             throw new IllegalArgumentException("Line " + id + ": runTimeVariability must be between 0 and "
                     + MAX_RUN_TIME_VARIABILITY);
+        }
+        if (depotAccessSeconds < 0) {
+            throw new IllegalArgumentException("Line " + id + ": depotAccessSeconds must not be negative");
         }
     }
 
