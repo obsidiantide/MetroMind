@@ -1175,7 +1175,8 @@ public final class SimulationEngine {
     /**
      * Scheduled runs to and from the depot: a line with a fleet plan running fewer trains than the period in force
      * brings one out (to the service pattern furthest below its share of the planned fleet), and one running more
-     * sends a train standing at the first terminal back. One train per line and review, under every strategy.
+     * sends a train standing at the first terminal back. One train per line and review, under every strategy;
+     * under one that dispatches from the depot, surplus trains go back only once no overload is forecast.
      */
     private void followFleetPlans() {
         for (Line line : lines.values()) {
@@ -1188,7 +1189,9 @@ public final class SimulationEngine {
                 ServicePattern pattern = patternShortOfShare(line, planned);
                 dispatch(line, pattern, "entered service on line %s towards %s as planned (%d trains)".formatted(
                         line.id(), network.station(pattern.towardsStationId(0, 1)).name(), planned));
-            } else if (running > planned) {
+            } else if (running > planned && !strategy.dispatchesFromDepot()) {
+                // A dispatching strategy withdraws surplus trains itself, once the line's forecast allows: cutting
+                // the fleet to plan while overload is forecast would only send the train straight back out.
                 withdrawAtDepot(line, planned);
             }
         }
