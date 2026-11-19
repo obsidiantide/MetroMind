@@ -305,6 +305,18 @@ directions:
 The expected time is estimated from the train's position, nominal run times and any blockage, so a negative
 `delaySeconds` means the train is running early.
 
+### Run-time variability
+
+By default every run between two stations takes exactly its nominal time, so the only irregularity is what
+demand and incidents create. Real runs vary a little (driving style, signals, a slow door), and that everyday
+noise is what makes headways drift apart. `metromind.sim.run-time-variability` (env
+`METROMIND_SIM_RUN_TIME_VARIABILITY`) sets how much: each run takes its nominal time times a log-normal factor
+with median 1 and that log-standard deviation (`0.05` ≈ ±5 %), clamped to three standard deviations; at most
+`0.25`. The draws come from `metromind.sim.run-time-seed`, and each is a pure function of the seed, the train
+and the number of its run, so a run is reproducible and every copy of the engine draws the same: in a what-if
+analysis a train's n-th run takes as long in the baseline as in the incident run unless the incident changes it,
+so the comparison shows the incident, not the noise. Timetables and lateness stay against nominal run times.
+
 ### Platform capacity and crowding
 
 A station may declare how many passengers its platforms hold, all queues together:
@@ -524,6 +536,12 @@ Each scenario lists only what its kind needs:
 `kinds` narrows the draw, e.g. `?kinds=SECTION_CLOSURE,STATION_CLOSURE` to compare strategies on closures only;
 by default all four kinds are drawn. The same seed, kinds and starting state always give the same report, and
 the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5–60 minutes.
+
+`runTimeVariability` (0–0.25) makes every run of the benchmark, baselines included, vary its run times as
+described under *Run-time variability*, drawn from the benchmark's `seed` rather than the live engine's: every
+strategy then faces the same everyday irregularity and a seed still reproduces its report, which records the
+spread it used. Left out, a benchmark varies run times as much as the live engine does; the benchmark page has a
+run-time spread field (in percent) for it.
 
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
