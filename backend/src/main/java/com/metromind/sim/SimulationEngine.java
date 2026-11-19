@@ -112,6 +112,7 @@ public final class SimulationEngine {
     private final Map<String, Integer> dispatchedCount = new LinkedHashMap<>();
     private double nextDispatchCheck;
     private HeadwayStrategy strategy;
+    private RunTimeVariability variability = RunTimeVariability.NONE;
     private double simTime;
     private boolean recordArrivals;
     /** Integral of passengers on board over time, all trains (passenger-seconds). */
@@ -243,6 +244,7 @@ public final class SimulationEngine {
         this.dispatchedCount.putAll(other.dispatchedCount);
         this.nextDispatchCheck = other.nextDispatchCheck;
         this.strategy = other.strategy;
+        this.variability = other.variability;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
         this.rideSeconds = other.rideSeconds;
@@ -585,7 +587,7 @@ public final class SimulationEngine {
         }
         t.phase = TrainPhase.RUNNING;
         t.segmentElapsed = 0;
-        t.segmentDuration = p.runSecondsFromStop(t.stop);
+        t.segmentDuration = p.runSecondsFromStop(t.stop) * variability.factor(t.id, t.runsStarted++);
         recordTrunkDeparture(t, p);
     }
 
@@ -730,12 +732,18 @@ public final class SimulationEngine {
 
     // ------------------------------------------------------------------ headways
 
-    /** Position of a train along its pattern's loop, in nominal seconds since stop 0. */
+    /**
+     * Position of a train along its pattern's loop, in nominal seconds since stop 0. A running train is placed by
+     * the share of its run completed, so a run drawn longer than nominal never puts it past the next stop.
+     */
     double loopPosition(TrainState t) {
         double[] cum = cumulativeStopSeconds.get(t.patternId);
         double base = cum[t.stop];
         if (t.phase == TrainPhase.RUNNING) {
-            return base + NOMINAL_DWELL + t.segmentElapsed;
+            double nominal = cum[t.stop + 1] - cum[t.stop] - NOMINAL_DWELL;
+            double along = t.segmentDuration == nominal ? t.segmentElapsed
+                    : nominal * Math.min(1, t.segmentElapsed / t.segmentDuration);
+            return base + NOMINAL_DWELL + along;
         }
         return base;
     }
@@ -1898,6 +1906,13 @@ public final class SimulationEngine {
     public double simTime() { return simTime; }
     public HeadwayStrategy strategy() { return strategy; }
     public void setStrategy(HeadwayStrategy strategy) { this.strategy = strategy; }
+    public RunTimeVariability runTimeVariability() { return variability; }
+
+    /**
+     * Draws every run started from now on around its nominal time (see {@link RunTimeVariability}); copies made
+     * afterwards inherit it. Runs already under way keep their duration.
+     */
+    public void setRunTimeVariability(RunTimeVariability variability) { this.variability = variability; }
     public MetroNetwork network() { return network; }
     public void setRecordArrivals(boolean record) { this.recordArrivals = record; }
     public List<TrainState> trains() { return List.copyOf(trains); }
