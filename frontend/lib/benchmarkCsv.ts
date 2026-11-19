@@ -1,4 +1,4 @@
-import type { BenchmarkReport } from "@/lib/types";
+import type { BenchmarkReport, TimeOfDayReport } from "@/lib/types";
 
 const COLUMNS = [
   "rank", "strategy", "mean_wait_s", "p95_wait_s", "mean_travel_min", "p95_travel_min", "mean_recovery_s",
@@ -32,4 +32,28 @@ export function benchmarkCsv(report: BenchmarkReport): string {
 /** File name for a report's CSV, e.g. `benchmark-seed7-wait-per-boarding.csv`. */
 export function benchmarkCsvName(report: BenchmarkReport): string {
   return `benchmark-seed${report.seed}-${report.metric.toLowerCase().replace(/_/g, "-")}.csv`;
+}
+
+const DAY_COLUMNS = [
+  "start_clock", "period_rank", "strategy", "mean_wait_s", "p95_wait_s", "mean_travel_min", "p95_travel_min",
+  "mean_recovery_s", "unrecovered_scenarios", "day_rank",
+] as const;
+
+/**
+ * A ranking across times of day as CSV, one row per period and strategy: periods in the order they were run,
+ * strategies by their rank in that period, each row also carrying the strategy's `day_rank` so a spreadsheet can
+ * pivot either way. Numbers are raw and rounded like `benchmarkCsv`.
+ */
+export function dayBenchmarkCsv(report: TimeOfDayReport): string {
+  const dayRank = new Map(report.rankings.map((r) => [r.strategy, r.rank]));
+  const rows = report.periods.flatMap((p) => p.report.rankings.map((r) => [
+    p.startClock, r.rank, r.strategy, r.meanWaitSeconds, r.p95WaitSeconds, r.meanTravelMinutes, r.p95TravelMinutes,
+    r.meanRecoverySeconds, r.unrecoveredScenarios, dayRank.get(r.strategy) ?? null,
+  ].map(field).join(",")));
+  return [DAY_COLUMNS.map(field).join(","), ...rows].join("\r\n") + "\r\n";
+}
+
+/** File name for a day report's CSV, e.g. `benchmark-day-seed7-wait-per-boarding.csv`. */
+export function dayBenchmarkCsvName(report: TimeOfDayReport): string {
+  return `benchmark-day-seed${report.seed}-${report.metric.toLowerCase().replace(/_/g, "-")}.csv`;
 }
