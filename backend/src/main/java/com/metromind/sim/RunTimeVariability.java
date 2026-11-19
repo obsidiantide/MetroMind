@@ -31,6 +31,11 @@ public record RunTimeVariability(double sigma, long seed) {
         return sigma > 0;
     }
 
+    /** The same seed with another spread, e.g. a line's own (see {@link com.metromind.network.Line#runTimeVariability()}). */
+    public RunTimeVariability withSigma(double sigma) {
+        return sigma == this.sigma ? this : new RunTimeVariability(sigma, seed);
+    }
+
     /** Factor applied to the nominal time of run number {@code runIndex} of train {@code trainId}. */
     public double factor(String trainId, long runIndex) {
         return SeededNoise.logNormalFactor(sigma, seed, trainId, runIndex);

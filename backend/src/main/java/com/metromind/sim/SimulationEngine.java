@@ -590,8 +590,17 @@ public final class SimulationEngine {
         t.phase = TrainPhase.RUNNING;
         t.doorFaultActive = false;
         t.segmentElapsed = 0;
-        t.segmentDuration = p.runSecondsFromStop(t.stop) * variability.factor(t.id, t.runsStarted++);
+        t.segmentDuration = p.runSecondsFromStop(t.stop) * runVariability(t).factor(t.id, t.runsStarted++);
         recordTrunkDeparture(t, p);
+    }
+
+    /**
+     * Run-time variability a train's runs are drawn with: its line's own spread when the line declares one, with the
+     * engine's seed, otherwise the engine-wide variability.
+     */
+    private RunTimeVariability runVariability(TrainState t) {
+        Double own = network.line(t.lineId).runTimeVariability();
+        return own == null ? variability : variability.withSigma(own);
     }
 
     private void arrive(TrainState t) {
@@ -1966,7 +1975,8 @@ public final class SimulationEngine {
 
     /**
      * Draws every run started from now on around its nominal time (see {@link RunTimeVariability}); copies made
-     * afterwards inherit it. Runs already under way keep their duration.
+     * afterwards inherit it. Runs already under way keep their duration. A line that declares its own
+     * {@link com.metromind.network.Line#runTimeVariability() spread} keeps it, drawn from this seed.
      */
     public void setRunTimeVariability(RunTimeVariability variability) { this.variability = variability; }
     public DwellVariability dwellVariability() { return dwellVariability; }
