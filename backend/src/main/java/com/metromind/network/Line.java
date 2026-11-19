@@ -25,10 +25,23 @@ import java.util.List;
  *                       stations on a branch may be timing points too
  * @param branches       branches some of the line's trains run to instead of the end of the main route (empty for
  *                       an unbranched line; a ring cannot branch)
+ * @param fleetPlan      time-of-day fleet plan, periods in order of their start; empty when the line runs
+ *                       {@code trainCount} trains all day. {@code trainCount} is still the fleet placed on the line
+ *                       when a run starts; trains beyond it come out of the depot, which holds enough for the
+ *                       busiest period on top of the {@code spareTrains}
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
-                   List<String> timingStationIds, List<Branch> branches) implements LoopTopology {
+                   List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan)
+        implements LoopTopology {
+
+    /** Line running the same fleet all day. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, List.of());
+    }
 
     /** Unbranched line. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -104,6 +117,40 @@ public record Line(String id, String name, String color, List<String> stationIds
                 throw new IllegalArgumentException("Line " + id + ": timing point " + sid + " is not on the line");
             }
         }
+        fleetPlan = fleetPlan == null ? List.of() : List.copyOf(fleetPlan);
+        for (int i = 0; i < fleetPlan.size(); i++) {
+            FleetPlanPeriod period = fleetPlan.get(i);
+            if (i > 0 && period.fromSeconds() <= fleetPlan.get(i - 1).fromSeconds()) {
+                throw new IllegalArgumentException("Line " + id + ": fleet plan periods must be in order of their start");
+            }
+            if (period.trains() < branches.size() + 1) {
+                throw new IllegalArgumentException("Line " + id + ": fleet plan period from " + period.from()
+                        + " needs at least one train per service pattern (" + (branches.size() + 1) + ")");
+            }
+        }
+    }
+
+    /**
+     * Trains the line should run at {@code simSeconds} (seconds since midnight of the first day): the fleet plan's
+     * period in force then, or {@code trainCount} when the line has no plan.
+     */
+    public int plannedTrains(double simSeconds) {
+        if (fleetPlan.isEmpty()) {
+            return trainCount;
+        }
+        double timeOfDay = ((simSeconds % 86_400) + 86_400) % 86_400;
+        FleetPlanPeriod current = fleetPlan.get(fleetPlan.size() - 1); // in force past midnight
+        for (FleetPlanPeriod period : fleetPlan) {
+            if (period.fromSeconds() <= timeOfDay) {
+                current = period;
+            }
+        }
+        return current.trains();
+    }
+
+    /** Most trains the line ever runs: its starting fleet or the busiest period of its fleet plan. */
+    public int peakPlannedTrains() {
+        return Math.max(trainCount, fleetPlan.stream().mapToInt(FleetPlanPeriod::trains).max().orElse(0));
     }
 
     /** Whether the network file gave the real track alignment rather than just the stations. */
