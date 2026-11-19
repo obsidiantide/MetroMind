@@ -33,21 +33,6 @@ public record RunTimeVariability(double sigma, long seed) {
 
     /** Factor applied to the nominal time of run number {@code runIndex} of train {@code trainId}. */
     public double factor(String trainId, long runIndex) {
-        if (!enabled()) {
-            return 1;
-        }
-        long key = mix(seed ^ mix(trainId.hashCode() * 0x9E3779B97F4A7C15L + runIndex));
-        // Box–Muller from two independent uniforms in (0, 1].
-        double u1 = ((mix(key) >>> 11) + 1) * 0x1.0p-53;
-        double u2 = (mix(key + 0x632BE59BD9B4E019L) >>> 11) * 0x1.0p-53;
-        double z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-        return Math.exp(sigma * Math.max(-3, Math.min(3, z)));
-    }
-
-    /** SplitMix64 finaliser: a fixed, well-mixed 64-bit hash. */
-    private static long mix(long z) {
-        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
-        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
-        return z ^ (z >>> 31);
+        return SeededNoise.logNormalFactor(sigma, seed, trainId, runIndex);
     }
 }
