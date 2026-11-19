@@ -38,12 +38,26 @@ import java.util.List;
  *                       0 to {@value #MAX_DWELL_VARIABILITY}), overriding the engine-wide spread for its trains, e.g.
  *                       for a crowded central line that loses more time at the doors; {@code null} to use the
  *                       engine-wide spread
+ * @param crewChangeStationIds stations where drivers swap, on the main route or a branch; every call there dwells
+ *                       {@code crewChangeSeconds} longer, and the timetable allows for it; empty for none
+ * @param crewChangeSeconds extra dwell of a crew change (0 when the line has no crew-change stations)
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
                    List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
-                   Double runTimeVariability, int depotAccessSeconds, Double dwellVariability)
+                   Double runTimeVariability, int depotAccessSeconds, Double dwellVariability,
+                   List<String> crewChangeStationIds, int crewChangeSeconds)
         implements LoopTopology {
+
+    /** Line where drivers do not swap in service. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
+                Double runTimeVariability, int depotAccessSeconds, Double dwellVariability) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, fleetPlan, runTimeVariability, depotAccessSeconds, dwellVariability,
+                List.of(), 0);
+    }
 
     /** Largest dwell spread a line may declare, as for the engine-wide one. */
     public static final double MAX_DWELL_VARIABILITY = 0.25;
@@ -183,6 +197,19 @@ public record Line(String id, String name, String color, List<String> stationIds
             throw new IllegalArgumentException("Line " + id + ": dwellVariability must be between 0 and "
                     + MAX_DWELL_VARIABILITY);
         }
+        crewChangeStationIds = crewChangeStationIds == null ? List.of() : List.copyOf(crewChangeStationIds);
+        for (String sid : crewChangeStationIds) {
+            if (!stationIds.contains(sid) && branches.stream().noneMatch(b -> b.stationIds().contains(sid))) {
+                throw new IllegalArgumentException("Line " + id + ": crew-change station " + sid
+                        + " is not on the line");
+            }
+        }
+        if (crewChangeSeconds < 0) {
+            throw new IllegalArgumentException("Line " + id + ": crewChangeSeconds must not be negative");
+        }
+        if (!crewChangeStationIds.isEmpty() && crewChangeSeconds == 0) {
+            throw new IllegalArgumentException("Line " + id + ": crew-change stations need crewChangeSeconds");
+        }
     }
 
     /**
@@ -252,6 +279,11 @@ public record Line(String id, String name, String color, List<String> stationIds
     }
 
     /** Every station the line serves: the main route, then each branch's stations. */
+    /** Extra dwell of a call at {@code stationId}: the crew-change time there, otherwise 0. */
+    public int crewChangeSecondsAt(String stationId) {
+        return crewChangeStationIds.contains(stationId) ? crewChangeSeconds : 0;
+    }
+
     public List<String> allStationIds() {
         if (branches.isEmpty()) {
             return stationIds;
