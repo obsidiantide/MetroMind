@@ -64,6 +64,20 @@ class BakuNetworkTest {
     }
 
     @Test
+    void trainsReachEveryLineFromADepotDownTheTrack() throws Exception {
+        MetroNetwork n = baku();
+        // The Red line's depot is out past Nəriman Nərimanov, far from İçərişəhər; the others are near the terminal.
+        assertThat(n.line("M1").depotAccessSeconds()).isEqualTo(300);
+        assertThat(n.line("M2").depotAccessSeconds()).isEqualTo(120);
+        assertThat(n.line("M3").depotAccessSeconds()).isEqualTo(150);
+
+        // Off-peak trains go back to the depot along the access track, so some are still on their way at 10:01.
+        SimulationEngine engine = new SimulationEngine(baku(), 9.9 * 3600, HeadwayStrategy.BALANCED);
+        engine.run(10 * 60, 1);
+        assertThat(engine.snapshot().metrics().trainsOnDepotRuns()).isPositive();
+    }
+
+    @Test
     void derivedRunTimesAreThoseOfARealMetro() throws Exception {
         for (Line line : baku().lines()) {
             // Baku's inter-station spacing is roughly 1–3.5 km: two to six and a half minutes at metro pace.

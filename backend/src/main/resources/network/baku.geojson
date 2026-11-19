@@ -335,6 +335,7 @@
     "trainCount": 10,
     "trainCapacity": 1000,
     "spareTrains": 2,
+    "depotAccessSeconds": 300,
     "fleetPlan": [
      {"from": "06:00", "trains": 6},
      {"from": "07:00", "trains": 10},
@@ -385,6 +386,7 @@
     "trainCount": 7,
     "trainCapacity": 1000,
     "spareTrains": 1,
+    "depotAccessSeconds": 120,
     "fleetPlan": [
      {"from": "06:00", "trains": 4},
      {"from": "07:00", "trains": 7},
@@ -413,6 +415,7 @@
     "stationIds": ["khojasan", "avtovaghzal", "ajami", "8noyabr"],
     "trainCount": 3,
     "trainCapacity": 800,
+    "depotAccessSeconds": 150,
     "fleetPlan": [
      {"from": "06:00", "trains": 2},
      {"from": "07:00", "trains": 3},
