@@ -22,6 +22,7 @@ import java.util.Map;
  *       last. Properties: {@code id}, {@code name}, {@code color}, {@code stationIds} (in track order),
  *       {@code trainCount}, {@code trainCapacity}, optional {@code spareTrains}, {@code timingStationIds} and
  *       {@code fleetPlan} (as in the native format: {@code [{"from": "HH:mm", "trains": n}, ...]}),
+ *       {@code runTimeVariability} (the line's own spread of run times, see {@link Line#runTimeVariability()}),
  *       and optionally either {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
  *   <li>A {@code LineString} feature with a {@code branchOf} property is a branch of that line, its geometry drawn
@@ -208,10 +209,17 @@ public class GeoJsonNetworkReader {
             }
             fleetPlan.add(new FleetPlanPeriod(period.get("from").asText(), period.get("trains").asInt()));
         }
+        Double runTimeVariability = null;
+        if (p.has("runTimeVariability") && !p.get("runTimeVariability").isNull()) {
+            if (!p.get("runTimeVariability").isNumber()) {
+                throw new IllegalArgumentException("Line " + id + ": runTimeVariability must be a number");
+            }
+            runTimeVariability = p.get("runTimeVariability").asDouble();
+        }
         List<List<Double>> path = track.stream().map(c -> List.of(c[0], c[1])).toList();
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
                 p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring,
-                timingStationIds, branches, fleetPlan);
+                timingStationIds, branches, fleetPlan, runTimeVariability);
     }
 
     /**
