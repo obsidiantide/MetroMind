@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -379,10 +379,36 @@ line's own platform queues 15 minutes ahead (closed stations left out); when the
 overload level (400 passengers), one spare train enters service at the first terminal as soon as its platform
 and the track into it are clear. It gets its own timetable from that moment, and the strategy's two-way
 balancing holds spread it out among the others. When the forecast drops below the medium level (200) and the
-line runs more trains than its base `trainCount`, a train standing at the first terminal returns to the depot;
+line runs more trains than it should (its `trainCount`, or its fleet plan's count below), a train standing at the
+first terminal returns to the depot;
 anyone who already boarded it waits for the next one. Target headways follow the number of trains in service.
 Dispatches and withdrawals appear as `TRAIN_DISPATCHED` and `TRAIN_WITHDRAWN` events, and snapshot `metrics`
 report `trainsInService` and `trainsInDepot`. Other strategies leave the spares in the depot.
+
+### Time-of-day fleet plan
+
+Real metros run fewer trains off-peak. A line may give a `fleetPlan`, periods in order of their start, each
+setting how many trains run from that time of day until the next period (the last one runs on past midnight, and
+the plan repeats every day):
+
+```json
+{ "id": "RED", "trainCount": 10, "spareTrains": 2, "trainCapacity": 1000,
+  "fleetPlan": [ { "from": "06:00", "trains": 6 }, { "from": "07:00", "trains": 10 },
+                 { "from": "10:00", "trains": 7 }, { "from": "16:30", "trains": 10 },
+                 { "from": "20:00", "trains": 6 }, { "from": "23:00", "trains": 4 } ] }
+```
+
+`trainCount` stays the fleet placed on the line when a run starts (set it to the plan's count for the start
+time); the depot holds the trains the busiest period needs on top of that, plus the `spareTrains`. These are
+scheduled runs, made under every strategy: at each one-minute review a line short of its plan brings one train
+out at the first terminal, to the service pattern furthest below its share of the planned fleet, with its own
+timetable from then on; a line over its plan sends surplus trains back to the depot as they call at the first
+terminal (never a pattern's last train), so even a long line reaches its off-peak fleet within one round trip.
+Under `ADAPTIVE_DISPATCH` the strategy's own spares come on top of the plan, and surplus trains only go back
+once the line's forecast drops below the medium level, so a plan cut never fights an overload. Every period must
+leave at least one train per service pattern. GeoJSON lines take the same `fleetPlan` property, the bundled Baku
+lines have one (full peaks, a thinner midday and evening, a late-night service), `GET /api/network` lists it,
+and the dashboard's line legend shows running against planned trains, in amber while a line is short.
 
 ### Short-turning for recovery
 
