@@ -78,6 +78,41 @@ class LineTest {
     }
 
     @Test
+    void crewChangesAreOptionalInJson() throws Exception {
+        Line plain = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B", "C"], "runSeconds": [90, 90],
+                 "trainCount": 2, "trainCapacity": 800}
+                """, Line.class);
+        assertThat(plain.crewChangeStationIds()).isEmpty();
+        assertThat(plain.crewChangeSecondsAt("A")).isZero();
+
+        Line relieved = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B", "C"], "runSeconds": [90, 90],
+                 "trainCount": 2, "trainCapacity": 800, "crewChangeStationIds": ["B"], "crewChangeSeconds": 60}
+                """, Line.class);
+        assertThat(relieved.crewChangeSecondsAt("B")).isEqualTo(60);
+        assertThat(relieved.crewChangeSecondsAt("A")).isZero();
+    }
+
+    @Test
+    void rejectsCrewChangesOffTheLineOrWithoutATime() {
+        assertThatThrownBy(() -> crewChanges(List.of("X"), 60))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("crew-change station X");
+        assertThatThrownBy(() -> crewChanges(List.of("A"), 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("crewChangeSeconds");
+        assertThatThrownBy(() -> crewChanges(List.of(), -5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("crewChangeSeconds");
+    }
+
+    private static Line crewChanges(List<String> stationIds, int seconds) {
+        return new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(), false, List.of(),
+                List.of(), List.of(), null, 0, null, stationIds, seconds);
+    }
+
+    @Test
     void depotAccessTimeIsOptionalInJsonAndMustNotBeNegative() throws Exception {
         Line plain = mapper.readValue("""
                 {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
