@@ -319,6 +319,16 @@ and the number of its run, so a run is reproducible and every copy of the engine
 analysis a train's n-th run takes as long in the baseline as in the incident run unless the incident changes it,
 so the comparison shows the incident, not the noise. Timetables and lateness stay against nominal run times.
 
+### Dwell-time variability
+
+Dwells are normally set by the passengers alone: 15 s plus a little per passenger getting off or on, at most
+90 s. Real stops also lose time to a door reopened for a late runner or a pram that takes a while.
+`metromind.sim.dwell-variability` (env `METROMIND_SIM_DWELL_VARIABILITY`) multiplies each stop's dwell by a
+log-normal factor drawn like run times (median 1, that log-standard deviation, clamped to three standard
+deviations, at most `0.25`), and never lets the doors close before the 15 s minimum, so on quiet stops the noise
+only ever lengthens a dwell. The draws use `metromind.sim.run-time-seed` from a stream of their own, keyed by the
+train and the number of its call, so run times and dwells are independent and copies of the engine share both.
+
 ### Platform capacity and crowding
 
 A station may declare how many passengers its platforms hold, all queues together:
@@ -555,7 +565,8 @@ the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5�
 described under *Run-time variability*, drawn from the benchmark's `seed` rather than the live engine's: every
 strategy then faces the same everyday irregularity and a seed still reproduces its report, which records the
 spread it used. Left out, a benchmark varies run times as much as the live engine does; the benchmark page has a
-run-time spread field (in percent) for it.
+run-time spread field (in percent) for it. `dwellVariability` (0–0.25) does the same for dwells, as described
+under *Dwell-time variability*, with a dwell spread field next to it.
 
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
