@@ -101,6 +101,10 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
     const r = await api.analyze(trainId, seconds);
     setReport({ title: `Impact of ${Math.round(r.injectedDelaySeconds / 60)} min delay on ${r.trainId}`, ...r });
   };
+  const analyzeDoorFault = async () => {
+    const r = await api.analyzeDoorFault(trainId, seconds);
+    setReport({ title: `Impact of a ${seconds} s door fault on ${trainId}`, ...r });
+  };
   const analyzeSectionClosure = async () => {
     const { lineId, from, to } = selectedSection();
     const r = await api.analyzeSectionClosure(lineId, from, to, closureMinutes * 60, closureResponse);
@@ -150,10 +154,15 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
         <div className="row" style={{ marginTop: 8 }}>
           <button disabled={busy} onClick={() => run(() => api.delay(trainId, seconds))}>Delay</button>
           <button disabled={busy} onClick={() => run(() => api.breakdown(trainId, seconds))}>Breakdown</button>
+          <button disabled={busy} onClick={() => run(() => api.doorFault(trainId, seconds))}>Door fault</button>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
           <button disabled={busy} onClick={() => run(analyzeDelay)}>
             What-if analysis
           </button>
+          <button disabled={busy} onClick={() => run(analyzeDoorFault)}>What-if door fault</button>
         </div>
+        <p className="muted">A delay stops the train where it is; a door fault holds it at its platform, or the next one.</p>
         {error && <p style={{ color: "var(--bad)" }}>{error}</p>}
       </section>
 

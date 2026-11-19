@@ -7,12 +7,14 @@ const KIND_COLOR: Record<IncidentKind, string> = {
   BREAKDOWN: "var(--bad)",
   SECTION_CLOSURE: "#a371f7",
   STATION_CLOSURE: "#58a6ff",
+  DOOR_FAULT: "#db6d28",
 };
 const KIND_LABEL: Record<IncidentKind, string> = {
   TRAIN_DELAY: "Delay",
   BREAKDOWN: "Breakdown",
   SECTION_CLOSURE: "Track closed",
   STATION_CLOSURE: "Station closed",
+  DOOR_FAULT: "Door fault",
 };
 
 /**

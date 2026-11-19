@@ -61,7 +61,7 @@ export type ClosureResponse = "WAIT" | "TURN_BACK";
 export interface ClosedSectionView {
   lineId: string; fromStationId: string; toStationId: string; response: ClosureResponse; remainingSeconds: number;
 }
-export type IncidentKind = "TRAIN_DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE";
+export type IncidentKind = "TRAIN_DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE" | "DOOR_FAULT";
 export interface ActiveIncidentView {
   kind: IncidentKind; subjectId: string; description: string; startedAt: number; clearsAt: number;
   remainingSeconds: number;
@@ -110,7 +110,7 @@ export interface StrategyOutcome {
 export interface DelayImpactReport {
   trainId: string; injectedDelaySeconds: number; horizonSeconds: number; outcomes: StrategyOutcome[]; bestStrategy: string;
 }
-export type ScenarioKind = "DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE";
+export type ScenarioKind = "DELAY" | "BREAKDOWN" | "SECTION_CLOSURE" | "STATION_CLOSURE" | "DOOR_FAULT";
 /** An incident injected by a what-if analysis or benchmark; only the fields its kind needs are present. */
 export interface IncidentScenario {
   kind: ScenarioKind; seconds: number; trainId?: string; lineId?: string; fromStationId?: string;

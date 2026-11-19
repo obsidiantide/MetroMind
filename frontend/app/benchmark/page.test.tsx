@@ -26,7 +26,7 @@ describe("BenchmarkPage", () => {
 
     expect(await screen.findByText("Running: 4 of 16 runs")).toBeTruthy();
     expect(submit).toHaveBeenCalledWith({
-      scenarios: 2, seed: 7, horizonSeconds: 1800, kinds: ["DELAY", "SECTION_CLOSURE", "STATION_CLOSURE"],
+      scenarios: 2, seed: 7, horizonSeconds: 1800, kinds: ["DELAY", "DOOR_FAULT", "SECTION_CLOSURE", "STATION_CLOSURE"],
       metric: "TRAVEL_TIME",
     });
     expect(screen.getByRole("button", { name: "Run benchmark" })).toHaveProperty("disabled", true);
@@ -134,7 +134,7 @@ describe("BenchmarkPage", () => {
     render(<BenchmarkPage />);
 
     const run = screen.getByRole("button", { name: "Run benchmark" });
-    for (const kind of ["Train delays", "Breakdowns", "Track closures", "Station closures"]) {
+    for (const kind of ["Train delays", "Breakdowns", "Door faults", "Track closures", "Station closures"]) {
       fireEvent.click(screen.getByLabelText(kind));
     }
     expect(run).toHaveProperty("disabled", true);
