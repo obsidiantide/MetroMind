@@ -586,6 +586,7 @@ public final class SimulationEngine {
             crossingBusyUntil.put(crossing.key(), simTime + crossing.seconds());
         }
         t.phase = TrainPhase.RUNNING;
+        t.doorFaultActive = false;
         t.segmentElapsed = 0;
         t.segmentDuration = p.runSecondsFromStop(t.stop) * variability.factor(t.id, t.runsStarted++);
         recordTrunkDeparture(t, p);
@@ -630,6 +631,9 @@ public final class SimulationEngine {
 
         t.phaseRemaining = Math.max(MIN_DWELL,
                 Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * (alight + board)));
+        if (t.doorFaultPending > 0) {
+            applyDoorFault(t);
+        }
     }
 
     /**
@@ -973,6 +977,39 @@ public final class SimulationEngine {
         t.blockedRemaining += repairSeconds;
         t.failed = true;
         emit(SimEvent.Type.INCIDENT, trainId, "Train %s broke down, repair ETA %.0f s".formatted(trainId, repairSeconds));
+    }
+
+    /**
+     * Door fault: the train cannot close its doors and stays at its platform for {@code seconds} longer than it
+     * otherwise would. Unlike {@link #injectDelay} it never stops a train between stations: one that is running
+     * when the fault is reported keeps going and is held at the next platform it calls at. The extra dwell comes on
+     * top of the usual boarding time and any headway hold.
+     */
+    public void injectDoorFault(String trainId, double seconds) {
+        TrainState t = train(trainId);
+        if (!t.doorFaultActive && t.doorFaultPending <= 0) {
+            t.doorFaultSince = simTime;
+        }
+        t.doorFaultPending += seconds;
+        if (t.phase != TrainPhase.RUNNING) {
+            applyDoorFault(t);
+        }
+        emit(SimEvent.Type.INCIDENT, trainId, "Train %s has a door fault, held %.0f s at %s".formatted(trainId,
+                seconds, t.phase == TrainPhase.RUNNING ? "its next stop" : stationName(pattern(t).stationAtStop(t.stop))));
+    }
+
+    /** Adds a pending door fault to the dwell of a train standing at a platform. */
+    private void applyDoorFault(TrainState t) {
+        double extra = t.doorFaultPending;
+        t.doorFaultPending = 0;
+        t.doorFaultActive = true;
+        if (t.phase == TrainPhase.WAITING_SIGNAL) {
+            t.phase = TrainPhase.HELD; // it must not leave before the doors close, even once the signal clears
+            t.holdDecided = true;
+            t.phaseRemaining = extra;
+        } else {
+            t.phaseRemaining = Math.max(0, t.phaseRemaining) + extra;
+        }
     }
 
     /** Records when a train's current stoppage began, unless it is already stopped by an earlier incident. */
@@ -1755,8 +1792,8 @@ public final class SimulationEngine {
     }
 
     /**
-     * Every incident still in force, soonest to clear first: stopped trains (delays and breakdowns), closed track
-     * sections and closed stations. Ties keep the order above, so the list is deterministic.
+     * Every incident still in force, soonest to clear first: stopped trains (delays and breakdowns), door faults,
+     * closed track sections and closed stations. Ties keep the order above, so the list is deterministic.
      */
     List<SimulationSnapshot.ActiveIncidentView> activeIncidents() {
         List<SimulationSnapshot.ActiveIncidentView> views = new ArrayList<>();
@@ -1766,6 +1803,15 @@ public final class SimulationEngine {
                         : SimulationSnapshot.IncidentKind.TRAIN_DELAY;
                 String what = t.failed ? "Train %s broken down" : "Train %s held";
                 views.add(incidentView(kind, t.id, what.formatted(t.id), t.blockedSince, t.blockedRemaining));
+            }
+            // A door fault clears when the extra dwell is over; one reported on the move once the train has reached
+            // its next platform and served it.
+            if (t.doorFaultPending > 0 || (t.doorFaultActive && t.phaseRemaining > 0)) {
+                double remaining = t.doorFaultPending > 0
+                        ? Math.max(0, t.segmentDuration - t.segmentElapsed) + t.doorFaultPending
+                        : t.phaseRemaining;
+                views.add(incidentView(SimulationSnapshot.IncidentKind.DOOR_FAULT, t.id,
+                        "Train %s held by a door fault".formatted(t.id), t.doorFaultSince, remaining));
             }
         }
         for (SectionClosure c : closures) {
