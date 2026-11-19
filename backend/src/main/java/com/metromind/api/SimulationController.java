@@ -13,6 +13,8 @@ import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.SimulationService;
 import com.metromind.sim.SimulationSnapshot;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -196,7 +198,9 @@ public class SimulationController {
      * from {@code seed}, and ranks them by mean and p95 passenger wait. {@code kinds} (comma-separated, e.g.
      * {@code DELAY,STATION_CLOSURE}) limits the incidents drawn; by default train delays, breakdowns, track-section
      * closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
-     * (default) or {@code TRAVEL_TIME}. Does not touch live state.
+     * (default) or {@code TRAVEL_TIME}. {@code runTimeVariability} (0 to 0.25) sets how much run times between
+     * stations vary around nominal in every run, drawn from {@code seed}; by default as much as on the live engine.
+     * Does not touch live state.
      */
     @Tag(name = "Analysis")
     @Operation(summary = "Rank strategies over random incident scenarios")
@@ -206,8 +210,11 @@ public class SimulationController {
                                      @RequestParam(defaultValue = "1800") @Min(300) @Max(3600) double horizonSeconds,
                                      @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
                                      @RequestParam(defaultValue = "WAIT_PER_BOARDING")
-                                     BenchmarkReport.RankingMetric metric) {
-        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric);
+                                     BenchmarkReport.RankingMetric metric,
+                                     @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
+                                     Double runTimeVariability) {
+        return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric,
+                spread(runTimeVariability));
     }
 
     /**
@@ -226,8 +233,10 @@ public class SimulationController {
             @RequestParam(defaultValue = "1") long seed,
             @RequestParam(defaultValue = "1800") @Min(300) @Max(7200) double horizonSeconds,
             @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
-            @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric) {
-        BenchmarkJobs.Job job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric);
+            @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability) {
+        BenchmarkJobs.Job job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric,
+                spread(runTimeVariability));
         return ResponseEntity.accepted()
                 .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
                         .toUri())
@@ -271,6 +280,11 @@ public class SimulationController {
     private static Set<BenchmarkReport.IncidentKind> drawn(Set<BenchmarkReport.IncidentKind> kinds) {
         return kinds == null || kinds.isEmpty()
                 ? EnumSet.allOf(BenchmarkReport.IncidentKind.class) : EnumSet.copyOf(kinds);
+    }
+
+    /** The run-time spread a benchmark uses: the one requested, otherwise the live engine's. */
+    private double spread(Double requested) {
+        return requested != null ? requested : simulation.runTimeVariability().sigma();
     }
 
     @ExceptionHandler(BenchmarkJobs.QueueFullException.class)
