@@ -367,6 +367,7 @@ public final class SimulationEngine {
             rideSeconds += t.passengers * dt;
             advance(t, dt);
         }
+        returnSurplusTrains();
         if (simTime >= nextDispatchCheck - 1e-9) {
             while (simTime >= nextDispatchCheck - 1e-9) {
                 nextDispatchCheck += DISPATCH_INTERVAL_SECONDS;
@@ -1174,9 +1175,8 @@ public final class SimulationEngine {
 
     /**
      * Scheduled runs to and from the depot: a line with a fleet plan running fewer trains than the period in force
-     * brings one out (to the service pattern furthest below its share of the planned fleet), and one running more
-     * sends a train standing at the first terminal back. One train per line and review, under every strategy;
-     * under one that dispatches from the depot, surplus trains go back only once no overload is forecast.
+     * brings one out (to the service pattern furthest below its share of the planned fleet), one train per line and
+     * review, under every strategy. Surplus trains go back through {@link #returnSurplusTrains()}.
      */
     private void followFleetPlans() {
         for (Line line : lines.values()) {
@@ -1189,10 +1189,27 @@ public final class SimulationEngine {
                 ServicePattern pattern = patternShortOfShare(line, planned);
                 dispatch(line, pattern, "entered service on line %s towards %s as planned (%d trains)".formatted(
                         line.id(), network.station(pattern.towardsStationId(0, 1)).name(), planned));
-            } else if (running > planned && !strategy.dispatchesFromDepot()) {
-                // A dispatching strategy withdraws surplus trains itself, once the line's forecast allows: cutting
-                // the fleet to plan while overload is forecast would only send the train straight back out.
-                withdrawAtDepot(line, planned);
+            }
+        }
+    }
+
+    /**
+     * Sends surplus trains of every line running more than its fleet plan back to the depot as they call at the
+     * first terminal, checked every step so none runs another round trip because it called between two dispatch
+     * reviews. A strategy that dispatches from the depot withdraws surplus trains itself, once the line's forecast
+     * allows: cutting the fleet to plan while overload is forecast would only send the train straight back out.
+     */
+    private void returnSurplusTrains() {
+        if (strategy.dispatchesFromDepot()) {
+            return;
+        }
+        for (Line line : lines.values()) {
+            if (line.fleetPlan().isEmpty()) {
+                continue;
+            }
+            int planned = line.plannedTrains(simTime);
+            while (runningTrains(line.id()) > planned && withdrawAtDepot(line, planned)) {
+                // one more train has gone in
             }
         }
     }
@@ -1222,7 +1239,7 @@ public final class SimulationEngine {
      * the pattern running most trains above its share of {@code planned}, and never a pattern's last train.
      * Anyone already aboard for the outbound trip steps off and waits for the next train.
      */
-    private void withdrawAtDepot(Line line, int planned) {
+    private boolean withdrawAtDepot(Line line, int planned) {
         TrainState chosen = null;
         double chosenSurplus = Double.NEGATIVE_INFINITY;
         for (TrainState t : trains) {
@@ -1236,7 +1253,7 @@ public final class SimulationEngine {
             }
         }
         if (chosen == null) {
-            return;
+            return false;
         }
         StationState st = stations.get(line.stationIds().get(0));
         double[] queue = st.waiting.get(new StationState.QueueKey(line.id(), line.directionAtStop(0)));
@@ -1247,6 +1264,7 @@ public final class SimulationEngine {
         depot.merge(line.id(), 1, Integer::sum);
         emit(SimEvent.Type.TRAIN_WITHDRAWN, chosen.id, "Train %s returned to the depot of line %s".formatted(
                 chosen.id, line.id()));
+        return true;
     }
 
     /** Trains of {@code planned} that pattern {@code p} should run: its share of the line's base fleet. */
