@@ -7,6 +7,7 @@ import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { KpiCharts } from "@/components/KpiCharts";
 import { MetroMap, type WaitHeat } from "@/components/MetroMap";
 import { api } from "@/lib/api";
+import { fleetBesidesService } from "@/lib/format";
 import type { MetroNetwork } from "@/lib/types";
 import { useSimulation } from "@/lib/useSimulation";
 
@@ -59,7 +60,7 @@ export default function Home() {
             )}
             <div className="kpi">
               <b>{m.trainsInService}</b>
-              <span>trains in service{m.trainsInDepot > 0 ? ` · ${m.trainsInDepot} in depot` : ""}</span>
+              <span>trains in service{fleetBesidesService(m)}</span>
             </div>
           </section>
         )}

@@ -83,6 +83,8 @@ export interface Snapshot {
      * CV judges each pattern on its own. Unbranched lines have no entry.
      */
     trunkHeadwayCv: Record<string, number>;
+    /** Trains running empty between a depot and its line's first terminal; absent from older snapshots. */
+    trainsOnDepotRuns?: number;
   };
 }
 export interface ShortTurn {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, duration, lateness, trunkCv } from "@/lib/format";
+import { clock, duration, fleetBesidesService, lateness, trunkCv } from "@/lib/format";
 
 describe("format", () => {
   it("shows simulated time of day, wrapping past midnight", () => {
@@ -23,5 +23,12 @@ describe("format", () => {
     expect(lateness(80)).toBe("+1m 20s");
     expect(lateness(-15)).toBe("-15s");
     expect(lateness(0.4)).toBe("on time");
+  });
+
+  it("says where trains not in service are: on depot runs, then in the depot", () => {
+    expect(fleetBesidesService({ trainsInDepot: 0 })).toBe("");
+    expect(fleetBesidesService({ trainsInDepot: 3, trainsOnDepotRuns: 0 })).toBe(" · 3 in depot");
+    expect(fleetBesidesService({ trainsInDepot: 0, trainsOnDepotRuns: 1 })).toBe(" · 1 on depot run");
+    expect(fleetBesidesService({ trainsInDepot: 2, trainsOnDepotRuns: 2 })).toBe(" · 2 on depot runs · 2 in depot");
   });
 });
