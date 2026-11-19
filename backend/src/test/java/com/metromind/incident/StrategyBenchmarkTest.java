@@ -158,8 +158,24 @@ class StrategyBenchmarkTest {
                 }
                 case SECTION_CLOSURE, STATION_CLOSURE -> assertThat(s.seconds())
                         .isBetween(StrategyBenchmark.MIN_CLOSURE_SECONDS, StrategyBenchmark.MAX_CLOSURE_SECONDS);
+                case DOOR_FAULT -> {
+                    assertThat(s.trainId()).isIn("L1-1", "L1-2", "L1-3", "L1-4");
+                    assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_DOOR_FAULT_SECONDS,
+                            StrategyBenchmark.MAX_DOOR_FAULT_SECONDS);
+                }
             }
         });
+    }
+
+    @Test
+    void benchmarksDoorFaultsHeldAtThePlatform() {
+        BenchmarkReport report = new StrategyBenchmark().run(live(), 3, 5, 900,
+                List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED),
+                EnumSet.of(BenchmarkReport.IncidentKind.DOOR_FAULT));
+        assertThat(report.scenarios()).extracting(BenchmarkReport.Scenario::kind)
+                .containsOnly(BenchmarkReport.IncidentKind.DOOR_FAULT);
+        assertThat(report.scenarios()).allSatisfy(s -> assertThat(s.stationId()).isNull());
+        assertThat(report.rankings()).hasSize(2).allSatisfy(r -> assertThat(r.meanWaitSeconds()).isPositive());
     }
 
     @Test

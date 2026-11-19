@@ -25,7 +25,8 @@ import java.util.TreeMap;
 
 /**
  * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a train
- * delayed or broken down, a track section or a station closed, each for a random time) from a seed, runs every
+ * delayed, broken down or held at a platform by a door fault, a track section or a station closed, each for a
+ * random time) from a seed, runs every
  * strategy against every scenario from the same copy of the live network, and compares the passenger wait or
  * total travel time they lead to.
  *
@@ -39,6 +40,8 @@ public final class StrategyBenchmark {
     static final double MAX_DELAY_SECONDS = 600;
     static final double MIN_REPAIR_SECONDS = 300;
     static final double MAX_REPAIR_SECONDS = 1200;
+    static final double MIN_DOOR_FAULT_SECONDS = 30;
+    static final double MAX_DOOR_FAULT_SECONDS = 180;
     static final double MIN_CLOSURE_SECONDS = 300;
     static final double MAX_CLOSURE_SECONDS = 1200;
     private static final double DT = 1.0;
@@ -233,6 +236,9 @@ public final class StrategyBenchmark {
                 case STATION_CLOSURE -> BenchmarkReport.Scenario.stationClosure(
                         stations.get(random.nextInt(stations.size())).id(),
                         between(random, MIN_CLOSURE_SECONDS, MAX_CLOSURE_SECONDS));
+                case DOOR_FAULT -> BenchmarkReport.Scenario.train(kind,
+                        trainIds.get(random.nextInt(trainIds.size())),
+                        between(random, MIN_DOOR_FAULT_SECONDS, MAX_DOOR_FAULT_SECONDS));
             });
         }
         return scenarios;

@@ -42,11 +42,11 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
         TRAVEL_TIME
     }
 
-    public enum IncidentKind { DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE }
+    public enum IncidentKind { DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE, DOOR_FAULT }
 
     /**
      * One incident injected at the start of the horizon. Only the fields its kind needs are set (the others are
-     * null and left out of the JSON): {@code trainId} for a delay or breakdown; {@code lineId},
+     * null and left out of the JSON): {@code trainId} for a delay, breakdown or door fault; {@code lineId},
      * {@code fromStationId}, {@code toStationId} and {@code response} for a track-section closure; {@code stationId}
      * for a station closure. {@code seconds} is how long it lasts.
      */
@@ -75,6 +75,7 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
                 case BREAKDOWN -> engine.injectBreakdown(trainId, seconds);
                 case SECTION_CLOSURE -> engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
                 case STATION_CLOSURE -> engine.closeStation(stationId, seconds);
+                case DOOR_FAULT -> engine.injectDoorFault(trainId, seconds);
             }
         }
     }
