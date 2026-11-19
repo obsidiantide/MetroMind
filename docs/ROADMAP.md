@@ -51,6 +51,12 @@ Mark items `[x]` when merged.
       fleet is constant all day and only adaptive dispatching changes it)
 - [x] Seeded run-time variability: each run between stations drawn around its nominal time from the scenario seed, so
       benchmarks reflect everyday irregularity while staying reproducible
+- [ ] Dwell-time variability: seeded noise on each stop's dwell (door reopenings, a slow boarding), drawn like run
+      times so what-if copies share it
+- [ ] Per-line run-time variability: a line's own `runTimeVariability` overriding the engine-wide spread (older lines
+      with more irregular running)
+- [ ] Depot access runs: trains entering or leaving service spend a configurable time running empty between the depot
+      and the first terminal, instead of appearing on the platform at once
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -77,6 +83,8 @@ Mark items `[x]` when merged.
       other pattern close behind can take over the stations a late train gives up
 - [x] Door-fault incident: a train held at its platform for an extra dwell, in the incident API, what-if and
       benchmark scenarios
+- [ ] Benchmark across times of day: run the same scenarios from several start times (morning peak, midday, late
+      evening) so strategies are ranked over the fleet plan's thin and full periods, not just the current moment
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
@@ -109,3 +117,5 @@ Mark items `[x]` when merged.
 - [x] Highlight the stations of a train's service pattern on the map when its detail drawer is open
 - [ ] Browser smoke test of the what-if flow: run a delay analysis from the control panel and see the heat layer
 - [ ] Pan and zoom the map (wheel, drag, keyboard) for networks larger than Baku
+- [ ] Inject a delay, breakdown or door fault and run its what-if straight from a train's detail drawer
+- [ ] Fleet plan chart: planned vs running trains per line over the day, next to the KPI charts
