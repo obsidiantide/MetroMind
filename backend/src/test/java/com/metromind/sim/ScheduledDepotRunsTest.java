@@ -64,6 +64,22 @@ class ScheduledDepotRunsTest {
     }
 
     @Test
+    void surplusTrainsGoInAtTheirFirstCallAtTheDepotTerminal() {
+        // A long line: each train calls at the first terminal about once an hour, and under headway balancing it
+        // rarely lays over there long enough to still be standing at the next dispatch review.
+        MetroNetwork base = TestNetworks.singleLine();
+        Line line = new Line("L1", "Line 1", "#f00", List.of("A", "B", "C", "D", "E", "F"),
+                List.of(600, 600, 600, 600, 600), 6, 900, 0, List.of(), false, List.of(), List.of(),
+                List.of(new FleetPlanPeriod("06:00", 6), new FleetPlanPeriod("22:00", 2)));
+        SimulationEngine engine = new SimulationEngine(new MetroNetwork("Test", base.stations(), List.of(line)),
+                22 * 3600, HeadwayStrategy.BALANCED);
+        engine.run(6400, 1);
+
+        assertThat(engine.trains()).hasSize(2);
+        assertThat(engine.depotTrains("L1")).isEqualTo(4);
+    }
+
+    @Test
     void adaptiveDispatchingKeepsSurplusTrainsWhileOverloadIsForecast() {
         // Small trains in the morning peak: the line stays overloaded after the plan drops to two trains.
         MetroNetwork network = planned(150, 4, 0, new FleetPlanPeriod("06:00", 4), new FleetPlanPeriod("08:00", 2));
