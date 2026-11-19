@@ -623,7 +623,10 @@ into service and the queues match its demand. It takes the same `scenarios` (at 
 Day means average the per-period means, so each time of day weighs the same however busy it is; `worstStartClock`
 is where the strategy ranked lowest. Warm-ups draw run times and dwells from the seed too, so the report is
 reproducible and independent of the live engine's state. The benchmark page's *Across the day* panel runs it with
-the page's settings, as a background job (below) with a progress bar and a cancel button.
+the page's settings, as a background job (below) with a progress bar and a cancel button. Its *Export CSV*
+button saves the day ranking with one row per period and strategy (`start_clock`, `period_rank`, `strategy`, the
+wait, travel-time and recovery columns of the strategy CSV, and the strategy's `day_rank`), named after the seed and
+metric, e.g. `benchmark-day-seed1-wait-per-boarding.csv`.
 
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
