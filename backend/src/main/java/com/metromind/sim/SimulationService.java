@@ -10,6 +10,8 @@ import com.metromind.incident.IncidentHistory;
 import com.metromind.incident.IncidentImpactReport;
 import com.metromind.incident.IncidentRecord;
 import com.metromind.incident.StrategyBenchmark;
+import com.metromind.incident.TimeOfDayBenchmark;
+import com.metromind.incident.TimeOfDayReport;
 import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import io.micrometer.core.instrument.Gauge;
@@ -43,6 +45,7 @@ public class SimulationService {
     private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
+    private final TimeOfDayBenchmark dayBenchmark = new TimeOfDayBenchmark();
     /** One benchmark job at a time: each already keeps a core busy, and jobs queue behind it. */
     private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
             .name("benchmark-job").daemon(true).factory());
@@ -247,6 +250,19 @@ public class SimulationService {
         return analysisTimer("benchmark").record(
                 () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric,
                         runTimeVariability, dwellVariability, StrategyBenchmark.ProgressListener.NONE));
+    }
+
+    /**
+     * Ranks every headway strategy over the same kind of benchmark run from several times of day, each from a fresh
+     * copy of the network warmed up to that time (see {@link TimeOfDayBenchmark}). The live engine is only read for
+     * its network.
+     */
+    public TimeOfDayReport benchmarkTimesOfDay(List<String> startClocks, int scenarios, long seed,
+                                               double horizonSeconds, Set<BenchmarkReport.IncidentKind> kinds,
+                                               BenchmarkReport.RankingMetric metric, double runTimeVariability,
+                                               double dwellVariability) {
+        return analysisTimer("benchmark_day").record(() -> dayBenchmark.run(engine.network(), startClocks, scenarios,
+                seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric, runTimeVariability, dwellVariability));
     }
 
     /**
