@@ -155,6 +155,8 @@ export interface StrategyRanking {
 export interface BenchmarkReport {
   seed: number; horizonSeconds: number; metric: RankingMetric; scenarios: IncidentScenario[];
   rankings: StrategyRanking[];
+  /** Spread of run times around nominal every run was drawn with (log-sd, 0.05 ≈ ±5 %); 0 or absent for nominal. */
+  runTimeVariability?: number;
 }
 export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 /**
@@ -168,4 +170,6 @@ export interface BenchmarkJob {
 }
 export interface BenchmarkRequest {
   scenarios: number; seed: number; horizonSeconds: number; kinds: ScenarioKind[]; metric: RankingMetric;
+  /** Spread of run times (0–0.25); left out, the benchmark uses the live engine's. */
+  runTimeVariability?: number;
 }

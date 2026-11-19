@@ -35,6 +35,18 @@ describe("BenchmarkPage", () => {
     expect(screen.queryByText(/Running:/)).toBeNull();
   });
 
+  it("sends a run-time spread when one is set and shows it on the ranking", async () => {
+    const submit = vi.spyOn(api, "submitBenchmark")
+      .mockResolvedValue(job({ report: { ...job().report!, runTimeVariability: 0.08 } }));
+    render(<BenchmarkPage />);
+
+    fireEvent.change(screen.getByLabelText(/Run-time spread/), { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run benchmark" }));
+
+    expect(await screen.findByText(/run times ±8 %/)).toBeTruthy();
+    expect(submit.mock.calls[0][0].runTimeVariability).toBeCloseTo(0.08);
+  });
+
   it("ranks strategies with recovery, short turns and skipped stops, and names scenario places", async () => {
     vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
     render(<BenchmarkPage />);
