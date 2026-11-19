@@ -24,14 +24,22 @@ import java.util.Map;
  * @param rankings   one entry per strategy, best first
  * @param runTimeVariability spread of run times every run was drawn with (see
  *                   {@link com.metromind.sim.RunTimeVariability}), seeded by {@code seed}; 0 for nominal run times
+ * @param dwellVariability spread of dwells every run was drawn with (see
+ *                   {@link com.metromind.sim.DwellVariability}), seeded by {@code seed}; 0 for passenger-driven dwells
  */
 public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
-                              List<StrategyRanking> rankings, double runTimeVariability) {
+                              List<StrategyRanking> rankings, double runTimeVariability, double dwellVariability) {
+
+    /** Report of a benchmark run with passenger-driven dwells. */
+    public BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
+                           List<StrategyRanking> rankings, double runTimeVariability) {
+        this(seed, horizonSeconds, metric, scenarios, rankings, runTimeVariability, 0);
+    }
 
     /** Report of a benchmark run to nominal run times. */
     public BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
                            List<StrategyRanking> rankings) {
-        this(seed, horizonSeconds, metric, scenarios, rankings, 0);
+        this(seed, horizonSeconds, metric, scenarios, rankings, 0, 0);
     }
 
     /** What strategies are ranked by. */

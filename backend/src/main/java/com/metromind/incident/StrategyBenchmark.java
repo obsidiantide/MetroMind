@@ -4,6 +4,7 @@ import com.metromind.network.Line;
 import com.metromind.network.Station;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.DwellVariability;
 import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.ShortTurn;
 import com.metromind.sim.SimulationEngine;
@@ -85,7 +86,7 @@ public final class StrategyBenchmark {
 
     /**
      * As {@link #run(SimulationEngine, int, long, double, List, Set, BenchmarkReport.RankingMetric)}, reporting
-     * progress to {@code progress} after every run. Run times vary as much as on the live engine.
+     * progress to {@code progress} after every run. Run times and dwells vary as much as on the live engine.
      */
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
@@ -95,16 +96,30 @@ public final class StrategyBenchmark {
     }
 
     /**
+     * The full benchmark with run times varying by {@code runTimeVariability} and dwells as much as on the live
+     * engine.
+     */
+    public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
+                               List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
+                               BenchmarkReport.RankingMetric metric, double runTimeVariability,
+                               ProgressListener progress) {
+        return run(live, scenarioCount, seed, horizonSeconds, strategies, kinds, metric, runTimeVariability,
+                live.dwellVariability().sigma(), progress);
+    }
+
+    /**
      * The full benchmark. Every run, baselines included, draws its run times with spread
-     * {@code runTimeVariability} from the benchmark {@code seed}: a seed gives the same everyday irregularity in
+     * {@code runTimeVariability} and its dwells with spread {@code dwellVariability} from the benchmark
+     * {@code seed}: a seed gives the same everyday irregularity in
      * every run (common random numbers), so strategies are compared on the same "day" and differences come from
      * the strategies and incidents, and the report stays reproducible whatever the live engine's own seed.
      */
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
                                BenchmarkReport.RankingMetric metric, double runTimeVariability,
-                               ProgressListener progress) {
+                               double dwellVariability, ProgressListener progress) {
         RunTimeVariability variability = new RunTimeVariability(runTimeVariability, seed);
+        DwellVariability dwells = new DwellVariability(dwellVariability, seed);
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
@@ -122,6 +137,7 @@ public final class StrategyBenchmark {
             SimulationEngine baseline = live.copy();
             baseline.setStrategy(strategy);
             baseline.setRunTimeVariability(variability);
+            baseline.setDwellVariability(dwells);
             List<Double> baselineCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizonSeconds,
                     RECOVERY_SAMPLE_SECONDS, DT);
             progress.onProgress(++completedRuns, totalRuns);
@@ -137,6 +153,7 @@ public final class StrategyBenchmark {
                 SimulationEngine run = live.copy();
                 run.setStrategy(strategy);
                 run.setRunTimeVariability(variability);
+                run.setDwellVariability(dwells);
                 scenario.applyTo(run);
                 double injectedAt = run.simTime();
                 HeadwayRecovery.Result recovery = HeadwayRecovery.measure(baselineCv,
@@ -176,7 +193,8 @@ public final class StrategyBenchmark {
         for (int i = 0; i < unranked.size(); i++) {
             rankings.add(unranked.get(i).withRank(i + 1));
         }
-        return new BenchmarkReport(seed, horizonSeconds, metric, scenarios, rankings, runTimeVariability);
+        return new BenchmarkReport(seed, horizonSeconds, metric, scenarios, rankings, runTimeVariability,
+                dwellVariability);
     }
 
     /** Each line's sum divided by {@code count}, in line order. */
