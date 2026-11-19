@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { dayBenchmarkCsv, dayBenchmarkCsvName } from "@/lib/benchmarkCsv";
+import { downloadCsv } from "@/lib/download";
 import type { BenchmarkRequest, DayBenchmarkJob } from "@/lib/types";
 
 const DEFAULT_TIMES = "08:00, 13:00, 18:00, 22:30";
@@ -80,6 +82,13 @@ export function DayBenchmark({ request, disabled }: { request: () => BenchmarkRe
         <p className="muted">Ranking cancelled after {job.completedRuns} of {job.totalRuns} runs.</p>
       )}
       {job?.status === "FAILED" && <p style={{ color: "var(--bad)" }}>Ranking failed: {job.error}</p>}
+      {report && (
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <button onClick={() => downloadCsv(dayBenchmarkCsv(report), dayBenchmarkCsvName(report))}>
+            Export CSV
+          </button>
+        </div>
+      )}
       {report && (
         <div className="table-scroll">
           <table>

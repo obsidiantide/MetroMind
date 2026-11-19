@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { DayBenchmark, parseTimes } from "@/components/DayBenchmark";
 import { api } from "@/lib/api";
 import type { BenchmarkRequest, DayBenchmarkJob, TimeOfDayReport } from "@/lib/types";
@@ -82,6 +82,33 @@ describe("DayBenchmark", () => {
     expect(await screen.findByText("Ranking cancelled after 8 of 32 runs.")).toBeTruthy();
     expect(cancel).toHaveBeenCalledWith("day-1");
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("exports the ranking across the day as a CSV file", async () => {
+    vi.spyOn(api, "submitDayBenchmark").mockResolvedValue(dayJob());
+    const created: Blob[] = [];
+    const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
+    onTestFinished(() => { URL.createObjectURL = original.create; URL.revokeObjectURL = original.revoke; });
+    URL.createObjectURL = vi.fn((blob: Blob) => { created.push(blob); return "blob:day"; });
+    URL.revokeObjectURL = vi.fn();
+    const clicked: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this);
+    });
+    render(<DayBenchmark request={() => request} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Rank across the day" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Export CSV" }));
+
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].download).toBe("benchmark-day-seed9-wait-per-boarding.csv");
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(created[0]);
+    });
+    expect(text.split("\r\n")[1]).toBe("08:00,1,BALANCED,101,151,9001,9501,600,0,1");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:day");
   });
 
   it("shows the error when the backend rejects the times", async () => {
