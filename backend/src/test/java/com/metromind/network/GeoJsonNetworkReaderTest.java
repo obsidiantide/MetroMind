@@ -199,6 +199,19 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsCrewChangesAndDefaultsToNone() throws Exception {
+        Line relieved = read(network(", \"crewChangeStationIds\": [\"B\"], \"crewChangeSeconds\": 45", "49.84"))
+                .line("L1");
+        assertThat(relieved.crewChangeStationIds()).containsExactly("B");
+        assertThat(relieved.crewChangeSecondsAt("B")).isEqualTo(45);
+        assertThat(read(network("", "49.84")).line("L1").crewChangeStationIds()).isEmpty();
+        assertThatThrownBy(() -> read(network(", \"crewChangeStationIds\": [\"Z\"], \"crewChangeSeconds\": 45",
+                "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("crew-change station Z");
+    }
+
+    @Test
     void readsADepotAccessTimeAndDefaultsToNone() throws Exception {
         assertThat(read(network(", \"depotAccessSeconds\": 180", "49.84")).line("L1").depotAccessSeconds())
                 .isEqualTo(180);
