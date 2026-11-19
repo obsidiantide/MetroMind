@@ -195,6 +195,17 @@ public class SimulationController {
                 horizonSeconds);
     }
 
+    /** What-if: impact of a door fault on a train, compared across all headway strategies. Does not touch live state. */
+    @Tag(name = "Analysis")
+    @Operation(summary = "What-if: impact of a door fault under every strategy")
+    @PostMapping("/analysis/door-fault-impact")
+    public IncidentImpactReport doorFaultImpact(@Valid @RequestBody IncidentRequest req,
+                                                @RequestParam(defaultValue = "1800") @Min(60) @Max(7200)
+                                                double horizonSeconds) {
+        return simulation.analyzeIncident(BenchmarkReport.Scenario.train(BenchmarkReport.IncidentKind.DOOR_FAULT,
+                req.trainId(), req.seconds()), horizonSeconds);
+    }
+
     /** What-if: impact of closing a station, compared across all headway strategies. Does not touch live state. */
     @Tag(name = "Analysis")
     @Operation(summary = "What-if: impact of a station closure under every strategy")
@@ -209,8 +220,8 @@ public class SimulationController {
     /**
      * Strategy benchmark: runs every headway strategy against the same {@code scenarios} random incidents, drawn
      * from {@code seed}, and ranks them by mean and p95 passenger wait. {@code kinds} (comma-separated, e.g.
-     * {@code DELAY,STATION_CLOSURE}) limits the incidents drawn; by default train delays, breakdowns, track-section
-     * closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
+     * {@code DELAY,STATION_CLOSURE}) limits the incidents drawn; by default train delays, breakdowns, door faults,
+     * track-section closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
      * (default) or {@code TRAVEL_TIME}. {@code runTimeVariability} (0 to 0.25) sets how much run times between
      * stations vary around nominal in every run, drawn from {@code seed}; by default as much as on the live engine.
      * Does not touch live state.

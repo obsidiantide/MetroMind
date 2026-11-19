@@ -194,6 +194,23 @@ class IncidentApiTest {
     }
 
     @Test
+    void whatIfForADoorFaultComparesStrategiesWithoutHoldingTheTrain() throws Exception {
+        mvc.perform(post("/api/analysis/door-fault-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"trainId": "BLUE-1", "seconds": 120}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incident.kind").value("DOOR_FAULT"))
+                .andExpect(jsonPath("$.incident.trainId").value("BLUE-1"))
+                .andExpect(jsonPath("$.incident.stationId").doesNotExist())
+                .andExpect(jsonPath("$.outcomes.length()").value(HeadwayStrategy.all().size()))
+                .andExpect(jsonPath("$.bestStrategy").isString());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.subjectId == 'BLUE-1')]").isEmpty());
+    }
+
+    @Test
     void whatIfForATrackSectionClosureDefaultsToWaiting() throws Exception {
         mvc.perform(post("/api/analysis/section-closure-impact").param("horizonSeconds", "300")
                         .contentType(MediaType.APPLICATION_JSON)
