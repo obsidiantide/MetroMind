@@ -1,7 +1,18 @@
 import type {
   BenchmarkJob, BenchmarkRequest, ClosureResponse, DelayImpactReport, Departure, IncidentImpactReport, MetroNetwork,
-  MinuteKpi,
+  MinuteKpi, TimeOfDayReport,
 } from "./types";
+
+/** Query parameters of a benchmark request; spreads left out use the live engine's. */
+function benchmarkQuery(r: BenchmarkRequest) {
+  const q = new URLSearchParams({
+    scenarios: String(r.scenarios), seed: String(r.seed), horizonSeconds: String(r.horizonSeconds), metric: r.metric,
+  });
+  if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
+  if (r.runTimeVariability !== undefined) q.set("runTimeVariability", String(r.runTimeVariability));
+  if (r.dwellVariability !== undefined) q.set("dwellVariability", String(r.dwellVariability));
+  return q;
+}
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? API_URL.replace(/^http/, "ws") + "/ws";
@@ -59,14 +70,13 @@ export const api = {
       body: JSON.stringify({ stationId, seconds }),
     }),
   /** Queues a strategy benchmark; poll `benchmarkJob` with the returned id until it has finished. */
-  submitBenchmark: (r: BenchmarkRequest) => {
-    const q = new URLSearchParams({
-      scenarios: String(r.scenarios), seed: String(r.seed), horizonSeconds: String(r.horizonSeconds), metric: r.metric,
-    });
-    if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
-    if (r.runTimeVariability !== undefined) q.set("runTimeVariability", String(r.runTimeVariability));
-    if (r.dwellVariability !== undefined) q.set("dwellVariability", String(r.dwellVariability));
-    return call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${q}`, { method: "POST" });
+  submitBenchmark: (r: BenchmarkRequest) =>
+    call<BenchmarkJob>(`/api/analysis/benchmark/jobs?${benchmarkQuery(r)}`, { method: "POST" }),
+  /** Ranks strategies across the given times of day (HH:mm); answers once every period has run. */
+  benchmarkDay: (r: BenchmarkRequest, startTimes: string[]) => {
+    const q = benchmarkQuery(r);
+    q.set("startTimes", startTimes.join(","));
+    return call<TimeOfDayReport>(`/api/analysis/benchmark/day?${q}`, { method: "POST" });
   },
   benchmarkJob: (id: string) => call<BenchmarkJob>(`/api/analysis/benchmark/jobs/${encodeURIComponent(id)}`),
   benchmarkJobs: () => call<BenchmarkJob[]>("/api/analysis/benchmark/jobs"),
