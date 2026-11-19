@@ -50,6 +50,8 @@ public class SimulationService {
     private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
             .name("benchmark-job").daemon(true).factory());
     private final BenchmarkJobs<BenchmarkReport> benchmarkJobs;
+    /** Benchmarks across times of day, queued on the same thread as strategy benchmarks. */
+    private final BenchmarkJobs<TimeOfDayReport> dayBenchmarkJobs;
     private final Timer tickTimer;
     private final MeterRegistry meters;
     private volatile boolean paused;
@@ -57,10 +59,13 @@ public class SimulationService {
 
     public SimulationService(MetroNetwork network, SimulationProperties props, List<SnapshotListener> listeners,
                              IncidentHistory history, MeterRegistry meters,
-                             ObjectProvider<BenchmarkJobStore<BenchmarkReport>> jobStore) {
+                             ObjectProvider<BenchmarkJobStore<BenchmarkReport>> jobStore,
+                             ObjectProvider<BenchmarkJobStore<TimeOfDayReport>> dayJobStore) {
         this.props = props;
         this.benchmarkJobs = new BenchmarkJobs<>(benchmarkExecutor, 20, Clock.systemUTC(),
                 jobStore.getIfAvailable(BenchmarkJobStore::none));
+        this.dayBenchmarkJobs = new BenchmarkJobs<>(benchmarkExecutor, 20, Clock.systemUTC(),
+                dayJobStore.getIfAvailable(BenchmarkJobStore::none));
         this.listeners = listeners;
         this.history = history;
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
@@ -298,6 +303,41 @@ public class SimulationService {
     /** Benchmark jobs still kept, most recently submitted first. */
     public List<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJobs(int limit) {
         return benchmarkJobs.recent(limit);
+    }
+
+    /**
+     * Queues the same benchmark as {@link #benchmarkTimesOfDay} as a background job and returns it at once. Its
+     * progress counts the simulated runs of every period. Bad start times are refused here, not by a failed job.
+     *
+     * @throws IllegalArgumentException if a start time is malformed, repeated or too close to midnight
+     * @throws BenchmarkJobs.QueueFullException if too many jobs are already queued or running
+     */
+    public BenchmarkJobs.Job<TimeOfDayReport> submitDayBenchmark(List<String> startClocks, int scenarios, long seed,
+                                                                double horizonSeconds,
+                                                                Set<BenchmarkReport.IncidentKind> kinds,
+                                                                BenchmarkReport.RankingMetric metric,
+                                                                double runTimeVariability, double dwellVariability) {
+        TimeOfDayBenchmark.checkStartClocks(startClocks);
+        List<String> clocks = List.copyOf(startClocks);
+        List<HeadwayStrategy> strategies = HeadwayStrategy.all();
+        return dayBenchmarkJobs.submit(TimeOfDayBenchmark.totalRuns(clocks.size(), scenarios, strategies.size()),
+                progress -> analysisTimer("benchmark_day").record(() -> dayBenchmark.run(engine.network(), clocks,
+                        scenarios, seed, horizonSeconds, strategies, kinds, metric, runTimeVariability,
+                        dwellVariability, progress)));
+    }
+
+    public Optional<BenchmarkJobs.Job<TimeOfDayReport>> dayBenchmarkJob(String id) {
+        return dayBenchmarkJobs.get(id);
+    }
+
+    /** Cancels a queued or running benchmark job across times of day; see {@link BenchmarkJobs#cancel}. */
+    public Optional<BenchmarkJobs.Job<TimeOfDayReport>> cancelDayBenchmarkJob(String id) {
+        return dayBenchmarkJobs.cancel(id);
+    }
+
+    /** Benchmark jobs across times of day still kept, most recently submitted first. */
+    public List<BenchmarkJobs.Job<TimeOfDayReport>> dayBenchmarkJobs(int limit) {
+        return dayBenchmarkJobs.recent(limit);
     }
 
     @PreDestroy

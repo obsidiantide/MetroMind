@@ -327,6 +327,65 @@ public class SimulationController {
         return simulation.benchmarkJobs(limit);
     }
 
+    /**
+     * The same benchmark as {@code POST /analysis/benchmark/day}, run as a background job like
+     * {@code POST /analysis/benchmark/jobs}: answers {@code 202 Accepted} with the queued job and its URL in
+     * {@code Location}, {@code 400} for bad start times and {@code 429} while too many jobs are queued or running.
+     * Its progress counts the simulated runs of every period.
+     */
+    @Tag(name = "Analysis")
+    @Operation(summary = "Queue a strategy benchmark across times of day as a background job")
+    @ApiResponse(responseCode = "202", description = "Job queued; poll the Location header")
+    @ApiResponse(responseCode = "429", description = "Too many benchmark jobs queued or running")
+    @PostMapping("/analysis/benchmark/day/jobs")
+    public ResponseEntity<BenchmarkJobs.Job<TimeOfDayReport>> submitDayBenchmark(
+            @RequestParam(defaultValue = "08:00,13:00,18:00,22:30") @Size(min = 1, max = 4) List<String> startTimes,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(50) int scenarios,
+            @RequestParam(defaultValue = "1") long seed,
+            @RequestParam(defaultValue = "1800") @Min(300) @Max(3600) double horizonSeconds,
+            @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
+            @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
+        BenchmarkJobs.Job<TimeOfDayReport> job = simulation.submitDayBenchmark(startTimes, scenarios, seed,
+                horizonSeconds, drawn(kinds), metric, spread(runTimeVariability), dwellSpread(dwellVariability));
+        return ResponseEntity.accepted()
+                .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
+                        .toUri())
+                .body(job);
+    }
+
+    @Tag(name = "Analysis")
+    @Operation(summary = "A benchmark job across times of day: status, progress and, once done, its report")
+    @ApiResponse(responseCode = "200", description = "The job")
+    @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
+    @GetMapping("/analysis/benchmark/day/jobs/{id}")
+    public ResponseEntity<BenchmarkJobs.Job<TimeOfDayReport>> dayBenchmarkJob(@PathVariable String id) {
+        return ResponseEntity.of(simulation.dayBenchmarkJob(id));
+    }
+
+    /** Cancels a benchmark job across times of day, answering like {@code DELETE /analysis/benchmark/jobs/{id}}. */
+    @Tag(name = "Analysis")
+    @Operation(summary = "Cancel a queued or running benchmark job across times of day")
+    @ApiResponse(responseCode = "200", description = "The job, now cancelled")
+    @ApiResponse(responseCode = "404", description = "No such job, or it has been forgotten")
+    @ApiResponse(responseCode = "409", description = "The job had already finished; it is returned unchanged")
+    @DeleteMapping("/analysis/benchmark/day/jobs/{id}")
+    public ResponseEntity<BenchmarkJobs.Job<TimeOfDayReport>> cancelDayBenchmarkJob(@PathVariable String id) {
+        return simulation.cancelDayBenchmarkJob(id)
+                .map(job -> ResponseEntity.status(job.status() == BenchmarkJobs.Status.CANCELLED
+                        ? HttpStatus.OK : HttpStatus.CONFLICT).body(job))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Tag(name = "Analysis")
+    @Operation(summary = "Benchmark jobs across times of day still kept, newest first")
+    @GetMapping("/analysis/benchmark/day/jobs")
+    public List<BenchmarkJobs.Job<TimeOfDayReport>> dayBenchmarkJobs(
+            @RequestParam(defaultValue = "20") @Min(1) @Max(20) int limit) {
+        return simulation.dayBenchmarkJobs(limit);
+    }
+
     /** The incident kinds to draw: all of them when none are named. */
     private static Set<BenchmarkReport.IncidentKind> drawn(Set<BenchmarkReport.IncidentKind> kinds) {
         return kinds == null || kinds.isEmpty()

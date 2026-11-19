@@ -50,13 +50,7 @@ public final class TimeOfDayBenchmark {
                                Set<BenchmarkReport.IncidentKind> kinds, BenchmarkReport.RankingMetric metric,
                                double runTimeVariability, double dwellVariability,
                                StrategyBenchmark.ProgressListener progress) {
-        if (startClocks.isEmpty()) {
-            throw new IllegalArgumentException("A time-of-day benchmark needs at least one start time");
-        }
-        if (startClocks.stream().distinct().count() != startClocks.size()) {
-            throw new IllegalArgumentException("Start times must not repeat");
-        }
-        startClocks.forEach(TimeOfDayBenchmark::startSeconds); // reject a bad start time before running any period
+        checkStartClocks(startClocks); // reject a bad start time before running any period
         int perPeriod = StrategyBenchmark.totalRuns(scenarioCount, strategies.size());
         int total = startClocks.size() * perPeriod;
         List<TimeOfDayReport.Period> periods = new ArrayList<>();
@@ -72,6 +66,22 @@ public final class TimeOfDayBenchmark {
                     (done, runs) -> progress.onProgress(before + done, total))));
         }
         return new TimeOfDayReport(seed, horizonSeconds, metric, periods, rank(strategies, periods, metric));
+    }
+
+    /**
+     * Checks start times as {@link #run} would, so a caller queueing a benchmark can refuse bad ones up front.
+     *
+     * @throws IllegalArgumentException if there are none, one repeats, or one is not an {@code HH:mm} time of day
+     *                                  that leaves room for the warm-up after midnight
+     */
+    public static void checkStartClocks(List<String> startClocks) {
+        if (startClocks.isEmpty()) {
+            throw new IllegalArgumentException("A time-of-day benchmark needs at least one start time");
+        }
+        if (startClocks.stream().distinct().count() != startClocks.size()) {
+            throw new IllegalArgumentException("Start times must not repeat");
+        }
+        startClocks.forEach(TimeOfDayBenchmark::startSeconds);
     }
 
     /**
