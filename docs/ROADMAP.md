@@ -62,6 +62,9 @@ Mark items `[x]` when merged.
 - [x] Crew changes: a fixed extra dwell at the terminals or stations where drivers swap, kept in the timetable
 - [x] Bundled Baku network: depot access times and per-line run-time spreads, so the default run shows everyday
       irregularity out of the box
+- [ ] Route planning aware of crew changes: a passenger's route cost includes the crew-change dwell at relief points
+      (today routes assume the nominal 25 s dwell at every stop)
+- [ ] Bundled Baku network: crew changes at the Red and Green line terminals
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
@@ -93,6 +96,8 @@ Mark items `[x]` when merged.
 - [x] Times-of-day benchmark as a background job (progress, cancel, persisted like strategy benchmark jobs), so the
       benchmark page does not hold a request open for four periods
 - [x] Times-of-day benchmark CSV export, one row per strategy and period
+- [ ] Day benchmark job history on the benchmark page: list recent times-of-day jobs and reopen a finished one, like
+      strategy benchmark jobs
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
