@@ -1,0 +1,51 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ControlPanel } from "@/components/ControlPanel";
+import { api } from "@/lib/api";
+import type { IncidentImpactReport, StrategyOutcome } from "@/lib/types";
+import { network, snapshot, trainView } from "@/test/fixtures";
+
+function outcome(strategy: string): StrategyOutcome {
+  return {
+    strategy, trainsAffected: 1, maxTrainDelaySeconds: 95, totalExtraPassengerWaitMinutes: 40,
+    totalPassengerWaitMinutes: 900, totalExtraRideMinutes: 12, totalExtraTravelMinutes: 52,
+    totalPassengerTravelMinutes: 3000, headwayCvAtHorizon: 0.1, trunkHeadwayCvAtHorizon: {},
+    headwayRecoverySeconds: 600, peakHeadwayCvExcess: 0.2, shortTurns: [], skippedStops: [], trains: [], stations: [],
+  };
+}
+
+describe("ControlPanel door faults", () => {
+  const live = snapshot({ trains: [trainView("RED-1"), trainView("RED-2")] });
+
+  beforeEach(() => {
+    vi.spyOn(api, "strategies").mockResolvedValue(["NO_CONTROL", "BALANCED"]);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("holds the chosen train with a door fault for the given seconds", async () => {
+    const doorFault = vi.spyOn(api, "doorFault").mockResolvedValue(undefined);
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.change(screen.getByLabelText("Train"), { target: { value: "RED-2" } });
+    fireEvent.change(screen.getByLabelText("Seconds"), { target: { value: "90" } });
+    fireEvent.click(screen.getByRole("button", { name: "Door fault" }));
+
+    await waitFor(() => expect(doorFault).toHaveBeenCalledWith("RED-2", 90));
+  });
+
+  it("compares strategies on a door fault without injecting it", async () => {
+    const report: IncidentImpactReport = {
+      incident: { kind: "DOOR_FAULT", trainId: "RED-1", seconds: 240 }, horizonSeconds: 1800,
+      outcomes: [outcome("BALANCED"), outcome("NO_CONTROL")], bestStrategy: "BALANCED",
+    };
+    const analyze = vi.spyOn(api, "analyzeDoorFault").mockResolvedValue(report);
+    const doorFault = vi.spyOn(api, "doorFault");
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "What-if door fault" }));
+
+    expect(await screen.findByText("Impact of a 240 s door fault on RED-1")).toBeTruthy();
+    expect(analyze).toHaveBeenCalledWith("RED-1", 240);
+    expect(doorFault).not.toHaveBeenCalled();
+  });
+});

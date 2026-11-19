@@ -11,6 +11,7 @@ import type {
 const KINDS: { kind: ScenarioKind; label: string }[] = [
   { kind: "DELAY", label: "Train delays" },
   { kind: "BREAKDOWN", label: "Breakdowns" },
+  { kind: "DOOR_FAULT", label: "Door faults" },
   { kind: "SECTION_CLOSURE", label: "Track closures" },
   { kind: "STATION_CLOSURE", label: "Station closures" },
 ];
@@ -28,6 +29,7 @@ function describe(s: IncidentScenario, name: Names): string {
       return `${name(s.lineId)} ${name(s.fromStationId)} – ${name(s.toStationId)} closed ${length}, `
         + (s.response === "TURN_BACK" ? "trains turn back" : "trains wait");
     case "STATION_CLOSURE": return `${name(s.stationId)} closed ${length}`;
+    case "DOOR_FAULT": return `${s.trainId} held by a door fault ${length}`;
   }
 }
 

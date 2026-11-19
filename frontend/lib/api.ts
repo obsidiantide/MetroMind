@@ -30,6 +30,9 @@ export const api = {
     call<void>("/api/incidents/delay", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
   breakdown: (trainId: string, seconds: number) =>
     call<void>("/api/incidents/breakdown", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
+  /** Holds a train at its platform (or the next one it reaches) for `seconds` of extra dwell. */
+  doorFault: (trainId: string, seconds: number) =>
+    call<void>("/api/incidents/door-fault", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
   closeSection: (lineId: string, fromStationId: string, toStationId: string, seconds: number, response: ClosureResponse) =>
     call<void>("/api/incidents/section-closure", {
       method: "POST",
@@ -44,6 +47,11 @@ export const api = {
     call<IncidentImpactReport>("/api/analysis/section-closure-impact", {
       method: "POST",
       body: JSON.stringify({ lineId, fromStationId, toStationId, seconds, response }),
+    }),
+  analyzeDoorFault: (trainId: string, seconds: number) =>
+    call<IncidentImpactReport>("/api/analysis/door-fault-impact", {
+      method: "POST",
+      body: JSON.stringify({ trainId, seconds }),
     }),
   analyzeStationClosure: (stationId: string, seconds: number) =>
     call<IncidentImpactReport>("/api/analysis/station-closure-impact", {
