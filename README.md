@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -318,6 +318,12 @@ with median 1 and that log-standard deviation (`0.05` ≈ ±5 %), clamped to thr
 and the number of its run, so a run is reproducible and every copy of the engine draws the same: in a what-if
 analysis a train's n-th run takes as long in the baseline as in the incident run unless the incident changes it,
 so the comparison shows the incident, not the noise. Timetables and lateness stay against nominal run times.
+
+Lines differ: an old line with worn track and mixed rolling stock runs less evenly than a new automated one. A
+line may set its own `runTimeVariability` (0–0.25, in the native JSON and as a GeoJSON line property), which its
+trains use instead of the engine-wide spread, drawn from the same seed; `0` keeps a line to its nominal times
+even when the rest of the network varies. Benchmarks keep line spreads too: their `runTimeVariability` applies to
+the lines that do not set one.
 
 ### Dwell-time variability
 
