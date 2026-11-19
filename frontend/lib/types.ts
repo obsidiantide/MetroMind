@@ -162,6 +162,18 @@ export interface BenchmarkReport {
   /** Spread of dwells around the passenger-driven one every run was drawn with; 0 or absent for none. */
   dwellVariability?: number;
 }
+/** A strategy's standing over every benchmarked time of day: means of its per-period means. */
+export interface DayRanking {
+  rank: number; strategy: string; meanWaitSeconds: number; meanTravelMinutes: number;
+  /** Start time (HH:mm) of the period where it ranked lowest, and that rank. */
+  worstStartClock: string; worstRank: number;
+}
+/** The benchmark run from several times of day, each from a network warmed up to that time. */
+export interface TimeOfDayReport {
+  seed: number; horizonSeconds: number; metric: RankingMetric;
+  periods: { startClock: string; report: BenchmarkReport }[];
+  rankings: DayRanking[];
+}
 export type BenchmarkJobStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 /**
  * A background benchmark run; `report` is set once SUCCEEDED, `error` once FAILED. A CANCELLED job keeps the runs it
