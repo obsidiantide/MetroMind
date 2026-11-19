@@ -75,7 +75,7 @@ Mark items `[x]` when merged.
       (today spare trains always join the main route)
 - [x] Short-turning and skip-stop on a shared trunk judge the follower by the platform headway, so a train of the
       other pattern close behind can take over the stations a late train gives up
-- [ ] Door-fault incident: a train held at its platform for an extra dwell, in the incident API, what-if and
+- [x] Door-fault incident: a train held at its platform for an extra dwell, in the incident API, what-if and
       benchmark scenarios
 
 ### Platform
