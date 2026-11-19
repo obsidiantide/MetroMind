@@ -92,7 +92,7 @@ Mark items `[x]` when merged.
       evening) so strategies are ranked over the fleet plan's thin and full periods, not just the current moment
 - [x] Times-of-day benchmark as a background job (progress, cancel, persisted like strategy benchmark jobs), so the
       benchmark page does not hold a request open for four periods
-- [ ] Times-of-day benchmark CSV export, one row per strategy and period
+- [x] Times-of-day benchmark CSV export, one row per strategy and period
 
 ### Platform
 - [x] Kafka consumer service: aggregate telemetry into per-minute KPIs stored in PostgreSQL
