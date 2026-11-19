@@ -28,6 +28,31 @@ class LineTest {
     }
 
     @Test
+    void runTimeVariabilityIsOptionalInJson() throws Exception {
+        Line plain = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800}
+                """, Line.class);
+        assertThat(plain.runTimeVariability()).isNull();
+
+        Line irregular = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "runTimeVariability": 0.12}
+                """, Line.class);
+        assertThat(irregular.runTimeVariability()).isEqualTo(0.12);
+    }
+
+    @Test
+    void rejectsARunTimeVariabilityOutsideTheSupportedRange() {
+        for (double spread : new double[] {-0.01, 0.3, Double.NaN}) {
+            assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(),
+                    false, List.of(), List.of(), List.of(), spread))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("runTimeVariability");
+        }
+    }
+
+    @Test
     void rejectsNegativeSpareTrains() {
         assertThatThrownBy(() -> new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, -1))
                 .isInstanceOf(IllegalArgumentException.class)

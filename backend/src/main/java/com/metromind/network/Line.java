@@ -29,11 +29,26 @@ import java.util.List;
  *                       {@code trainCount} trains all day. {@code trainCount} is still the fleet placed on the line
  *                       when a run starts; trains beyond it come out of the depot, which holds enough for the
  *                       busiest period on top of the {@code spareTrains}
+ * @param runTimeVariability the line's own spread of run times around nominal (log-standard deviation, 0 to
+ *                       {@value #MAX_RUN_TIME_VARIABILITY}), overriding the engine-wide spread for its trains, e.g.
+ *                       for an older line with less even running; {@code null} to use the engine-wide spread
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
-                   List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan)
+                   List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
+                   Double runTimeVariability)
         implements LoopTopology {
+
+    /** Largest run-time spread a line may declare, as for the engine-wide one. */
+    public static final double MAX_RUN_TIME_VARIABILITY = 0.25;
+
+    /** Line running at the engine-wide run-time spread. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, fleetPlan, null);
+    }
 
     /** Line running the same fleet all day. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -127,6 +142,11 @@ public record Line(String id, String name, String color, List<String> stationIds
                 throw new IllegalArgumentException("Line " + id + ": fleet plan period from " + period.from()
                         + " needs at least one train per service pattern (" + (branches.size() + 1) + ")");
             }
+        }
+        if (runTimeVariability != null
+                && !(runTimeVariability >= 0 && runTimeVariability <= MAX_RUN_TIME_VARIABILITY)) {
+            throw new IllegalArgumentException("Line " + id + ": runTimeVariability must be between 0 and "
+                    + MAX_RUN_TIME_VARIABILITY);
         }
     }
 
