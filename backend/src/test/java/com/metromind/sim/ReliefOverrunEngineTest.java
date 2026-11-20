@@ -1,6 +1,5 @@
 package com.metromind.sim;
 
-import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import org.junit.jupiter.api.Test;
 
@@ -12,13 +11,8 @@ class ReliefOverrunEngineTest {
 
     private static final double START = 7 * 3600;
 
-    /** {@code base}'s only line with drivers swapping at {@code stationIds} for 60 s. */
     private static MetroNetwork withCrewChanges(MetroNetwork base, List<String> stationIds) {
-        Line l = base.lines().get(0);
-        Line relieved = new Line(l.id(), l.name(), l.color(), l.stationIds(), l.runSeconds(), l.trainCount(),
-                l.trainCapacity(), l.spareTrains(), l.path(), l.ring(), l.timingStationIds(), l.branches(),
-                l.fleetPlan(), l.runTimeVariability(), l.depotAccessSeconds(), l.dwellVariability(), stationIds, 60);
-        return new MetroNetwork(base.city(), base.stations(), List.of(relieved), base.odWeights());
+        return TestNetworks.withCrewChanges(base, stationIds, 60);
     }
 
     private static SimulationEngine engine(MetroNetwork network, ReliefOverrun overrun) {

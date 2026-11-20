@@ -3,6 +3,7 @@ package com.metromind.incident;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.DwellVariability;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.SimulationEngine;
 import com.metromind.sim.SimulationSnapshot;
@@ -160,6 +161,37 @@ class StrategyBenchmarkTest {
         otherLive.setDwellVariability(new DwellVariability(0.2, 999));
         assertThat(benchmark.run(otherLive, 3, 7, 900, two, delays, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING,
                 0, 0.2, StrategyBenchmark.ProgressListener.NONE)).isEqualTo(irregular);
+    }
+
+    @Test
+    void lateReliefsComeFromTheLiveEngineButAreSeededByTheBenchmarkSeed() {
+        List<HeadwayStrategy> two = List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED);
+        Set<BenchmarkReport.IncidentKind> delays = EnumSet.of(BenchmarkReport.IncidentKind.DELAY);
+        StrategyBenchmark benchmark = new StrategyBenchmark();
+        java.util.function.LongFunction<SimulationEngine> relievedLive = liveSeed -> {
+            SimulationEngine live = new SimulationEngine(
+                    TestNetworks.withCrewChanges(TestNetworks.singleLine(), List.of("A", "C", "F"), 60),
+                    8 * 3600, HeadwayStrategy.NO_CONTROL);
+            live.run(300, 1);
+            live.setReliefOverrun(new ReliefOverrun(0.5, 120, liveSeed));
+            return live;
+        };
+        SimulationEngine onTimeLive = new SimulationEngine(
+                TestNetworks.withCrewChanges(TestNetworks.singleLine(), List.of("A", "C", "F"), 60),
+                8 * 3600, HeadwayStrategy.NO_CONTROL);
+        onTimeLive.run(300, 1);
+
+        BenchmarkReport late = benchmark.run(relievedLive.apply(1), 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, StrategyBenchmark.ProgressListener.NONE);
+        BenchmarkReport onTime = benchmark.run(onTimeLive, 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, StrategyBenchmark.ProgressListener.NONE);
+
+        assertThat(late.rankings()).extracting(BenchmarkReport.StrategyRanking::meanWaitSeconds)
+                .isNotEqualTo(onTime.rankings().stream().map(BenchmarkReport.StrategyRanking::meanWaitSeconds).toList());
+        // The live engine's own seed does not change the report: the benchmark seed draws the late reliefs.
+        assertThat(benchmark.run(relievedLive.apply(999), 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, StrategyBenchmark.ProgressListener.NONE))
+                .isEqualTo(late);
     }
 
     @Test

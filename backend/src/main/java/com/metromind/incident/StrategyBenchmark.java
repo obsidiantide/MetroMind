@@ -5,6 +5,7 @@ import com.metromind.network.Station;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.HeadwayStrategy;
 import com.metromind.sim.DwellVariability;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.ShortTurn;
 import com.metromind.sim.SimulationEngine;
@@ -109,8 +110,8 @@ public final class StrategyBenchmark {
 
     /**
      * The full benchmark. Every run, baselines included, draws its run times with spread
-     * {@code runTimeVariability} and its dwells with spread {@code dwellVariability} from the benchmark
-     * {@code seed}: a seed gives the same everyday irregularity in
+     * {@code runTimeVariability}, its dwells with spread {@code dwellVariability} and its late reliefs as often and
+     * as long as on the live engine from the benchmark {@code seed}: a seed gives the same everyday irregularity in
      * every run (common random numbers), so strategies are compared on the same "day" and differences come from
      * the strategies and incidents, and the report stays reproducible whatever the live engine's own seed.
      */
@@ -120,6 +121,7 @@ public final class StrategyBenchmark {
                                double dwellVariability, ProgressListener progress) {
         RunTimeVariability variability = new RunTimeVariability(runTimeVariability, seed);
         DwellVariability dwells = new DwellVariability(dwellVariability, seed);
+        ReliefOverrun reliefs = live.reliefOverrun().withSeed(seed);
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
@@ -138,6 +140,7 @@ public final class StrategyBenchmark {
             baseline.setStrategy(strategy);
             baseline.setRunTimeVariability(variability);
             baseline.setDwellVariability(dwells);
+            baseline.setReliefOverrun(reliefs);
             List<Double> baselineCv = HeadwayRecovery.sampleHeadwayCv(baseline, horizonSeconds,
                     RECOVERY_SAMPLE_SECONDS, DT);
             progress.onProgress(++completedRuns, totalRuns);
@@ -154,6 +157,7 @@ public final class StrategyBenchmark {
                 run.setStrategy(strategy);
                 run.setRunTimeVariability(variability);
                 run.setDwellVariability(dwells);
+                run.setReliefOverrun(reliefs);
                 scenario.applyTo(run);
                 double injectedAt = run.simTime();
                 HeadwayRecovery.Result recovery = HeadwayRecovery.measure(baselineCv,
