@@ -29,6 +29,15 @@ final class SeededNoise {
         return Math.exp(sigma * Math.max(-CLAMP_SIGMAS, Math.min(CLAMP_SIGMAS, z)));
     }
 
+    /**
+     * Uniform number in [0, 1) for event number {@code index} of train {@code trainId}; draw {@code draw} of the
+     * same event gives an independent number, for models that need more than one per event.
+     */
+    static double uniform(long seed, String trainId, long index, int draw) {
+        long key = mix(seed ^ mix(trainId.hashCode() * 0x9E3779B97F4A7C15L + index));
+        return (mix(key + draw * 0x632BE59BD9B4E019L) >>> 11) * 0x1.0p-53;
+    }
+
     /** SplitMix64 finaliser: a fixed, well-mixed 64-bit hash. */
     static long mix(long z) {
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
