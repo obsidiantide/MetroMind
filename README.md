@@ -307,7 +307,9 @@ directions:
 `crewChangeStationIds` and the swap time in `crewChangeSeconds` (JSON or GeoJSON); every call there dwells that much
 longer on top of the dwell its passengers set, in both directions. The timetable plans the same extra time at those
 stops, as do the even placement of trains at the start, headway positions and departure boards, so a scheduled swap
-neither makes trains late nor looks like a gap opening behind them:
+neither makes trains late nor looks like a gap opening behind them. Passengers plan around the swaps too: riding
+on from a relief point costs its crew-change time (alighting there costs nothing extra), and the longer round trip
+spreads the line's trains further apart, so a long swap can send passengers to another interchange:
 
 ```json
 { "id": "RED", "stationIds": ["R1", "R2", "R3", "R4", "R5"], "crewChangeStationIds": ["R1", "R5"],
