@@ -88,6 +88,8 @@ export const api = {
   },
   dayBenchmarkJob: (id: string) =>
     call<DayBenchmarkJob>(`/api/analysis/benchmark/day/jobs/${encodeURIComponent(id)}`),
+  /** Benchmark jobs across times of day the server still keeps, newest first. */
+  dayBenchmarkJobs: () => call<DayBenchmarkJob[]>("/api/analysis/benchmark/day/jobs"),
   /** As `cancelBenchmarkJob`, for a benchmark across times of day. */
   cancelDayBenchmarkJob: (id: string) =>
     cancelJob<DayBenchmarkJob>(`/api/analysis/benchmark/day/jobs/${encodeURIComponent(id)}`),
