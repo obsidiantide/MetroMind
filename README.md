@@ -776,6 +776,14 @@ live in the sorted set `metromind:replay`, scored by simulated time, so other se
 `GET /api/replay?at=27950` returns the newest kept snapshot taken at or before that time, in the same shape as
 `/api/state` (`404` if it is older than the range).
 
+**Versioned payloads.** Everything another process may read later (the replay set, the latest snapshot under
+`metromind:snapshot` and the three Kafka telemetry topics) is written with a `"schemaVersion"` field (currently
+`2`). Readers treat an entry without one as version 1, the layout from before versioning, and upgrade it step by
+step: a train with no `patternId` gets its line id (every train followed its line's only pattern back then), and
+lists added since, such as a station's `queues` or the snapshot's `activeIncidents`, come back empty. Fields a newer
+writer added are ignored, so the KPI consumer and a replaying service keep working through a rolling upgrade, and
+renaming a field later means adding one upgrade step in `VersionedPayloads` and bumping the version.
+
 ### Operational metrics
 
 The backend publishes Micrometer meters at `/actuator/metrics` and in Prometheus format at `/actuator/prometheus`:
