@@ -94,3 +94,41 @@ describe("ControlPanel what-if requested from elsewhere", () => {
     await waitFor(() => expect(analyze).toHaveBeenCalledTimes(2));
   });
 });
+
+describe("ControlPanel power failures", () => {
+  const live = snapshot({ trains: [trainView("RED-1")] });
+
+  beforeEach(() => {
+    vi.spyOn(api, "strategies").mockResolvedValue(["NO_CONTROL", "BALANCED"]);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cuts power to the chosen line for the closure minutes", async () => {
+    const cutPower = vi.spyOn(api, "cutPower").mockResolvedValue(undefined);
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.change(screen.getByLabelText("Line"), { target: { value: "BLUE" } });
+    fireEvent.change(screen.getByLabelText("Minutes"), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cut power" }));
+
+    await waitFor(() => expect(cutPower).toHaveBeenCalledWith("BLUE", 300));
+  });
+
+  it("compares strategies on a power failure without cutting power", async () => {
+    const report: IncidentImpactReport = {
+      incident: { kind: "POWER_FAILURE", lineId: "RED", seconds: 600 }, horizonSeconds: 1800,
+      outcomes: [outcome("BALANCED"), outcome("NO_CONTROL")], bestStrategy: "BALANCED",
+    };
+    const analyze = vi.spyOn(api, "analyzePowerFailure").mockResolvedValue(report);
+    const cutPower = vi.spyOn(api, "cutPower");
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    // The power row's what-if is the last of the closure panel's.
+    const whatIfs = screen.getAllByRole("button", { name: "What-if" });
+    fireEvent.click(whatIfs[whatIfs.length - 1]);
+
+    expect(await screen.findByText("Impact of a 10 min power failure on Red Line")).toBeTruthy();
+    expect(analyze).toHaveBeenCalledWith("RED", 600);
+    expect(cutPower).not.toHaveBeenCalled();
+  });
+});
