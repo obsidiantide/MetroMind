@@ -320,6 +320,15 @@ spreads the line's trains further apart, so a long swap can send passengers to a
   "crewChangeSeconds": 60, ... }
 ```
 
+**Late relief drivers.** Real swaps do not always run to plan: the relieving driver is late to the platform or the
+handover runs on. `metromind.sim.relief-overrun-share` (0 to 1, default 0) sets the share of crew changes that
+overrun, and `metromind.sim.relief-overrun-seconds` (default 60, at most 600) the mean overrun; each late relief
+lasts an exponentially distributed time around that mean, capped at four times it. Like dwell noise the draws are
+seeded by `metromind.sim.run-time-seed` from their own stream and keyed by train and call, so what-if copies see
+the same late reliefs and a run replays exactly. The timetable keeps the planned swap time, so an overrun shows up
+as lateness. Each one emits a `RELIEF_OVERRUN` event and is counted in the snapshot's `metrics.reliefOverruns`;
+strategy benchmarks draw late reliefs as often and as long as on the live engine, from the benchmark seed.
+
 `GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
 
 ```json
