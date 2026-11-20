@@ -49,6 +49,18 @@ class CrewChangeRoutingTest {
         assertThat(beyondB(relieved, "A", "C")).isCloseTo(beyondB(plain, "A", "C"), within(1e-6));
     }
 
+    @Test
+    void crewChangesLengthenTheExpectedWaitForATrain() {
+        RoutePlanner plain = planner(TestNetworks.singleLine());
+        RoutePlanner relieved = planner(withCrewChanges(TestNetworks.singleLine(), "L1", List.of("A", "F"), 90));
+
+        // Two 90 s swaps per round trip spread the 4 trains 45 s further apart: 22.5 s more expected wait at C,
+        // where drivers do not swap.
+        double before = plain.travelSeconds(plain.index("C"), plain.index("D"));
+        double after = relieved.travelSeconds(relieved.index("C"), relieved.index("D"));
+        assertThat(after - before).isCloseTo(22.5, within(1e-6));
+    }
+
     /**
      * From C a passenger for Z changes at B to L2 or at D to L3; L2 is slightly faster, so it wins until its drivers
      * swap at B, where a four-minute crew change makes the change at D the better route.
