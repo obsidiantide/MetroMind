@@ -31,6 +31,8 @@ metromind:
     run-time-variability: 0  # spread of run times around nominal, e.g. 0.05 for ~5 %; 0 = to the timetable
     run-time-seed: 0       # also seeds dwell draws, from a separate stream
     dwell-variability: 0   # spread of dwells around the passenger-driven one, e.g. 0.1; 0 = passengers alone
+    relief-overrun-share: 0    # share of crew changes whose relief driver is late, e.g. 0.1; 0 = always on time
+    relief-overrun-seconds: 60 # mean overrun of a late relief, seconds
   replay:
     retention-minutes: 30  # simulated minutes of snapshots kept for time travel
     interval-seconds: 10   # simulated seconds between kept snapshots

@@ -12,10 +12,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param runTimeSeed        seed of the live engine's run-time draws, and of its dwell draws (an independent stream)
  * @param dwellVariability   spread of dwells around the one passengers set (see {@link DwellVariability#sigma()});
  *                           0, the default, leaves dwells to boarding and alighting alone
+ * @param reliefOverrunShare share of crew changes whose relief driver is late (see {@link ReliefOverrun#share()});
+ *                           0, the default, runs every crew change to plan
+ * @param reliefOverrunSeconds mean length of a late relief's overrun, seconds
  */
 @ConfigurationProperties("metromind.sim")
 public record SimulationProperties(double speed, long tickMillis, String startClock, String strategy,
-                                   double runTimeVariability, long runTimeSeed, double dwellVariability) {
+                                   double runTimeVariability, long runTimeSeed, double dwellVariability,
+                                   double reliefOverrunShare, double reliefOverrunSeconds) {
     public SimulationProperties {
         if (speed <= 0) speed = 10;
         if (tickMillis <= 0) tickMillis = 500;
@@ -36,5 +40,10 @@ public record SimulationProperties(double speed, long tickMillis, String startCl
     /** The live engine's dwell variability; rejects a spread outside the supported range at startup. */
     public DwellVariability dwells() {
         return new DwellVariability(dwellVariability, runTimeSeed);
+    }
+
+    /** The live engine's late reliefs, seeded like its dwells; rejects values outside the supported range at startup. */
+    public ReliefOverrun reliefOverrun() {
+        return new ReliefOverrun(reliefOverrunShare, reliefOverrunSeconds, runTimeSeed);
     }
 }
