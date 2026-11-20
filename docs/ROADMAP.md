@@ -96,7 +96,7 @@ Mark items `[x]` when merged.
 - [x] Times-of-day benchmark as a background job (progress, cancel, persisted like strategy benchmark jobs), so the
       benchmark page does not hold a request open for four periods
 - [x] Times-of-day benchmark CSV export, one row per strategy and period
-- [ ] Day benchmark job history on the benchmark page: list recent times-of-day jobs and reopen a finished one, like
+- [x] Day benchmark job history on the benchmark page: list recent times-of-day jobs and reopen a finished one, like
       strategy benchmark jobs
 
 ### Platform
