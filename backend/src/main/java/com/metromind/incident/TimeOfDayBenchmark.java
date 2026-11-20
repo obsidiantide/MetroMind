@@ -3,6 +3,7 @@ package com.metromind.incident;
 import com.metromind.network.MetroNetwork;
 import com.metromind.sim.DwellVariability;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.RunTimeVariability;
 import com.metromind.sim.SimulationEngine;
 
@@ -15,7 +16,9 @@ import java.util.Set;
  * Runs the {@link StrategyBenchmark} from several times of day. For each start time a fresh engine is placed on the
  * network {@link #WARM_UP_SECONDS} earlier and run uncontrolled until then, so the fleet plan has brought the
  * period's trains into service and queues reflect that time's demand; the benchmark then runs from that state.
- * Warm-ups draw run times and dwells from the benchmark seed too, so a seed reproduces the whole report.
+ * Warm-ups draw run times and dwells from the benchmark seed too, so a seed reproduces the whole report. Crew
+ * changes overrun as often and as long as the given {@link ReliefOverrun} says (the live engine's, typically), with
+ * late reliefs drawn from the benchmark seed as well.
  */
 public final class TimeOfDayBenchmark {
 
@@ -23,6 +26,17 @@ public final class TimeOfDayBenchmark {
     public static final double WARM_UP_SECONDS = 1800;
 
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
+    private final ReliefOverrun reliefs;
+
+    /** A benchmark whose crew changes always run to plan. */
+    public TimeOfDayBenchmark() {
+        this(ReliefOverrun.NONE);
+    }
+
+    /** A benchmark whose relief drivers are late as often and as long as {@code reliefs} says. */
+    public TimeOfDayBenchmark(ReliefOverrun reliefs) {
+        this.reliefs = reliefs;
+    }
 
     /**
      * Simulated runs a benchmark of {@code periods} start times makes: each period's strategy benchmark (see
@@ -60,6 +74,7 @@ public final class TimeOfDayBenchmark {
                     HeadwayStrategy.NO_CONTROL);
             engine.setRunTimeVariability(new RunTimeVariability(runTimeVariability, seed));
             engine.setDwellVariability(new DwellVariability(dwellVariability, seed));
+            engine.setReliefOverrun(reliefs.withSeed(seed));
             engine.run(WARM_UP_SECONDS, 1);
             periods.add(new TimeOfDayReport.Period(clock, benchmark.run(engine, scenarioCount, seed, horizonSeconds,
                     strategies, kinds, metric, runTimeVariability, dwellVariability,

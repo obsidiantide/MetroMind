@@ -329,7 +329,8 @@ lasts an exponentially distributed time around that mean, capped at four times i
 seeded by `metromind.sim.run-time-seed` from their own stream and keyed by train and call, so what-if copies see
 the same late reliefs and a run replays exactly. The timetable keeps the planned swap time, so an overrun shows up
 as lateness. Each one emits a `RELIEF_OVERRUN` event and is counted in the snapshot's `metrics.reliefOverruns`;
-strategy benchmarks draw late reliefs as often and as long as on the live engine, from the benchmark seed.
+strategy and times-of-day benchmarks draw late reliefs as often and as long as on the live engine,
+from the benchmark seed.
 
 `GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
 

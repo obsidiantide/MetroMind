@@ -4,6 +4,7 @@ import com.metromind.network.FleetPlanPeriod;
 import com.metromind.network.Line;
 import com.metromind.network.MetroNetwork;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.TestNetworks;
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +51,20 @@ class TimeOfDayBenchmarkTest {
         double peakWait = peak.report().rankings().get(0).meanWaitSeconds();
         double middayWait = midday.report().rankings().get(0).meanWaitSeconds();
         assertThat(middayWait).isGreaterThan(peakWait);
+    }
+
+    @Test
+    void lateReliefsAreDrawnFromTheBenchmarkSeed() {
+        MetroNetwork relieved = TestNetworks.withCrewChanges(planned(), List.of("A", "F"), 60);
+        TimeOfDayReport onTime = new TimeOfDayBenchmark().run(relieved, List.of("08:00"), 2, 3, 1200, TWO, DELAYS,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0);
+        TimeOfDayReport late = new TimeOfDayBenchmark(new ReliefOverrun(0.5, 120, 1)).run(relieved, List.of("08:00"),
+                2, 3, 1200, TWO, DELAYS, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0);
+        TimeOfDayReport otherLiveSeed = new TimeOfDayBenchmark(new ReliefOverrun(0.5, 120, 99)).run(relieved,
+                List.of("08:00"), 2, 3, 1200, TWO, DELAYS, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0);
+
+        assertThat(late).isNotEqualTo(onTime);
+        assertThat(otherLiveSeed).isEqualTo(late);
     }
 
     @Test
