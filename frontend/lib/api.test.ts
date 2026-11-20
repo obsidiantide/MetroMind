@@ -34,6 +34,13 @@ describe("day benchmark jobs", () => {
     });
   });
 
+  it("lists the jobs the server keeps", async () => {
+    const fetch = respond(200, [queued]);
+
+    expect(await api.dayBenchmarkJobs()).toEqual([queued]);
+    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/analysis/benchmark/day/jobs`);
+  });
+
   it("returns a job that had already finished when cancelling it", async () => {
     const done: DayBenchmarkJob = { ...queued, status: "SUCCEEDED", completedRuns: 48, progress: 1 };
     const fetch = respond(409, done);
