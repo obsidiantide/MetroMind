@@ -173,6 +173,19 @@ public class SimulationController {
         return ResponseEntity.accepted().build();
     }
 
+    public record PowerFailureRequest(@NotBlank String lineId, @Min(1) @Max(7200) double seconds) {
+    }
+
+    /** Traction power failure: every train of the line stops where it is until power is restored. */
+    @Tag(name = "Incidents")
+    @Operation(summary = "Cut traction power to a line; its trains stop where they are")
+    @ApiResponse(responseCode = "202", description = "Power cut")
+    @PostMapping("/incidents/power-failure")
+    public ResponseEntity<Void> cutPower(@Valid @RequestBody PowerFailureRequest req) {
+        simulation.cutPower(req.lineId(), req.seconds());
+        return ResponseEntity.accepted().build();
+    }
+
     /** What-if: impact of delaying a train, compared across all headway strategies. Does not touch live state. */
     @Tag(name = "Analysis")
     @Operation(summary = "What-if: propagate a train delay under every strategy")

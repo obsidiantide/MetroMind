@@ -107,6 +107,35 @@ class IncidentApiTest {
     }
 
     @Test
+    void cutsTractionPowerToALineAndRecordsIt() throws Exception {
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "BLUE", "seconds": 120}"""))
+                .andExpect(status().isAccepted());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.subjectId == 'BLUE')].kind", hasItem("POWER_FAILURE")))
+                .andExpect(jsonPath("$.recentEvents[*].message", hasItem(containsString("power lost on line BLUE"))));
+        mvc.perform(get("/api/incidents").param("limit", "1"))
+                .andExpect(jsonPath("$[0].kind").value("POWER_FAILURE"))
+                .andExpect(jsonPath("$[0].subjectId").value("BLUE"))
+                .andExpect(jsonPath("$[0].seconds").value(120.0));
+    }
+
+    @Test
+    void aPowerFailureOnAnUnknownLineOrWithoutSecondsIsABadRequest() throws Exception {
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "NOPE", "seconds": 60}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Unknown line NOPE"));
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "BLUE", "seconds": 0}"""))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void closingAnUnknownStationIsABadRequest() throws Exception {
         mvc.perform(post("/api/incidents/station-closure").contentType(MediaType.APPLICATION_JSON)
                         .content("""

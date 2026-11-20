@@ -180,6 +180,14 @@ public class SimulationService {
         }
     }
 
+    public void cutPower(String lineId, double seconds) {
+        synchronized (engine) {
+            engine.cutPower(lineId, seconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.POWER_FAILURE, lineId, seconds, "");
+            countIncident(IncidentRecord.Kind.POWER_FAILURE);
+        }
+    }
+
     /** Incidents injected so far, most recent first. */
     public List<IncidentRecord> incidentHistory(int limit) {
         return history.recent(limit);
