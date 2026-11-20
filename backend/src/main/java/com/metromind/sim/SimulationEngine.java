@@ -107,6 +107,10 @@ public final class SimulationEngine {
     private final Map<String, Double> closedStations = new LinkedHashMap<>();
     /** Simulated time at which each currently closed station was closed. */
     private final Map<String, Double> stationClosedSince = new LinkedHashMap<>();
+    /** Lines whose traction power is off and the seconds until it is restored. */
+    private final Map<String, Double> powerOff = new LinkedHashMap<>();
+    /** Simulated time at which each line now without power lost it. */
+    private final Map<String, Double> powerOffSince = new LinkedHashMap<>();
     /** Spare trains waiting in each line's depot. */
     private final Map<String, Integer> depot = new LinkedHashMap<>();
     /** Trains each line has brought out of its depot so far; numbers new trains so ids are never reused. */
@@ -246,6 +250,8 @@ public final class SimulationEngine {
         other.closures.forEach(c -> this.closures.add(c.copy()));
         this.closedStations.putAll(other.closedStations);
         this.stationClosedSince.putAll(other.stationClosedSince);
+        this.powerOff.putAll(other.powerOff);
+        this.powerOffSince.putAll(other.powerOffSince);
         this.depot.putAll(other.depot);
         this.dispatchedCount.putAll(other.dispatchedCount);
         other.depotRuns.forEach(r -> this.depotRuns.add(r.copy()));
@@ -432,6 +438,9 @@ public final class SimulationEngine {
                 emit(SimEvent.Type.INCIDENT_CLEARED, t.id, "Train " + t.id + " is back in service");
             }
             return;
+        }
+        if (powerOff.containsKey(t.lineId)) {
+            return; // no traction current: the train stands where it is, doors and all
         }
         switch (t.phase) {
             case DWELLING -> {
@@ -1227,6 +1236,37 @@ public final class SimulationEngine {
                         "Station " + network.station(e.getKey()).name() + " reopened");
             }
         }
+        for (var it = powerOff.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            e.setValue(e.getValue() - dt);
+            if (e.getValue() <= 1e-9) {
+                it.remove();
+                powerOffSince.remove(e.getKey());
+                emit(SimEvent.Type.INCIDENT_CLEARED, e.getKey(), "Traction power restored on line " + e.getKey());
+            }
+        }
+    }
+
+    /**
+     * Traction power failure: every train of line {@code lineId}, running or at a platform, stops where it is for
+     * {@code seconds} and then carries on from there. Signalling stays up, so nothing else changes: passengers keep
+     * arriving and queueing, a train with its doors open stays open, and repairs and holds already under way keep
+     * counting down. Trains of other lines are unaffected, interchanges included. A second failure on a line
+     * already without power extends the outage.
+     */
+    public void cutPower(String lineId, double seconds) {
+        network.line(lineId); // rejects an unknown line
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Power failure duration must be positive");
+        }
+        powerOffSince.putIfAbsent(lineId, simTime);
+        powerOff.merge(lineId, seconds, Math::max);
+        emit(SimEvent.Type.INCIDENT, lineId, "Traction power lost on line %s for %.0f s".formatted(lineId, seconds));
+    }
+
+    /** Lines without traction power and the seconds until each gets it back. */
+    public Map<String, Double> powerFailures() {
+        return Map.copyOf(powerOff);
     }
 
     /**
