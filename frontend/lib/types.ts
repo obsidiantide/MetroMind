@@ -86,6 +86,8 @@ export interface Snapshot {
     trunkHeadwayCv: Record<string, number>;
     /** Trains running empty between a depot and its line's first terminal; absent from older snapshots. */
     trainsOnDepotRuns?: number;
+    /** Crew changes that overran because the relief driver was late; absent from older snapshots. */
+    reliefOverruns?: number;
   };
 }
 export interface ShortTurn {

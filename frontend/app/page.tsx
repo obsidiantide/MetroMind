@@ -62,6 +62,12 @@ export default function Home() {
                 <span>stops skipped · {Math.round(m.passengersCarriedPast)} carried past</span>
               </div>
             )}
+            {(m.reliefOverruns ?? 0) > 0 && (
+              <div className="kpi" title="Crew changes that took longer than planned because the relief driver was late">
+                <b>{m.reliefOverruns}</b>
+                <span>late reliefs</span>
+              </div>
+            )}
             <div className="kpi">
               <b>{m.trainsInService}</b>
               <span>trains in service{fleetBesidesService(m)}</span>
