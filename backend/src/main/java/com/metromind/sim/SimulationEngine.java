@@ -1992,7 +1992,8 @@ public final class SimulationEngine {
 
     /**
      * Every incident still in force, soonest to clear first: stopped trains (delays and breakdowns), door faults,
-     * closed track sections and closed stations. Ties keep the order above, so the list is deterministic.
+     * closed track sections, closed stations and lines without traction power. Ties keep the order above, so the
+     * list is deterministic.
      */
     List<SimulationSnapshot.ActiveIncidentView> activeIncidents() {
         List<SimulationSnapshot.ActiveIncidentView> views = new ArrayList<>();
@@ -2023,6 +2024,10 @@ public final class SimulationEngine {
                 SimulationSnapshot.IncidentKind.STATION_CLOSURE, id,
                 "Station " + network.station(id).name() + " closed",
                 stationClosedSince.getOrDefault(id, simTime), remaining)));
+        powerOff.forEach((lineId, remaining) -> views.add(incidentView(
+                SimulationSnapshot.IncidentKind.POWER_FAILURE, lineId,
+                "No traction power on line " + network.line(lineId).name(),
+                powerOffSince.getOrDefault(lineId, simTime), remaining)));
         views.sort(Comparator.comparingDouble(SimulationSnapshot.ActiveIncidentView::remainingSeconds));
         return views;
     }

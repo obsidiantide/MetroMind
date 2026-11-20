@@ -37,6 +37,23 @@ class ActiveIncidentsTest {
     }
 
     @Test
+    void listsAPowerFailureUnderItsLineUntilPowerIsBack() {
+        SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
+        engine.run(60, 1);
+        engine.cutPower("L1", 300);
+        engine.run(100, 1);
+
+        assertThat(engine.snapshot().activeIncidents()).singleElement().satisfies(i -> {
+            assertThat(i.kind()).isEqualTo(IncidentKind.POWER_FAILURE);
+            assertThat(i.subjectId()).isEqualTo("L1");
+            assertThat(i.startedAt()).isCloseTo(START + 60, within(1e-9));
+            assertThat(i.remainingSeconds()).isCloseTo(200, within(1e-9));
+        });
+        engine.run(200, 1);
+        assertThat(engine.snapshot().activeIncidents()).isEmpty();
+    }
+
+    @Test
     void clearingTimeCountsDownAndTheIncidentDisappearsWhenItClears() {
         SimulationEngine engine = new SimulationEngine(TestNetworks.singleLine(), START, HeadwayStrategy.NO_CONTROL);
         engine.closeSection("L1", "C", "D", 300, ClosureResponse.TURN_BACK);

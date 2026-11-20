@@ -42,7 +42,7 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
                                     ClosureResponse response, double remainingSeconds) {
     }
 
-    public enum IncidentKind { TRAIN_DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE, DOOR_FAULT }
+    public enum IncidentKind { TRAIN_DELAY, BREAKDOWN, SECTION_CLOSURE, STATION_CLOSURE, DOOR_FAULT, POWER_FAILURE }
 
     /**
      * An incident still in force, with its automatic clearing time.
