@@ -1,6 +1,5 @@
 package com.metromind.infra;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metromind.sim.SimEvent;
 import com.metromind.sim.SimulationSnapshot;
@@ -11,7 +10,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Streams train telemetry and simulation events to Kafka so other services (analytics, alerting, replay)
- * can consume them independently of the simulator.
+ * can consume them independently of the simulator. Messages are {@link VersionedPayloads versioned}, so a consumer
+ * of another build reads them, and the topics' retained backlog, across schema changes.
  */
 @Component
 @ConditionalOnProperty(name = "metromind.kafka.enabled", havingValue = "true")
@@ -23,12 +23,12 @@ public class KafkaSnapshotPublisher implements SnapshotListener {
     public static final String METRICS_TOPIC = "metromind.network-metrics";
 
     private final KafkaTemplate<String, String> kafka;
-    private final ObjectMapper mapper;
+    private final VersionedPayloads payloads;
     private double lastEventTime = Double.NEGATIVE_INFINITY;
 
     public KafkaSnapshotPublisher(KafkaTemplate<String, String> kafka, ObjectMapper mapper) {
         this.kafka = kafka;
-        this.mapper = mapper;
+        this.payloads = new VersionedPayloads(mapper);
     }
 
     @Override
@@ -54,10 +54,6 @@ public class KafkaSnapshotPublisher implements SnapshotListener {
     }
 
     private String json(Object o) {
-        try {
-            return mapper.writeValueAsString(o);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException(e);
-        }
+        return payloads.write(o);
     }
 }

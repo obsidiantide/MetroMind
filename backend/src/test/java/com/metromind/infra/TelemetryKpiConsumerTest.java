@@ -52,6 +52,25 @@ class TelemetryKpiConsumerTest {
     }
 
     @Test
+    void readsPublishedMessagesAndOnesLeftOnTheTopicsByAnOlderBuild() throws Exception {
+        var publisher = new VersionedPayloads(mapper);
+        consumer.onPosition(publisher.write(new KafkaSnapshotPublisher.Position(28_800,
+                new SimulationSnapshot.TrainView("RED-1", "RED", "RED", "R1", "R2", "R5", 0.3, 40.4, 49.8,
+                        TrainPhase.RUNNING, 20, 120, 240, false))));
+        // Unversioned, from before trains carried their service pattern.
+        consumer.onPosition("""
+                {"simTime": 28830, "train": {"id": "RED-2", "lineId": "RED", "fromStationId": "R2",
+                 "toStationId": "R3", "phase": "RUNNING", "delaySeconds": 40, "load": 60, "capacity": 240}}
+                """);
+        recorder.flush();
+
+        assertThat(recorder.recent(10)).singleElement().satisfies(k -> {
+            assertThat(k.trainsReporting()).isEqualTo(2);
+            assertThat(k.averageDelaySeconds()).isEqualTo(30.0);
+        });
+    }
+
+    @Test
     void skipsMalformedMessages() throws Exception {
         consumer.onPosition("{not json");
         consumer.onEvent("{\"simTime\": 1, \"type\": \"NO_SUCH_TYPE\"}");
