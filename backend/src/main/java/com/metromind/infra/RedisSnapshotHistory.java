@@ -16,7 +16,8 @@ import java.util.Set;
 
 /**
  * Snapshot history in a Redis sorted set ({@value #KEY}) scored by simulated time, so other services can replay the
- * last minutes too. A restarted simulator starts a new timeline, so the set is cleared on startup.
+ * last minutes too. A restarted simulator starts a new timeline, so the set is cleared on startup. Entries are
+ * {@link VersionedPayloads versioned}, so another service replaying the set reads entries of an older or newer build.
  */
 @Component
 @ConditionalOnProperty(name = "metromind.redis.enabled", havingValue = "true")
@@ -25,12 +26,12 @@ public class RedisSnapshotHistory extends SnapshotHistory {
     static final String KEY = "metromind:replay";
 
     private final StringRedisTemplate redis;
-    private final ObjectMapper mapper;
+    private final VersionedPayloads payloads;
 
     public RedisSnapshotHistory(ReplayProperties props, StringRedisTemplate redis, ObjectMapper mapper) {
         super(props);
         this.redis = redis;
-        this.mapper = mapper;
+        this.payloads = new VersionedPayloads(mapper);
     }
 
     @PostConstruct
@@ -59,11 +60,7 @@ public class RedisSnapshotHistory extends SnapshotHistory {
 
     @Override
     protected void store(SimulationSnapshot snapshot) {
-        try {
-            redis.opsForZSet().add(KEY, mapper.writeValueAsString(snapshot), snapshot.simTime());
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Cannot serialise snapshot", e);
-        }
+        redis.opsForZSet().add(KEY, payloads.write(snapshot), snapshot.simTime());
     }
 
     @Override
@@ -74,7 +71,7 @@ public class RedisSnapshotHistory extends SnapshotHistory {
 
     private SimulationSnapshot read(String json) {
         try {
-            return mapper.readValue(json, SimulationSnapshot.class);
+            return payloads.read(json, VersionedPayloads.Kind.SNAPSHOT, SimulationSnapshot.class);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Cannot read stored snapshot", e);
         }
