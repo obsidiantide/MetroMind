@@ -206,7 +206,8 @@ map's projection and selection, and the benchmark page's submit, poll, cancel, r
 The browser smoke test (`frontend/e2e/`) runs the production build of the dashboard in Chromium against the
 backend jar on the `standalone` profile, both started by Playwright: it checks that the map draws every line and
 branch, that trains arrive over the live WebSocket feed, and that clicking a station opens its drawer with a
-departure board. Run `mvn -B -DskipTests package` in `backend/` and `npm run build` in `frontend/` first; servers
+departure board. A second test runs a delay what-if from the control panel, checks that the best strategy's extra
+wait is drawn on the map with its legend, switches the map to another strategy's row and hides the layer. Run `mvn -B -DskipTests package` in `backend/` and `npm run build` in `frontend/` first; servers
 already listening on ports 8080 and 3000 are reused outside CI. CI runs it as its own job and keeps the Playwright
 traces of a failed run.
 
