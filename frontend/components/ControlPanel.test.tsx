@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ControlPanel } from "@/components/ControlPanel";
 import { api } from "@/lib/api";
-import type { IncidentImpactReport, StrategyOutcome } from "@/lib/types";
+import type { DelayImpactReport, IncidentImpactReport, StrategyOutcome } from "@/lib/types";
 import { network, snapshot, trainView } from "@/test/fixtures";
 
 function outcome(strategy: string): StrategyOutcome {
@@ -47,5 +47,50 @@ describe("ControlPanel door faults", () => {
     expect(await screen.findByText("Impact of a 240 s door fault on RED-1")).toBeTruthy();
     expect(analyze).toHaveBeenCalledWith("RED-1", 240);
     expect(doorFault).not.toHaveBeenCalled();
+  });
+});
+
+describe("ControlPanel what-if requested from elsewhere", () => {
+  const live = snapshot({ trains: [trainView("RED-1"), trainView("RED-2")] });
+
+  beforeEach(() => {
+    vi.spyOn(api, "strategies").mockResolvedValue(["NO_CONTROL", "BALANCED"]);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("runs the requested analysis, selects its train and maps the best strategy", async () => {
+    const report: IncidentImpactReport = {
+      incident: { kind: "DOOR_FAULT", trainId: "RED-2", seconds: 90 }, horizonSeconds: 1800,
+      outcomes: [outcome("BALANCED"), outcome("NO_CONTROL")], bestStrategy: "BALANCED",
+    };
+    const analyze = vi.spyOn(api, "analyzeDoorFault").mockResolvedValue(report);
+    const onHeat = vi.fn();
+    const { rerender } = render(<ControlPanel snapshot={live} network={network} onHeat={onHeat} />);
+    expect(analyze).not.toHaveBeenCalled();
+
+    rerender(<ControlPanel snapshot={live} network={network} onHeat={onHeat}
+                           whatIf={{ id: 1, kind: "DOOR_FAULT", trainId: "RED-2", seconds: 90 }} />);
+
+    expect(await screen.findByText("Impact of a 90 s door fault on RED-2")).toBeTruthy();
+    expect(analyze).toHaveBeenCalledWith("RED-2", 90);
+    expect((screen.getByLabelText("Train") as HTMLSelectElement).value).toBe("RED-2");
+    expect((screen.getByLabelText("Seconds") as HTMLInputElement).value).toBe("90");
+    expect(onHeat).toHaveBeenLastCalledWith(expect.objectContaining({ label: "BALANCED" }));
+  });
+
+  it("runs a delay what-if again for a new request but not on other re-renders", async () => {
+    const report: DelayImpactReport = {
+      trainId: "RED-1", injectedDelaySeconds: 120, horizonSeconds: 1800,
+      outcomes: [outcome("BALANCED")], bestStrategy: "BALANCED",
+    };
+    const analyze = vi.spyOn(api, "analyze").mockResolvedValue(report);
+    const request = { id: 1, kind: "DELAY" as const, trainId: "RED-1", seconds: 120 };
+    const { rerender } = render(<ControlPanel snapshot={live} network={network} whatIf={request} />);
+    expect(await screen.findByText("Impact of 2 min delay on RED-1")).toBeTruthy();
+
+    rerender(<ControlPanel snapshot={snapshot({ trains: [trainView("RED-1")] })} network={network} whatIf={request} />);
+    rerender(<ControlPanel snapshot={live} network={network} whatIf={{ ...request, id: 2 }} />);
+
+    await waitFor(() => expect(analyze).toHaveBeenCalledTimes(2));
   });
 });

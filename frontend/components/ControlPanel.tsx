@@ -48,10 +48,20 @@ function heatOf(outcome: StrategyOutcome): WaitHeat {
   };
 }
 
-export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
+/** A what-if asked for outside the panel (from a train's detail drawer); a new `id` runs it again. */
+export interface WhatIfRequest {
+  id: number;
+  kind: "DELAY" | "DOOR_FAULT";
+  trainId: string;
+  seconds: number;
+}
+
+export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = null }: {
   snapshot: Snapshot | null; network: MetroNetwork | null;
   /** Called with the extra wait per station of the strategy shown on the map (the best one by default). */
   onHeat?: (heat: WaitHeat | null) => void;
+  /** Runs this what-if as if picked in the panel, showing its report here and its heat on the map. */
+  whatIf?: WhatIfRequest | null;
 }) {
   const [strategies, setStrategies] = useState<string[]>([]);
   const [trainId, setTrainId] = useState("");
@@ -97,13 +107,13 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
     const { lineId, from, to } = selectedSection();
     return api.closeSection(lineId, from, to, closureMinutes * 60, closureResponse);
   };
-  const analyzeDelay = async () => {
-    const r = await api.analyze(trainId, seconds);
+  const analyzeDelay = async (train = trainId, secs = seconds) => {
+    const r = await api.analyze(train, secs);
     setReport({ title: `Impact of ${Math.round(r.injectedDelaySeconds / 60)} min delay on ${r.trainId}`, ...r });
   };
-  const analyzeDoorFault = async () => {
-    const r = await api.analyzeDoorFault(trainId, seconds);
-    setReport({ title: `Impact of a ${seconds} s door fault on ${trainId}`, ...r });
+  const analyzeDoorFault = async (train = trainId, secs = seconds) => {
+    const r = await api.analyzeDoorFault(train, secs);
+    setReport({ title: `Impact of a ${secs} s door fault on ${train}`, ...r });
   };
   const analyzeSectionClosure = async () => {
     const { lineId, from, to } = selectedSection();
@@ -132,6 +142,18 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
     }
   };
 
+  // A what-if from a train's drawer: select that train and incident here too, so the report reads like one run
+  // from the panel and can be tweaked and run again.
+  useEffect(() => {
+    if (!whatIf) return;
+    setTrainId(whatIf.trainId);
+    setSeconds(whatIf.seconds);
+    void run(() => whatIf.kind === "DELAY"
+      ? analyzeDelay(whatIf.trainId, whatIf.seconds)
+      : analyzeDoorFault(whatIf.trainId, whatIf.seconds));
+    // Runs once per request, not again when the helpers are recreated on the next render.
+  }, [whatIf?.id]);
+
   return (
     <div className="stack">
       <section className="panel">
@@ -157,10 +179,10 @@ export function ControlPanel({ snapshot, network, onHeat = () => {} }: {
           <button disabled={busy} onClick={() => run(() => api.doorFault(trainId, seconds))}>Door fault</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <button disabled={busy} onClick={() => run(analyzeDelay)}>
+          <button disabled={busy} onClick={() => run(() => analyzeDelay())}>
             What-if analysis
           </button>
-          <button disabled={busy} onClick={() => run(analyzeDoorFault)}>What-if door fault</button>
+          <button disabled={busy} onClick={() => run(() => analyzeDoorFault())}>What-if door fault</button>
         </div>
         <p className="muted">A delay stops the train where it is; a door fault holds it at its platform, or the next one.</p>
         {error && <p style={{ color: "var(--bad)" }}>{error}</p>}
