@@ -13,6 +13,7 @@ import org.springframework.core.io.ClassPathResource;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 /** The bundled Baku network: a real city laid out from GeoJSON, with run times derived from its track. */
 class BakuNetworkTest {
@@ -102,6 +103,37 @@ class BakuNetworkTest {
         engine.setRecordArrivals(true);
         engine.run(1800, 1);
         return engine.trains().stream().map(TrainState::arrivals).toList();
+    }
+
+    @Test
+    void driversSwapAtTheRedAndGreenLineTerminals() throws Exception {
+        MetroNetwork n = baku();
+        assertThat(n.line("M1").crewChangeStationIds()).containsExactlyInAnyOrder("icherisheher", "aslanov", "bakmil");
+        assertThat(n.line("M1").crewChangeSecondsAt("aslanov")).isEqualTo(60);
+        assertThat(n.line("M1").crewChangeSecondsAt("28may")).isZero();
+        assertThat(n.line("M2").crewChangeStationIds()).containsExactlyInAnyOrder("darnagul", "khatai");
+        assertThat(n.line("M2").crewChangeSecondsAt("khatai")).isEqualTo(45);
+        assertThat(n.line("M3").crewChangeStationIds()).isEmpty();
+
+        // The timetable plans the swaps, so they barely change how late the trains of a peak hour run.
+        double relieved = meanDelay(n);
+        double plain = meanDelay(withoutCrewChanges(n));
+        assertThat(relieved).isCloseTo(plain, within(30.0));
+    }
+
+    private static double meanDelay(MetroNetwork network) {
+        SimulationEngine engine = new SimulationEngine(network, MORNING, HeadwayStrategy.BALANCED);
+        engine.run(3600, 1);
+        return engine.trains().stream().filter(t -> !t.lineId().equals("M3"))
+                .mapToDouble(TrainState::delaySeconds).average().orElseThrow();
+    }
+
+    private static MetroNetwork withoutCrewChanges(MetroNetwork n) {
+        List<Line> lines = n.lines().stream().map(l -> new Line(l.id(), l.name(), l.color(), l.stationIds(),
+                l.runSeconds(), l.trainCount(), l.trainCapacity(), l.spareTrains(), l.path(), l.ring(),
+                l.timingStationIds(), l.branches(), l.fleetPlan(), l.runTimeVariability(), l.depotAccessSeconds(),
+                l.dwellVariability())).toList();
+        return new MetroNetwork(n.city(), n.stations(), lines, n.odWeights(), n.crossPlatform());
     }
 
     @Test
