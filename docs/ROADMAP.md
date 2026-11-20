@@ -67,14 +67,22 @@ Mark items `[x]` when merged.
 - [x] Bundled Baku network: crew changes at the Red and Green line terminals
 - [x] Late relief drivers: a seeded share of crew changes overrun their planned time, drawn like dwell noise so
       what-if copies share it (today a swap always takes exactly `crewChangeSeconds`)
+- [ ] Per-line late reliefs: a line's own share and mean overrun of late relief drivers, overriding the engine-wide
+      setting like run-time and dwell spreads
+- [ ] Late reliefs in the benchmark API: `reliefOverrunShare` and `reliefOverrunSeconds` query parameters, like the
+      run-time and dwell spreads, reported in the benchmark result
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
 - [x] Station closure (trains skip the station, demand redistributes to neighbours)
 - [x] Persist incidents and their analysis results to the `incident` table; `GET /api/incidents` history
 - [x] Automatic incident clearing timeline in the UI
-- [x] Traction power failure: every train on a line (or a stretch of it) stops where it is for the duration, in the
-      incident API, what-if and benchmark scenarios
+- [x] Traction power failure: every train on a line stops where it is for the duration, in the incident API, what-if
+      and benchmark scenarios
+- [ ] Sectional power failure: only trains between two stations of a line lose power (a feeder section), the rest of
+      the line keeps running up to the dead stretch
+- [ ] Passengers detrain from a train stuck between stations for longer than a threshold and walk to the nearest
+      platform, so a long power failure empties trains instead of keeping passengers on board
 
 ### Optimisation and comparison
 - [x] Strategy: adaptive dispatching that adds / withdraws trains from depot when overload is predicted
