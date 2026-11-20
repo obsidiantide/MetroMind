@@ -2014,7 +2014,8 @@ public final class SimulationEngine {
         double held = stations.values().stream().mapToDouble(s -> s.heldAtEntrance).sum();
         int inDepot = depot.values().stream().mapToInt(Integer::intValue).sum();
         return new SimulationSnapshot.Metrics(avg, max, waiting, served, delivered, transfers, leftBehind, held,
-                headwayCv(), trains.size(), inDepot, stopsSkipped, carriedPast, trunkHeadwayCv(), depotRuns.size());
+                headwayCv(), trains.size(), inDepot, stopsSkipped, carriedPast, trunkHeadwayCv(), depotRuns.size(),
+                reliefOverruns);
     }
 
     /**

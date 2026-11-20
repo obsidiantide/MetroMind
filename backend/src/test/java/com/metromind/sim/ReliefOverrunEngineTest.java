@@ -58,6 +58,8 @@ class ReliefOverrunEngineTest {
         assertThat(overrun.subList(0, 2)).isEqualTo(planned.subList(0, 2));
         assertThat(overrun.get(2)).isGreaterThan(planned.get(2));
         assertThat(late.reliefOverruns()).isEqualTo(1);
+        assertThat(late.snapshot().metrics().reliefOverruns()).isEqualTo(1);
+        assertThat(onTime.snapshot().metrics().reliefOverruns()).isZero();
         assertThat(late.snapshot().recentEvents()).anySatisfy(e -> {
             assertThat(e.type()).isEqualTo(SimEvent.Type.RELIEF_OVERRUN);
             assertThat(e.subjectId()).isEqualTo(late.trains().get(0).id());

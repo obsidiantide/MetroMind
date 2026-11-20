@@ -72,13 +72,15 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
      *                           {@code headwayCoefficientOfVariation} looks at each pattern on its own
      * @param trainsOnDepotRuns  trains running empty between a depot and its line's first terminal, in or out of
      *                           service (neither in service nor in a depot)
+     * @param reliefOverruns     crew changes that took longer than planned because the relief driver was late (see
+     *                           {@link ReliefOverrun}), since the engine started
      */
     public record Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
                           double passengersServed, double passengersDelivered, double transfers,
                           double passengersLeftBehind, double passengersHeldAtEntrance,
                           double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
                           int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv,
-                          int trainsOnDepotRuns) {
+                          int trainsOnDepotRuns, int reliefOverruns) {
 
         public Metrics {
             trunkHeadwayCv = trunkHeadwayCv == null ? Map.of() : Map.copyOf(trunkHeadwayCv);
@@ -93,6 +95,18 @@ public record SimulationSnapshot(double simTime, String clock, String strategy, 
             this(averageDelaySeconds, maxDelaySeconds, totalWaiting, passengersServed, passengersDelivered, transfers,
                     passengersLeftBehind, passengersHeldAtEntrance, headwayCoefficientOfVariation, trainsInService,
                     trainsInDepot, stopsSkipped, passengersCarriedPast, trunkHeadwayCv, 0);
+        }
+
+        /** Metrics of a network whose crew changes all ran to plan. */
+        public Metrics(double averageDelaySeconds, double maxDelaySeconds, double totalWaiting,
+                       double passengersServed, double passengersDelivered, double transfers,
+                       double passengersLeftBehind, double passengersHeldAtEntrance,
+                       double headwayCoefficientOfVariation, int trainsInService, int trainsInDepot,
+                       int stopsSkipped, double passengersCarriedPast, Map<String, Double> trunkHeadwayCv,
+                       int trainsOnDepotRuns) {
+            this(averageDelaySeconds, maxDelaySeconds, totalWaiting, passengersServed, passengersDelivered, transfers,
+                    passengersLeftBehind, passengersHeldAtEntrance, headwayCoefficientOfVariation, trainsInService,
+                    trainsInDepot, stopsSkipped, passengersCarriedPast, trunkHeadwayCv, trainsOnDepotRuns, 0);
         }
     }
 }
