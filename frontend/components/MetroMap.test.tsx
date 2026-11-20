@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MetroMap, pointsAlong, projection } from "@/components/MetroMap";
 import type { MetroNetwork } from "@/lib/types";
@@ -200,5 +200,86 @@ describe("MetroMap", () => {
     fireEvent.keyDown(alpha, { key: "Enter" });
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenCalledWith({ kind: "station", id: "A" });
+  });
+
+  describe("pan and zoom", () => {
+    const transform = (c: HTMLElement) => c.querySelector("[data-viewport]")!.getAttribute("transform");
+    const map = () => screen.getByRole("img", { name: "Metro network map" });
+
+    it("shows the whole network until zoomed", () => {
+      const { container } = render(<MetroMap network={network} snapshot={snapshot()} />);
+      expect(transform(container)).toBe("translate(0,0) scale(1)");
+      expect(screen.queryByRole("button", { name: "Reset map view" })).toBeNull();
+      // Line and heat legends are not part of the moving content.
+      expect(container.querySelector('[data-viewport] [aria-label="Line legend"]')).toBeNull();
+    });
+
+    it("zooms about the pointer with the wheel and leaves the page scroll alone at the limits", () => {
+      const { container } = render(<MetroMap network={network} snapshot={snapshot()} />);
+
+      // e^(0.0015 × 462.1) = 2.
+      const zoomIn = new WheelEvent("wheel", { deltaY: -Math.log(2) / 0.0015, clientX: 450, clientY: 320, cancelable: true });
+      act(() => { map().dispatchEvent(zoomIn); });
+      expect(zoomIn.defaultPrevented).toBe(true);
+      // The point under the pointer, the centre, stays where it was.
+      expect(transform(container)).toBe("translate(-450,-320) scale(2)");
+
+      act(() => {
+        map().dispatchEvent(new WheelEvent("wheel", { deltaY: 5000, clientX: 450, clientY: 320, cancelable: true }));
+      });
+      expect(transform(container)).toBe("translate(0,0) scale(1)");
+      const zoomOut = new WheelEvent("wheel", { deltaY: 100, clientX: 450, clientY: 320, cancelable: true });
+      act(() => { map().dispatchEvent(zoomOut); });
+      expect(zoomOut.defaultPrevented).toBe(false);
+    });
+
+    it("zooms, pans and resets from the keyboard", () => {
+      const { container } = render(<MetroMap network={network} snapshot={snapshot()} />);
+
+      fireEvent.keyDown(map(), { key: "+" });
+      expect(transform(container)).toBe("translate(-225,-160) scale(1.5)");
+      fireEvent.keyDown(map(), { key: "ArrowRight" });
+      fireEvent.keyDown(map(), { key: "ArrowDown" });
+      expect(transform(container)).toBe("translate(-285,-220) scale(1.5)");
+      fireEvent.keyDown(map(), { key: "-" });
+      expect(transform(container)).toBe("translate(0,0) scale(1)");
+
+      fireEvent.keyDown(map(), { key: "+" });
+      fireEvent.keyDown(map(), { key: "0" });
+      expect(transform(container)).toBe("translate(0,0) scale(1)");
+    });
+
+    it("pans by dragging without selecting what the drag ends on", () => {
+      const onSelect = vi.fn();
+      const { container } = render(<MetroMap network={network} snapshot={snapshot()} onSelect={onSelect} />);
+      fireEvent.keyDown(map(), { key: "+" });
+      const alpha = screen.getAllByRole("button").find((b) => b.textContent?.includes("Alpha"))!;
+
+      fireEvent.pointerDown(alpha, { button: 0, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(alpha, { clientX: 140, clientY: 120 });
+      fireEvent.pointerUp(alpha, { clientX: 140, clientY: 120 });
+      fireEvent.click(alpha);
+
+      expect(transform(container)).toBe("translate(-185,-140) scale(1.5)");
+      expect(onSelect).not.toHaveBeenCalled();
+
+      // A press without movement is still a click.
+      fireEvent.pointerDown(alpha, { button: 0, clientX: 100, clientY: 100 });
+      fireEvent.pointerUp(alpha, { clientX: 101, clientY: 100 });
+      fireEvent.click(alpha);
+      expect(onSelect).toHaveBeenCalledWith({ kind: "station", id: "A" });
+    });
+
+    it("offers a way back to the whole network once zoomed", () => {
+      const { container } = render(<MetroMap network={network} snapshot={snapshot()} />);
+      fireEvent.keyDown(map(), { key: "+" });
+
+      const reset = screen.getByRole("button", { name: "Reset map view" });
+      expect(reset.textContent).toContain("1.5×");
+      fireEvent.click(reset);
+
+      expect(transform(container)).toBe("translate(0,0) scale(1)");
+      expect(screen.queryByRole("button", { name: "Reset map view" })).toBeNull();
+    });
   });
 });
