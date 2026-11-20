@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { DayBenchmark, parseTimes } from "@/components/DayBenchmark";
 import { api } from "@/lib/api";
 import type { BenchmarkRequest, DayBenchmarkJob, TimeOfDayReport } from "@/lib/types";
@@ -32,6 +32,10 @@ function dayJob(over: Partial<DayBenchmarkJob> = {}): DayBenchmarkJob {
 const running = dayJob({ status: "RUNNING", completedRuns: 8, progress: 0.25, finishedAt: null, report: null });
 
 describe("DayBenchmark", () => {
+  beforeEach(() => {
+    vi.spyOn(api, "dayBenchmarkJobs").mockResolvedValue([]);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -109,6 +113,46 @@ describe("DayBenchmark", () => {
     });
     expect(text.split("\r\n")[1]).toBe("08:00,1,BALANCED,101,151,9001,9501,600,0,1");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:day");
+  });
+
+  it("lists recent rankings and reopens a finished one", async () => {
+    vi.spyOn(api, "dayBenchmarkJobs").mockResolvedValue([dayJob(), { ...running, id: "day-2" }]);
+    render(<DayBenchmark request={() => request} />);
+
+    const recent = await screen.findByRole("table", { name: "Recent rankings across the day" });
+    const rows = within(recent).getAllByRole("row");
+    expect(rows[1].textContent).toContain("SUCCEEDED");
+    expect(rows[1].textContent).toContain("08:00, 22:30");
+    expect(rows[1].textContent).toContain("BALANCED");
+    expect(rows[2].textContent).toContain("RUNNING");
+    expect(rows[2].textContent).toContain("8/32");
+
+    fireEvent.click(within(rows[1]).getByRole("button", { name: "Show" }));
+
+    expect(screen.getByText("22:30 (#2)")).toBeTruthy();
+    expect(within(rows[1]).queryByRole("button", { name: "Show" })).toBeNull();
+  });
+
+  it("resumes polling a running job reopened from the list", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(api, "dayBenchmarkJobs").mockResolvedValue([running]);
+    const poll = vi.spyOn(api, "dayBenchmarkJob").mockResolvedValue(dayJob());
+    render(<DayBenchmark request={() => request} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByText("Running: 8 of 32 runs")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(poll).toHaveBeenCalledWith("day-1");
+    expect(screen.getByText("22:30 (#2)")).toBeTruthy();
+    // The finished job refreshes the list, so it shows its new status.
+    expect(api.dayBenchmarkJobs).toHaveBeenCalledTimes(2);
   });
 
   it("shows the error when the backend rejects the times", async () => {

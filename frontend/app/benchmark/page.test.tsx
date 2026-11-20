@@ -9,6 +9,7 @@ describe("BenchmarkPage", () => {
   beforeEach(() => {
     vi.spyOn(api, "network").mockResolvedValue(network);
     vi.spyOn(api, "benchmarkJobs").mockResolvedValue([]);
+    vi.spyOn(api, "dayBenchmarkJobs").mockResolvedValue([]);
   });
   afterEach(() => vi.restoreAllMocks());
 
