@@ -73,6 +73,7 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
   const [closureMinutes, setClosureMinutes] = useState(10);
   const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
   const [closedStation, setClosedStation] = useState("");
+  const [darkLine, setDarkLine] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +129,13 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
     const stationId = closedStation || network!.stations[0].id;
     const r = await api.analyzeStationClosure(stationId, closureMinutes * 60);
     setReport({ title: `Impact of closing ${stationName.get(stationId) ?? stationId} for ${closureMinutes} min`, ...r });
+  };
+
+  const powerLine = () => darkLine || network!.lines[0].id;
+  const analyzePowerFailure = async () => {
+    const lineId = powerLine();
+    const r = await api.analyzePowerFailure(lineId, closureMinutes * 60);
+    setReport({ title: `Impact of a ${closureMinutes} min power failure on ${lineName.get(lineId) ?? lineId}`, ...r });
   };
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -216,9 +224,18 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
             </button>
             <button disabled={busy} onClick={() => run(analyzeStationClosure)}>What-if</button>
           </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <select value={powerLine()} onChange={(e) => setDarkLine(e.target.value)} aria-label="Line">
+              {network!.lines.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <button disabled={busy} onClick={() => run(() => api.cutPower(powerLine(), closureMinutes * 60))}>
+              Cut power
+            </button>
+            <button disabled={busy} onClick={() => run(analyzePowerFailure)}>What-if</button>
+          </div>
           <p className="muted">
             Track: trains wait at the signal or turn back at the last open station. Station: trains run through and
-            passengers use the neighbouring stations.
+            passengers use the neighbouring stations. Power: every train of the line stops where it is.
           </p>
         </section>
       )}
