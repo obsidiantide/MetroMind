@@ -27,8 +27,8 @@ import java.util.TreeMap;
 
 /**
  * Ranks headway strategies over many incidents rather than one: draws {@code N} random incident scenarios (a train
- * delayed, broken down or held at a platform by a door fault, a track section or a station closed, each for a
- * random time) from a seed, runs every
+ * delayed, broken down or held at a platform by a door fault, a track section or a station closed, a line's
+ * traction power lost, each for a random time) from a seed, runs every
  * strategy against every scenario from the same copy of the live network, and compares the passenger wait or
  * total travel time they lead to.
  *
@@ -46,6 +46,8 @@ public final class StrategyBenchmark {
     static final double MAX_DOOR_FAULT_SECONDS = 180;
     static final double MIN_CLOSURE_SECONDS = 300;
     static final double MAX_CLOSURE_SECONDS = 1200;
+    static final double MIN_POWER_FAILURE_SECONDS = 120;
+    static final double MAX_POWER_FAILURE_SECONDS = 900;
     private static final double DT = 1.0;
     static final double RECOVERY_SAMPLE_SECONDS = 30;
 
@@ -225,8 +227,8 @@ public final class StrategyBenchmark {
 
     /**
      * Draws the scenarios: for each one a kind among {@code kinds} (in declaration order, so a seed always maps to
-     * the same incidents), then its subject (a train of the live fleet, a pair of adjacent stations of a line, or a
-     * station) and a duration in the kind's range. A closed section gets a random response.
+     * the same incidents), then its subject (a train of the live fleet, a pair of adjacent stations of a line, a
+     * station, or a line) and a duration in the kind's range. A closed section gets a random response.
      */
     static List<BenchmarkReport.Scenario> drawScenarios(SimulationEngine live, int count, long seed,
                                                         Set<BenchmarkReport.IncidentKind> kinds) {
@@ -261,6 +263,9 @@ public final class StrategyBenchmark {
                 case DOOR_FAULT -> BenchmarkReport.Scenario.train(kind,
                         trainIds.get(random.nextInt(trainIds.size())),
                         between(random, MIN_DOOR_FAULT_SECONDS, MAX_DOOR_FAULT_SECONDS));
+                case POWER_FAILURE -> BenchmarkReport.Scenario.powerFailure(
+                        lines.get(random.nextInt(lines.size())).id(),
+                        between(random, MIN_POWER_FAILURE_SECONDS, MAX_POWER_FAILURE_SECONDS));
             });
         }
         return scenarios;

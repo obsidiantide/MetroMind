@@ -227,6 +227,12 @@ class StrategyBenchmarkTest {
                     assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_DOOR_FAULT_SECONDS,
                             StrategyBenchmark.MAX_DOOR_FAULT_SECONDS);
                 }
+                case POWER_FAILURE -> {
+                    assertThat(s.lineId()).isEqualTo("L1");
+                    assertThat(s.trainId()).isNull();
+                    assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_POWER_FAILURE_SECONDS,
+                            StrategyBenchmark.MAX_POWER_FAILURE_SECONDS);
+                }
             }
         });
     }
@@ -239,6 +245,19 @@ class StrategyBenchmarkTest {
         assertThat(report.scenarios()).extracting(BenchmarkReport.Scenario::kind)
                 .containsOnly(BenchmarkReport.IncidentKind.DOOR_FAULT);
         assertThat(report.scenarios()).allSatisfy(s -> assertThat(s.stationId()).isNull());
+        assertThat(report.rankings()).hasSize(2).allSatisfy(r -> assertThat(r.meanWaitSeconds()).isPositive());
+    }
+
+    @Test
+    void benchmarksPowerFailuresOnEveryLine() {
+        SimulationEngine live = new SimulationEngine(TestNetworks.twoLines(), 8 * 3600, HeadwayStrategy.NO_CONTROL);
+        live.run(300, 1);
+        BenchmarkReport report = new StrategyBenchmark().run(live, 6, 4, 1200,
+                List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED),
+                EnumSet.of(BenchmarkReport.IncidentKind.POWER_FAILURE));
+        assertThat(report.scenarios()).extracting(BenchmarkReport.Scenario::kind)
+                .containsOnly(BenchmarkReport.IncidentKind.POWER_FAILURE);
+        assertThat(report.scenarios()).extracting(BenchmarkReport.Scenario::lineId).contains("L1", "L2");
         assertThat(report.rankings()).hasSize(2).allSatisfy(r -> assertThat(r.meanWaitSeconds()).isPositive());
     }
 
