@@ -244,6 +244,7 @@ are started once and shared by every integration test.
 | POST | `/api/analysis/benchmark/day/jobs?startTimes=08:00,22:30` | Benchmark across times of day as a background job |
 | GET | `/api/analysis/benchmark/day/jobs/{id}` | Day job status, progress over all periods and, once done, its report |
 | DELETE | `/api/analysis/benchmark/day/jobs/{id}` | Cancel a queued or running day job |
+| GET | `/api/analysis/benchmark/day/jobs?limit=20` | Day jobs still kept, newest first |
 | GET | `/api/incidents?limit=50` | Incident history, newest first |
 | GET | `/api/incidents/analyses?limit=10` | Past what-if analyses with their full reports, newest first |
 | GET | `/api/kpis?limit=60` | Per-minute KPIs aggregated from telemetry, oldest first |
@@ -630,7 +631,9 @@ reproducible and independent of the live engine's state. The benchmark page's *A
 the page's settings, as a background job (below) with a progress bar and a cancel button. Its *Export CSV*
 button saves the day ranking with one row per period and strategy (`start_clock`, `period_rank`, `strategy`, the
 wait, travel-time and recovery columns of the strategy CSV, and the strategy's `day_rank`), named after the seed and
-metric, e.g. `benchmark-day-seed1-wait-per-boarding.csv`.
+metric, e.g. `benchmark-day-seed1-wait-per-boarding.csv`. Below it, *Recent rankings* lists the day jobs the
+server keeps (status, runs, times of day, seed and winner); *Show* reopens one, so a finished ranking can be read
+or exported again after a reload, and a job still running picks up its progress bar.
 
 **Large runs as background jobs.** `POST /api/analysis/benchmark/jobs` takes the same parameters, copies the live
 state at once and answers `202 Accepted` with the queued job and its URL in `Location`. Poll
