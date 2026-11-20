@@ -1,6 +1,7 @@
 package com.metromind.infra;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.metromind.replay.ReplayProperties;
 import com.metromind.sim.SimEvent;
 import com.metromind.sim.SimulationSnapshot;
@@ -50,7 +51,8 @@ class RedisSnapshotHistoryTest {
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
         verify(zset).add(eq(RedisSnapshotHistory.KEY), json.capture(), eq(28_800.0));
-        assertThat(json.getValue()).contains("\"strategy\":\"BALANCED\"");
+        assertThat(json.getValue()).contains("\"strategy\":\"BALANCED\"")
+                .contains("\"schemaVersion\":" + VersionedPayloads.CURRENT_VERSION);
         ArgumentCaptor<Double> max = ArgumentCaptor.forClass(Double.class);
         verify(zset).removeRangeByScore(eq(RedisSnapshotHistory.KEY), eq(Double.NEGATIVE_INFINITY), max.capture());
         assertThat(max.getValue()).isLessThan(28_740.0).isGreaterThan(28_739.999);
@@ -63,6 +65,17 @@ class RedisSnapshotHistoryTest {
                 .thenReturn(new LinkedHashSet<>(List.of(mapper.writeValueAsString(stored))));
 
         assertThat(history.at(28_805)).hasValue(stored);
+    }
+
+    @Test
+    void readsAnEntryStoredBeforeSnapshotsWereVersioned() throws Exception {
+        // An older build stored trains without their service pattern and no version tag.
+        var tree = mapper.valueToTree(snapshot(28_800));
+        ((ObjectNode) tree.get("trains").get(0)).remove("patternId");
+        when(zset.reverseRangeByScore(RedisSnapshotHistory.KEY, Double.NEGATIVE_INFINITY, 28_805, 0, 1))
+                .thenReturn(new LinkedHashSet<>(List.of(mapper.writeValueAsString(tree))));
+
+        assertThat(history.at(28_805)).hasValue(snapshot(28_800));
     }
 
     @Test
