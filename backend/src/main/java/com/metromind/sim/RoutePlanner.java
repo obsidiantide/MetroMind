@@ -95,7 +95,11 @@ final class RoutePlanner {
             }
             Line line = lines.get(patternLine[pi]);
             crewChange[pi] = p.stationIds().stream().mapToDouble(line::crewChangeSecondsAt).toArray();
+            // A round trip includes the timetabled crew changes, which spread the trains further apart.
             double loop = p.loopRunSeconds() + p.loopLength() * nominalDwell;
+            for (int k = 0; k < p.loopLength(); k++) {
+                loop += line.crewChangeSecondsAt(p.stationAtStop(k));
+            }
             frequency[pi] = p.trainCount() / loop;
         }
         crossPlatform = new boolean[lines.size()][lines.size()][stationCount];
