@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { dayBenchmarkCsv, dayBenchmarkCsvName } from "@/lib/benchmarkCsv";
 import { downloadCsv } from "@/lib/download";
@@ -16,26 +16,36 @@ export function parseTimes(text: string): string[] {
 /**
  * Ranks the strategies over several times of day with the page's benchmark settings, so a strategy that only shines
  * in the peak does not win on the strength of the current moment. Runs as a background job: the panel polls it,
- * shows its progress over all periods and can cancel it.
+ * shows its progress over all periods and can cancel it. Recent jobs the server still keeps are listed below, and
+ * any of them can be reopened: a finished one shows its ranking, a running one picks up polling again.
  */
 export function DayBenchmark({ request, disabled }: { request: () => BenchmarkRequest; disabled?: boolean }) {
   const [times, setTimes] = useState(DEFAULT_TIMES);
   const [job, setJob] = useState<DayBenchmarkJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<DayBenchmarkJob[]>([]);
 
-  const running = job !== null && (job.status === "QUEUED" || job.status === "RUNNING");
+  const refreshHistory = useCallback(() => {
+    api.dayBenchmarkJobs().then(setHistory).catch((e) => setError(String(e)));
+  }, []);
+  useEffect(refreshHistory, [refreshHistory]);
+
+  const running = job !== null && isActive(job);
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => {
-      api.dayBenchmarkJob(job.id).then(setJob).catch((e) => setError(String(e)));
+      api.dayBenchmarkJob(job.id)
+        .then((j) => { setJob(j); if (!isActive(j)) refreshHistory(); })
+        .catch((e) => setError(String(e)));
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [running, job?.id]);
+  }, [running, job?.id, refreshHistory]);
 
   const run = async () => {
     setError(null);
     try {
       setJob(await api.submitDayBenchmark(request(), parseTimes(times)));
+      refreshHistory();
     } catch (e) {
       setError(String(e));
     }
@@ -45,6 +55,7 @@ export function DayBenchmark({ request, disabled }: { request: () => BenchmarkRe
     setError(null);
     try {
       setJob(await api.cancelDayBenchmarkJob(job.id));
+      refreshHistory();
     } catch (e) {
       setError(String(e));
     }
@@ -118,6 +129,35 @@ export function DayBenchmark({ request, disabled }: { request: () => BenchmarkRe
           </table>
         </div>
       )}
+      {history.length > 0 && (
+        <>
+          <h3>Recent rankings</h3>
+          <div className="table-scroll">
+            <table aria-label="Recent rankings across the day">
+              <thead>
+                <tr><th>Submitted</th><th>Status</th><th>Runs</th><th>Times of day</th><th>Seed</th><th>Best</th><th /></tr>
+              </thead>
+              <tbody>
+                {history.map((j) => (
+                  <tr key={j.id}>
+                    <td>{new Date(j.submittedAt).toLocaleTimeString()}</td>
+                    <td>{j.status}</td>
+                    <td>{j.completedRuns}/{j.totalRuns}</td>
+                    <td>{j.report ? j.report.periods.map((p) => p.startClock).join(", ") : "–"}</td>
+                    <td>{j.report?.seed ?? "–"}</td>
+                    <td>{j.report?.rankings[0]?.strategy ?? "–"}</td>
+                    <td>{j.id !== job?.id && <button onClick={() => setJob(j)}>Show</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
+}
+
+function isActive(job: DayBenchmarkJob) {
+  return job.status === "QUEUED" || job.status === "RUNNING";
 }
