@@ -62,9 +62,9 @@ Mark items `[x]` when merged.
 - [x] Crew changes: a fixed extra dwell at the terminals or stations where drivers swap, kept in the timetable
 - [x] Bundled Baku network: depot access times and per-line run-time spreads, so the default run shows everyday
       irregularity out of the box
-- [ ] Route planning aware of crew changes: a passenger's route cost includes the crew-change dwell at relief points
+- [x] Route planning aware of crew changes: a passenger's route cost includes the crew-change dwell at relief points
       (today routes assume the nominal 25 s dwell at every stop)
-- [ ] Bundled Baku network: crew changes at the Red and Green line terminals
+- [x] Bundled Baku network: crew changes at the Red and Green line terminals
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
