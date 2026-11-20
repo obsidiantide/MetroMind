@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ControlPanel } from "@/components/ControlPanel";
-import { DetailDrawer, type Selection } from "@/components/DetailDrawer";
+import { ControlPanel, type WhatIfRequest } from "@/components/ControlPanel";
+import { DetailDrawer, type Selection, type TrainWhatIf } from "@/components/DetailDrawer";
 import { IncidentTimeline } from "@/components/IncidentTimeline";
 import { KpiCharts } from "@/components/KpiCharts";
 import { MetroMap, type WaitHeat } from "@/components/MetroMap";
@@ -18,6 +18,10 @@ export default function Home() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const closeDrawer = useCallback(() => setSelection(null), []);
   const [heat, setHeat] = useState<WaitHeat | null>(null);
+  const [whatIf, setWhatIf] = useState<WhatIfRequest | null>(null);
+  const requestWhatIf = useCallback<TrainWhatIf>((kind, trainId, seconds) => {
+    setWhatIf((prev) => ({ id: (prev?.id ?? 0) + 1, kind, trainId, seconds }));
+  }, []);
 
   useEffect(() => {
     api.network().then(setNetwork).catch((e) => setError(String(e)));
@@ -73,9 +77,10 @@ export default function Home() {
           )}
         </section>
       </div>
-      <ControlPanel snapshot={snapshot} network={network} onHeat={setHeat} />
+      <ControlPanel snapshot={snapshot} network={network} onHeat={setHeat} whatIf={whatIf} />
       {selection && network && (
-        <DetailDrawer selection={selection} network={network} snapshot={snapshot} onClose={closeDrawer} />
+        <DetailDrawer selection={selection} network={network} snapshot={snapshot} onClose={closeDrawer}
+                      onWhatIf={requestWhatIf} />
       )}
     </main>
   );
