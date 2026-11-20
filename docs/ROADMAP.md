@@ -113,7 +113,7 @@ Mark items `[x]` when merged.
 - [x] Persist finished benchmark jobs in PostgreSQL so results survive restarts
 - [x] Service patterns in `GET /api/network` (stations, run times and trains of each) and the pattern of each train
       in the snapshot
-- [ ] Versioned snapshot payloads in Redis and Kafka telemetry, so replay and the KPI consumer read entries written
+- [x] Versioned snapshot payloads in Redis and Kafka telemetry, so replay and the KPI consumer read entries written
       before a snapshot field was added or renamed
 
 ### Frontend
