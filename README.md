@@ -736,6 +736,11 @@ The map's legend lists every line in its colour. A ring line is marked ↻ or �
 north-up map, and arrows along its track point the way they run, so the two directions of a ring sharing one
 track (Ringtown's) can be told apart.
 
+For networks larger than Baku the map pans and zooms: the mouse wheel zooms about the pointer (up to 8×), dragging
+pans, and with the map focused `+` and `-` zoom, the arrow keys pan and `0` shows the whole network again, as does
+the control in the top-right corner once zoomed. The legends stay in place, the view never pans past the network's
+edges, and on an unzoomed map the wheel still scrolls the page. A drag that ends on a station does not open it.
+
 Click a station or train on the map (or focus it with Tab and press Enter) to open a detail drawer. A station
 shows its lines, passengers waiting now and predicted in 15 minutes with the overload risk, the queue on each
 platform and its live departure board with lateness. A train shows where it is heading, where it is, what it is
