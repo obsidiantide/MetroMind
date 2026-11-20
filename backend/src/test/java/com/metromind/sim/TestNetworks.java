@@ -111,4 +111,13 @@ public final class TestNetworks {
                         crossingSeconds)));
         return new MetroNetwork("Test", stations, List.of(line), odWeights);
     }
+
+    /** {@code base}'s only line with drivers swapping at {@code stationIds}, taking {@code seconds}. */
+    public static MetroNetwork withCrewChanges(MetroNetwork base, List<String> stationIds, int seconds) {
+        Line l = base.lines().get(0);
+        Line relieved = new Line(l.id(), l.name(), l.color(), l.stationIds(), l.runSeconds(), l.trainCount(),
+                l.trainCapacity(), l.spareTrains(), l.path(), l.ring(), l.timingStationIds(), l.branches(),
+                l.fleetPlan(), l.runTimeVariability(), l.depotAccessSeconds(), l.dwellVariability(), stationIds, seconds);
+        return new MetroNetwork(base.city(), base.stations(), List.of(relieved), base.odWeights());
+    }
 }

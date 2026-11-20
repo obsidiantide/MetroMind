@@ -39,6 +39,11 @@ public record ReliefOverrun(double share, double meanSeconds, long seed) {
         }
     }
 
+    /** The same share and mean drawn from another seed, e.g. a benchmark's. */
+    public ReliefOverrun withSeed(long seed) {
+        return seed == this.seed ? this : new ReliefOverrun(share, meanSeconds, seed);
+    }
+
     public boolean enabled() {
         return share > 0 && meanSeconds > 0;
     }
