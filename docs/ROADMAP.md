@@ -65,12 +65,16 @@ Mark items `[x]` when merged.
 - [x] Route planning aware of crew changes: a passenger's route cost includes the crew-change dwell at relief points
       (today routes assume the nominal 25 s dwell at every stop)
 - [x] Bundled Baku network: crew changes at the Red and Green line terminals
+- [ ] Late relief drivers: a seeded share of crew changes overrun their planned time, drawn like dwell noise so
+      what-if copies share it (today a swap always takes exactly `crewChangeSeconds`)
 
 ### Incidents
 - [x] Segment / signal failure (track section closed, trains turn back or wait)
 - [x] Station closure (trains skip the station, demand redistributes to neighbours)
 - [x] Persist incidents and their analysis results to the `incident` table; `GET /api/incidents` history
 - [x] Automatic incident clearing timeline in the UI
+- [ ] Traction power failure: every train on a line (or a stretch of it) stops where it is for the duration, in the
+      incident API, what-if and benchmark scenarios
 
 ### Optimisation and comparison
 - [x] Strategy: adaptive dispatching that adds / withdraws trains from depot when overload is predicted
@@ -115,6 +119,8 @@ Mark items `[x]` when merged.
       in the snapshot
 - [x] Versioned snapshot payloads in Redis and Kafka telemetry, so replay and the KPI consumer read entries written
       before a snapshot field was added or renamed
+- [ ] Rebuild per-minute KPIs from the retained telemetry topics on demand (replay the Kafka backlog into a fresh
+      `minute_kpi` range), e.g. after a fix to the aggregation
 
 ### Frontend
 - [x] Charts: delay and waiting over time
@@ -132,3 +138,4 @@ Mark items `[x]` when merged.
 - [x] Pan and zoom the map (wheel, drag, keyboard) for networks larger than Baku
 - [x] Inject a delay, breakdown or door fault and run its what-if straight from a train's detail drawer
 - [ ] Fleet plan chart: planned vs running trains per line over the day, next to the KPI charts
+- [ ] Zoom the map to a line by clicking it in the legend, and keep the map view across reloads
