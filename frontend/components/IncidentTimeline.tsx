@@ -8,6 +8,7 @@ const KIND_COLOR: Record<IncidentKind, string> = {
   SECTION_CLOSURE: "#a371f7",
   STATION_CLOSURE: "#58a6ff",
   DOOR_FAULT: "#db6d28",
+  POWER_FAILURE: "#e3b341",
 };
 const KIND_LABEL: Record<IncidentKind, string> = {
   TRAIN_DELAY: "Delay",
@@ -15,6 +16,7 @@ const KIND_LABEL: Record<IncidentKind, string> = {
   SECTION_CLOSURE: "Track closed",
   STATION_CLOSURE: "Station closed",
   DOOR_FAULT: "Door fault",
+  POWER_FAILURE: "Power failure",
 };
 
 /**

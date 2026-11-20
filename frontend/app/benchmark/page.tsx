@@ -16,6 +16,7 @@ const KINDS: { kind: ScenarioKind; label: string }[] = [
   { kind: "DOOR_FAULT", label: "Door faults" },
   { kind: "SECTION_CLOSURE", label: "Track closures" },
   { kind: "STATION_CLOSURE", label: "Station closures" },
+  { kind: "POWER_FAILURE", label: "Power failures" },
 ];
 const POLL_MS = 1000;
 
@@ -37,6 +38,7 @@ function describe(s: IncidentScenario, name: Names): string {
         + (s.response === "TURN_BACK" ? "trains turn back" : "trains wait");
     case "STATION_CLOSURE": return `${name(s.stationId)} closed ${length}`;
     case "DOOR_FAULT": return `${s.trainId} held by a door fault ${length}`;
+    case "POWER_FAILURE": return `${name(s.lineId)} without traction power ${length}`;
   }
 }
 
