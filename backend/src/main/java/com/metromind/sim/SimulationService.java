@@ -45,7 +45,7 @@ public class SimulationService {
     private final IncidentHistory history;
     private final DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
     private final StrategyBenchmark benchmark = new StrategyBenchmark();
-    private final TimeOfDayBenchmark dayBenchmark = new TimeOfDayBenchmark();
+    private final TimeOfDayBenchmark dayBenchmark;
     /** One benchmark job at a time: each already keeps a core busy, and jobs queue behind it. */
     private final ExecutorService benchmarkExecutor = Executors.newSingleThreadExecutor(Thread.ofPlatform()
             .name("benchmark-job").daemon(true).factory());
@@ -62,6 +62,7 @@ public class SimulationService {
                              ObjectProvider<BenchmarkJobStore<BenchmarkReport>> jobStore,
                              ObjectProvider<BenchmarkJobStore<TimeOfDayReport>> dayJobStore) {
         this.props = props;
+        this.dayBenchmark = new TimeOfDayBenchmark(props.reliefOverrun());
         this.benchmarkJobs = new BenchmarkJobs<>(benchmarkExecutor, 20, Clock.systemUTC(),
                 jobStore.getIfAvailable(BenchmarkJobStore::none));
         this.dayBenchmarkJobs = new BenchmarkJobs<>(benchmarkExecutor, 20, Clock.systemUTC(),
