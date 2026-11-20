@@ -73,7 +73,7 @@ Mark items `[x]` when merged.
 - [x] Station closure (trains skip the station, demand redistributes to neighbours)
 - [x] Persist incidents and their analysis results to the `incident` table; `GET /api/incidents` history
 - [x] Automatic incident clearing timeline in the UI
-- [ ] Traction power failure: every train on a line (or a stretch of it) stops where it is for the duration, in the
+- [x] Traction power failure: every train on a line (or a stretch of it) stops where it is for the duration, in the
       incident API, what-if and benchmark scenarios
 
 ### Optimisation and comparison
