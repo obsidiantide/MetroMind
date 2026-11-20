@@ -240,6 +240,24 @@ class IncidentApiTest {
     }
 
     @Test
+    void analysesAPowerFailureWithoutCuttingLivePower() throws Exception {
+        mvc.perform(post("/api/analysis/power-failure-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "GREEN", "seconds": 240}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incident.kind").value("POWER_FAILURE"))
+                .andExpect(jsonPath("$.incident.lineId").value("GREEN"))
+                .andExpect(jsonPath("$.incident.trainId").doesNotExist())
+                .andExpect(jsonPath("$.outcomes.length()").value(HeadwayStrategy.all().size()))
+                .andExpect(jsonPath("$.bestStrategy").isString());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.kind == 'POWER_FAILURE' && @.subjectId == 'GREEN')]")
+                        .isEmpty());
+    }
+
+    @Test
     void whatIfForATrackSectionClosureDefaultsToWaiting() throws Exception {
         mvc.perform(post("/api/analysis/section-closure-impact").param("horizonSeconds", "300")
                         .contentType(MediaType.APPLICATION_JSON)

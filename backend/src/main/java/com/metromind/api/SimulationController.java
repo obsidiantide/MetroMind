@@ -233,10 +233,24 @@ public class SimulationController {
     }
 
     /**
+     * What-if: impact of a traction power failure on a line, compared across all headway strategies. Does not touch
+     * live state.
+     */
+    @Tag(name = "Analysis")
+    @Operation(summary = "What-if: impact of a traction power failure under every strategy")
+    @PostMapping("/analysis/power-failure-impact")
+    public IncidentImpactReport powerFailureImpact(@Valid @RequestBody PowerFailureRequest req,
+                                                   @RequestParam(defaultValue = "1800") @Min(60) @Max(7200)
+                                                   double horizonSeconds) {
+        return simulation.analyzeIncident(BenchmarkReport.Scenario.powerFailure(req.lineId(), req.seconds()),
+                horizonSeconds);
+    }
+
+    /**
      * Strategy benchmark: runs every headway strategy against the same {@code scenarios} random incidents, drawn
      * from {@code seed}, and ranks them by mean and p95 passenger wait. {@code kinds} (comma-separated, e.g.
      * {@code DELAY,STATION_CLOSURE}) limits the incidents drawn; by default train delays, breakdowns, door faults,
-     * track-section closures and station closures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
+     * track-section closures, station closures and traction power failures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
      * (default) or {@code TRAVEL_TIME}. {@code runTimeVariability} (0 to 0.25) sets how much run times between
      * stations vary around nominal in every run, drawn from {@code seed}; by default as much as on the live engine.
      * {@code dwellVariability} (0 to 0.25) does the same for dwells at platforms. Does not touch live state.
