@@ -187,6 +187,8 @@ and fleet sizes are illustrative. Its lines also carry everyday irregularity out
 Red line from a depot five minutes down the track (two to two and a half on the Green and Purple lines), and each
 line has its own run-time and dwell spread, largest on the 1967 Red line (8 % and 12 %) and smallest on the 2016
 Purple line (3 % and 5 %), drawn from `metromind.sim.run-time-seed` even with the engine-wide spreads at 0.
+Drivers swap at the terminals of the Red line (60 s at İçərişəhər, Həzi Aslanov and Bakmil) and the Green line
+(45 s at Dərnəgül and Xətai), planned in the timetable; the short Purple line runs without crew changes.
 
 ### Tests
 
