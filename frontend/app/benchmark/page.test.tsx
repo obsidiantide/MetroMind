@@ -27,7 +27,8 @@ describe("BenchmarkPage", () => {
 
     expect(await screen.findByText("Running: 4 of 16 runs")).toBeTruthy();
     expect(submit).toHaveBeenCalledWith({
-      scenarios: 2, seed: 7, horizonSeconds: 1800, kinds: ["DELAY", "DOOR_FAULT", "SECTION_CLOSURE", "STATION_CLOSURE"],
+      scenarios: 2, seed: 7, horizonSeconds: 1800,
+      kinds: ["DELAY", "DOOR_FAULT", "SECTION_CLOSURE", "STATION_CLOSURE", "POWER_FAILURE"],
       metric: "TRAVEL_TIME",
     });
     expect(screen.getByRole("button", { name: "Run benchmark" })).toHaveProperty("disabled", true);
@@ -74,6 +75,16 @@ describe("BenchmarkPage", () => {
     expect(screen.getByText("2.5 (42 carried past)")).toBeTruthy();
     expect(screen.getByText("RED-1 delayed 4m 00s")).toBeTruthy();
     expect(await screen.findByText("Red Line Alpha – Central closed 15m 00s, trains turn back")).toBeTruthy();
+  });
+
+  it("names the line of a power failure scenario", async () => {
+    const withOutage = job({ report: { ...job().report!, scenarios: [{ kind: "POWER_FAILURE", seconds: 300, lineId: "RED" }] } });
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([withOutage]);
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+
+    expect(await screen.findByText("Red Line without traction power 5m 00s")).toBeTruthy();
   });
 
   it("shows each branched line's trunk regularity when the network has one", async () => {
@@ -148,7 +159,8 @@ describe("BenchmarkPage", () => {
     render(<BenchmarkPage />);
 
     const run = screen.getByRole("button", { name: "Run benchmark" });
-    for (const kind of ["Train delays", "Breakdowns", "Door faults", "Track closures", "Station closures"]) {
+    for (const kind of ["Train delays", "Breakdowns", "Door faults", "Track closures", "Station closures",
+      "Power failures"]) {
       fireEvent.click(screen.getByLabelText(kind));
     }
     expect(run).toHaveProperty("disabled", true);
