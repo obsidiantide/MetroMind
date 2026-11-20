@@ -19,7 +19,7 @@ detects delays, predicts overcrowded stations and answers the key operational qu
 | Platform crowding | Optional `platformCapacity` per station: when platforms are full, new passengers queue at the entrance; passengers left behind by full trains are counted |
 | Overload prediction | 15-minute forecast per station, summed over its directional queues: queue + inflow (new trips and recent transfers) − share of free space of trains calling in that direction, after their passengers for this station alight; on a branched line a train only relieves the passengers its service pattern would take |
 | Dynamic headway control | Pluggable `HeadwayStrategy`: `NO_CONTROL`, `FORWARD_HOLDING`, `BALANCED` (two-way headway balancing), `ADAPTIVE_DISPATCH` (balancing plus spare trains from the depot when overload is predicted), `SHORT_TURN` (balancing plus short-turning badly late trains), `DEMAND_HOLDING` (forward holding against a demand-tracking target), `SKIP_STOP` (balancing plus late trains running through quiet stops), `SHORT_TURN_SKIP_STOP` (both recovery tools, short turns first) |
-| Incidents & failures | Inject delays, breakdowns or door faults on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station |
+| Incidents & failures | Inject delays, breakdowns or door faults on any train at runtime; close a track section (signal failure) with trains waiting or turning back; close a station; cut a line's traction power |
 | **Delay propagation (what-if)** | Fork the live engine, run *baseline* vs *incident* for every strategy, diff arrivals and passenger wait |
 
 ### The delay-propagation mechanic
@@ -234,10 +234,12 @@ are started once and shared by every integration test.
 | POST | `/api/incidents/door-fault` | `{ "trainId": "RED-1", "seconds": 120 }`: extra dwell at its platform |
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
+| POST | `/api/incidents/power-failure` | `{ "lineId": "GREEN", "seconds": 600 }`: every train of the line stops |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
 | POST | `/api/analysis/section-closure-impact` | What-if for a track-section closure (same body as `/api/incidents/section-closure`) |
 | POST | `/api/analysis/station-closure-impact` | What-if for a station closure (same body as `/api/incidents/station-closure`) |
 | POST | `/api/analysis/door-fault-impact` | What-if for a door fault (same body as `/api/incidents/door-fault`) |
+| POST | `/api/analysis/power-failure-impact` | What-if for a power failure (same body as `/api/incidents/power-failure`) |
 | POST | `/api/analysis/benchmark?scenarios=10&seed=1&horizonSeconds=1800&kinds=DELAY,STATION_CLOSURE` | Rank strategies over random incident scenarios |
 | POST | `/api/analysis/benchmark/jobs` | Same benchmark as a background job: `202 Accepted`, poll `Location` |
 | GET | `/api/analysis/benchmark/jobs/{id}` | Job status, progress and, once done, its report |
@@ -429,6 +431,19 @@ signal clears. The snapshot lists it among `activeIncidents` as `DOOR_FAULT` unt
 dashboard's incident panel has Door fault and What-if door fault buttons, and benchmarks draw door faults as one
 of their incident kinds.
 
+### Traction power failures
+
+`POST /api/incidents/power-failure` with `{ "lineId": "GREEN", "seconds": 600 }` takes the traction current off a
+whole line: every one of its trains, between stations or at a platform, stops where it is for `seconds` and then
+carries on from there, so all of them run late by about the outage. Signalling and stations stay up: passengers
+keep arriving and queueing along the line, doors that were open stay open, repairs and holds already under way keep
+counting down, and other lines run as usual, interchanges included (passengers changing onto the dark line just
+wait). A second failure on a line already without power extends the outage. The snapshot lists it among
+`activeIncidents` as `POWER_FAILURE` under the line's id until power is back, `INCIDENT` and `INCIDENT_CLEARED`
+events mark both ends, and the history records it as `POWER_FAILURE`. `POST /api/analysis/power-failure-impact`
+runs the same outage as a what-if; the dashboard's *Closures* panel has Cut power and What-if buttons for a chosen
+line, using the panel's minutes, and benchmarks draw power failures of 2 to 15 minutes on a random line.
+
 ### What-if for closures
 
 Closures can be analysed before they are applied, like delays. `POST /api/analysis/section-closure-impact` and
@@ -610,8 +625,8 @@ Each scenario lists only what its kind needs:
 ```
 
 `kinds` narrows the draw, e.g. `?kinds=SECTION_CLOSURE,STATION_CLOSURE` to compare strategies on closures only;
-by default all five kinds are drawn (`DOOR_FAULT` holds a train at its platform for 30 s to 3 min; adding it
-changed which incidents a seed draws when no `kinds` are given). The same seed, kinds and starting state always give the same report, and
+by default all six kinds are drawn (`DOOR_FAULT` holds a train at its platform for 30 s to 3 min, `POWER_FAILURE`
+stops a whole line for 2 to 15 min; adding each changed which incidents a seed draws when no `kinds` are given). The same seed, kinds and starting state always give the same report, and
 the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5–60 minutes.
 
 `runTimeVariability` (0–0.25) makes every run of the benchmark, baselines included, vary its run times as
