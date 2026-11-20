@@ -117,12 +117,14 @@ public final class SimulationEngine {
     private HeadwayStrategy strategy;
     private RunTimeVariability variability = RunTimeVariability.NONE;
     private DwellVariability dwellVariability = DwellVariability.NONE;
+    private ReliefOverrun reliefOverrun = ReliefOverrun.NONE;
     private double simTime;
     private boolean recordArrivals;
     /** Integral of passengers on board over time, all trains (passenger-seconds). */
     private double rideSeconds;
     /** Stops trains have run through under a skip-stop strategy so far. */
     private int stopsSkipped;
+    private int reliefOverruns;
     /** Most recent short turns, oldest first, at most {@link #MAX_SHORT_TURN_LOG}. */
     private final Deque<ShortTurn> shortTurnLog = new ArrayDeque<>();
     /** Most recent skipped stops, oldest first, at most {@link #MAX_SKIPPED_STOP_LOG}. */
@@ -251,10 +253,12 @@ public final class SimulationEngine {
         this.strategy = other.strategy;
         this.variability = other.variability;
         this.dwellVariability = other.dwellVariability;
+        this.reliefOverrun = other.reliefOverrun;
         this.simTime = other.simTime;
         this.recordArrivals = other.recordArrivals;
         this.rideSeconds = other.rideSeconds;
         this.stopsSkipped = other.stopsSkipped;
+        this.reliefOverruns = other.reliefOverruns;
         this.shortTurnLog.addAll(other.shortTurnLog);
         this.skippedStopLog.addAll(other.skippedStopLog);
         this.trunkEnds.putAll(other.trunkEnds);
@@ -664,13 +668,26 @@ public final class SimulationEngine {
      * Dwell of a train calling at a platform where {@code passengersMoved} get off or on: set by the passengers
      * (between {@link #MIN_DWELL} and {@link #MAX_DWELL}), then drawn around that by the dwell variability, never
      * below the minimum. Each call draws the next number of the train's dwell stream. Where drivers swap the crew
-     * change adds its fixed time on top.
+     * change adds its planned time on top, plus the overrun drawn for this call when the relief is late (see
+     * {@link ReliefOverrun}).
      */
     private double dwell(TrainState t, double passengersMoved) {
         double byPassengers = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * passengersMoved));
-        double drawn = Math.max(MIN_DWELL, byPassengers * dwellVariability(t).factor(t.id, t.callsMade++));
+        long call = t.callsMade++;
+        double drawn = Math.max(MIN_DWELL, byPassengers * dwellVariability(t).factor(t.id, call));
         ServicePattern p = pattern(t);
-        return drawn + lines.get(t.lineId).crewChangeSecondsAt(p.stationAtStop(t.stop));
+        String stationId = p.stationAtStop(t.stop);
+        int crewChange = lines.get(t.lineId).crewChangeSecondsAt(stationId);
+        if (crewChange == 0) {
+            return drawn;
+        }
+        double overrun = reliefOverrun.extraSeconds(t.id, call);
+        if (overrun > 0) {
+            reliefOverruns++;
+            emit(SimEvent.Type.RELIEF_OVERRUN, t.id, "Relief driver late for train %s at %s, crew change %.0f s over"
+                    .formatted(t.id, network.station(stationId).name(), overrun));
+        }
+        return drawn + crewChange + overrun;
     }
 
     /**
@@ -2110,6 +2127,16 @@ public final class SimulationEngine {
      * {@link com.metromind.network.Line#dwellVariability() spread} keeps it, drawn from this seed.
      */
     public void setDwellVariability(DwellVariability variability) { this.dwellVariability = variability; }
+    public ReliefOverrun reliefOverrun() { return reliefOverrun; }
+
+    /**
+     * Lets crew changes started from now on overrun their planned time (see {@link ReliefOverrun}); copies made
+     * afterwards draw the same late reliefs.
+     */
+    public void setReliefOverrun(ReliefOverrun overrun) { this.reliefOverrun = overrun; }
+
+    /** Crew changes that overran their planned time since the engine started. */
+    public int reliefOverruns() { return reliefOverruns; }
     public MetroNetwork network() { return network; }
     public void setRecordArrivals(boolean record) { this.recordArrivals = record; }
     public List<TrainState> trains() { return List.copyOf(trains); }
