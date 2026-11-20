@@ -16,6 +16,8 @@ import java.util.Map;
  *
  * <p>Trains run on service patterns: one per line, or one per route of a branched line. Passengers follow the
  * route with the lowest expected travel time, where riding a segment costs its nominal run time plus one dwell,
+ * leaving a station where drivers swap first costs the crew-change dwell there (a passenger alighting at a relief
+ * point does not sit through it),
  * waiting on a platform costs half the combined headway of the trains a passenger will board there, and changing
  * lines additionally costs {@link #TRANSFER_WALK_SECONDS}, unless the two lines meet at a cross-platform
  * interchange where passengers just step across the island. On a platform of a branched line a passenger boards
@@ -47,6 +49,8 @@ final class RoutePlanner {
     private final boolean[][][] crossPlatform;
     /** Trains per second of each pattern passing any one of its stations in one direction. */
     private final double[] frequency;
+    /** crewChange[pattern][pos]: extra dwell before a train of the pattern leaves position pos (crew change). */
+    private final double[][] crewChange;
     /** position[pattern][station]: index of the station in the pattern's station list, or -1. */
     private final int[][] position;
     /** cost[d][pattern][pos]: seconds to reach destination d from a platform of pattern at position pos. */
@@ -82,12 +86,15 @@ final class RoutePlanner {
         patternLine = owner.stream().mapToInt(Integer::intValue).toArray();
         position = new int[patterns.size()][stationCount];
         frequency = new double[patterns.size()];
+        crewChange = new double[patterns.size()][];
         for (int pi = 0; pi < patterns.size(); pi++) {
             ServicePattern p = patterns.get(pi);
             Arrays.fill(position[pi], -1);
             for (int pos = 0; pos < p.stationIds().size(); pos++) {
                 position[pi][stationIndex.get(p.stationIds().get(pos))] = pos;
             }
+            Line line = lines.get(patternLine[pi]);
+            crewChange[pi] = p.stationIds().stream().mapToDouble(line::crewChangeSecondsAt).toArray();
             double loop = p.loopRunSeconds() + p.loopLength() * nominalDwell;
             frequency[pi] = p.trainCount() / loop;
         }
@@ -199,7 +206,10 @@ final class RoutePlanner {
         return crossPlatform[from][to][s] ? 0 : TRANSFER_WALK_SECONDS;
     }
 
-    /** Cost of riding pattern {@code pi} one segment from position {@code pos} in {@code dir}, then onwards to d. */
+    /**
+     * Cost of riding pattern {@code pi} one segment from position {@code pos} in {@code dir}, then onwards to d. A
+     * train leaving a crew-change station first sits there for the swap, so riding on from it costs that dwell.
+     */
     private double rideCost(int d, int pi, int pos, int dir, double dwell) {
         if (pos < 0) {
             return INF;
@@ -210,7 +220,7 @@ final class RoutePlanner {
             return INF;
         }
         double run = pattern.runSeconds().get(dir > 0 ? pos : next);
-        return run + dwell + cost[d][pi][next];
+        return crewChange[pi][pos] + run + dwell + cost[d][pi][next];
     }
 
     /** Cheapest ride to d on any pattern of line {@code li} leaving station {@code s} in {@code dir}. */
