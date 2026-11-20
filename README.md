@@ -745,7 +745,9 @@ Click a station or train on the map (or focus it with Tab and press Enter) to op
 shows its lines, passengers waiting now and predicted in 15 minutes with the overload risk, the queue on each
 platform and its live departure board with lateness. A train shows where it is heading, where it is, what it is
 doing (running, dwelling, held, waiting at a signal), its lateness and load, and any incident and recent events
-concerning it.
+concerning it. Its *Incident* section injects a delay, breakdown or door fault on that train for the given seconds,
+or runs a delay or door-fault what-if on it without touching the live run: the report opens in the control panel
+with the train and seconds selected there, and the best strategy's extra wait goes on the map.
 
 On a branched line, a train bound for the branch terminal carries a label on the map ("to Bakmil") until it turns
 back; every train's tooltip names its destination (on a ring, the next station, as on the platform signs), and
