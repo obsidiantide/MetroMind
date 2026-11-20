@@ -129,6 +129,6 @@ Mark items `[x]` when merged.
 - [x] Train markers and departure boards name the branch a train is bound for (e.g. "to Bakmil")
 - [x] Highlight the stations of a train's service pattern on the map when its detail drawer is open
 - [x] Browser smoke test of the what-if flow: run a delay analysis from the control panel and see the heat layer
-- [ ] Pan and zoom the map (wheel, drag, keyboard) for networks larger than Baku
+- [x] Pan and zoom the map (wheel, drag, keyboard) for networks larger than Baku
 - [ ] Inject a delay, breakdown or door fault and run its what-if straight from a train's detail drawer
 - [ ] Fleet plan chart: planned vs running trains per line over the day, next to the KPI charts
