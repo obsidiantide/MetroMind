@@ -65,7 +65,7 @@ Mark items `[x]` when merged.
 - [x] Route planning aware of crew changes: a passenger's route cost includes the crew-change dwell at relief points
       (today routes assume the nominal 25 s dwell at every stop)
 - [x] Bundled Baku network: crew changes at the Red and Green line terminals
-- [ ] Late relief drivers: a seeded share of crew changes overrun their planned time, drawn like dwell noise so
+- [x] Late relief drivers: a seeded share of crew changes overrun their planned time, drawn like dwell noise so
       what-if copies share it (today a swap always takes exactly `crewChangeSeconds`)
 
 ### Incidents
