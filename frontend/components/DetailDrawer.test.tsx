@@ -115,6 +115,56 @@ describe("DetailDrawer", () => {
     expect(screen.getByText("RED-1 broke down")).toBeTruthy();
   });
 
+  it("injects an incident on the drawer's train", async () => {
+    const breakdown = vi.spyOn(api, "breakdown").mockResolvedValue(undefined);
+    render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={network}
+                         snapshot={snapshot({ trains: [trainView("RED-1")] })} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Incident seconds"), { target: { value: "180" } });
+    fireEvent.click(screen.getByRole("button", { name: "Breakdown" }));
+
+    expect(await screen.findByText("Breakdown injected for 180 s.")).toBeTruthy();
+    expect(breakdown).toHaveBeenCalledWith("RED-1", 180);
+    // Without a handler for what-ifs the drawer offers none.
+    expect(screen.queryByRole("button", { name: "What-if delay" })).toBeNull();
+  });
+
+  it("shows why an incident could not be injected", async () => {
+    vi.spyOn(api, "doorFault").mockRejectedValue(new Error("409 train is in the depot"));
+    render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={network}
+                         snapshot={snapshot({ trains: [trainView("RED-1")] })} onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Door fault" }));
+
+    expect(await screen.findByText(/train is in the depot/)).toBeTruthy();
+  });
+
+  it("hands a what-if on the drawer's train to the dashboard without injecting anything", () => {
+    const onWhatIf = vi.fn();
+    const delay = vi.spyOn(api, "delay");
+    render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={network}
+                         snapshot={snapshot({ trains: [trainView("RED-1")] })} onClose={() => {}} onWhatIf={onWhatIf} />);
+
+    fireEvent.change(screen.getByLabelText("Incident seconds"), { target: { value: "300" } });
+    fireEvent.click(screen.getByRole("button", { name: "What-if delay" }));
+    fireEvent.click(screen.getByRole("button", { name: "What-if door fault" }));
+
+    expect(onWhatIf).toHaveBeenNthCalledWith(1, "DELAY", "RED-1", 300);
+    expect(onWhatIf).toHaveBeenNthCalledWith(2, "DOOR_FAULT", "RED-1", 300);
+    expect(delay).not.toHaveBeenCalled();
+  });
+
+  it("refuses incident lengths the backend would reject", () => {
+    render(<DetailDrawer selection={{ kind: "train", id: "RED-1" }} network={network}
+                         snapshot={snapshot({ trains: [trainView("RED-1")] })} onClose={() => {}} onWhatIf={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText("Incident seconds"), { target: { value: "0" } });
+
+    for (const name of ["Delay", "Breakdown", "Door fault", "What-if delay", "What-if door fault"]) {
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
   it("explains a train that is not in service", () => {
     render(<DetailDrawer selection={{ kind: "train", id: "RED-9" }} network={network} snapshot={snapshot()}
                          onClose={() => {}} />);

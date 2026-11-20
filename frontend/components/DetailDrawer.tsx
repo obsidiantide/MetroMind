@@ -16,9 +16,16 @@ const PHASE_LABEL: Record<TrainPhase, string> = {
   RUNNING: "Running",
 };
 
-/** Side drawer with the live details of the station or train picked on the map. Escape closes it. */
-export function DetailDrawer({ selection, network, snapshot, onClose }: {
+/** What-if analyses a train's drawer can ask for; the dashboard runs them in its control panel. */
+export type TrainWhatIf = (kind: "DELAY" | "DOOR_FAULT", trainId: string, seconds: number) => void;
+
+/**
+ * Side drawer with the live details of the station or train picked on the map. Escape closes it. A train's drawer
+ * can also inject an incident on that train, or hand a what-if on it to `onWhatIf` when one is given.
+ */
+export function DetailDrawer({ selection, network, snapshot, onClose, onWhatIf }: {
   selection: Selection; network: MetroNetwork; snapshot: Snapshot | null; onClose: () => void;
+  onWhatIf?: TrainWhatIf;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -32,7 +39,10 @@ export function DetailDrawer({ selection, network, snapshot, onClose }: {
       {selection.kind === "station" && (
         <StationDetail key={selection.id} stationId={selection.id} network={network} snapshot={snapshot} />
       )}
-      {selection.kind === "train" && <TrainDetail trainId={selection.id} network={network} snapshot={snapshot} />}
+      {selection.kind === "train" && (
+        <TrainDetail key={selection.id} trainId={selection.id} network={network} snapshot={snapshot}
+                     onWhatIf={onWhatIf} />
+      )}
     </aside>
   );
 }
@@ -130,8 +140,8 @@ function StationDetail({ stationId, network, snapshot }: {
   );
 }
 
-function TrainDetail({ trainId, network, snapshot }: {
-  trainId: string; network: MetroNetwork; snapshot: Snapshot | null;
+function TrainDetail({ trainId, network, snapshot, onWhatIf }: {
+  trainId: string; network: MetroNetwork; snapshot: Snapshot | null; onWhatIf?: TrainWhatIf;
 }) {
   const train = snapshot?.trains.find((t) => t.id === trainId);
   if (!train) {
@@ -177,6 +187,7 @@ function TrainDetail({ trainId, network, snapshot }: {
           </div>
         </dd>
       </dl>
+      <TrainIncident trainId={train.id} onWhatIf={onWhatIf} />
       {incidents.length > 0 && (
         <>
           <h2>Incidents</h2>
@@ -193,6 +204,54 @@ function TrainDetail({ trainId, network, snapshot }: {
           </div>
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * Incidents on the drawer's train: inject a delay, breakdown or door fault now, or compare the strategies on a delay
+ * or door fault without injecting it.
+ */
+function TrainIncident({ trainId, onWhatIf }: { trainId: string; onWhatIf?: TrainWhatIf }) {
+  const [seconds, setSeconds] = useState(240);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; bad: boolean } | null>(null);
+  const valid = Number.isInteger(seconds) && seconds >= 1 && seconds <= 3600;
+
+  const inject = async (what: string, fn: (id: string, s: number) => Promise<void>) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await fn(trainId, seconds);
+      setNote({ text: `${what} injected for ${seconds} s.`, bad: false });
+    } catch (e) {
+      setNote({ text: String(e), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <h2>Incident</h2>
+      <div className="row">
+        <input type="number" min={1} max={3600} value={seconds} onChange={(e) => setSeconds(+e.target.value)}
+               aria-label="Incident seconds" style={{ width: 80 }} /> s
+        <button disabled={busy || !valid} onClick={() => inject("Delay", api.delay)}>Delay</button>
+        <button disabled={busy || !valid} onClick={() => inject("Breakdown", api.breakdown)}>Breakdown</button>
+        <button disabled={busy || !valid} onClick={() => inject("Door fault", api.doorFault)}>Door fault</button>
+      </div>
+      {onWhatIf && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <button disabled={!valid} onClick={() => onWhatIf("DELAY", trainId, seconds)}>What-if delay</button>
+          <button disabled={!valid} onClick={() => onWhatIf("DOOR_FAULT", trainId, seconds)}>What-if door fault</button>
+        </div>
+      )}
+      {note && <p className={note.bad ? undefined : "muted"} style={note.bad ? { color: "var(--bad)" } : undefined}>
+        {note.text}
+      </p>}
+      {onWhatIf && <p className="muted">A what-if compares the strategies without touching the live run; its report
+        opens in the control panel and its extra wait goes on the map.</p>}
     </>
   );
 }
