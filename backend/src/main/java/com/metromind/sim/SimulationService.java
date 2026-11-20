@@ -71,6 +71,7 @@ public class SimulationService {
         this.engine = new SimulationEngine(network, props.startSeconds(), HeadwayStrategy.byName(props.strategy()));
         this.engine.setRunTimeVariability(props.variability());
         this.engine.setDwellVariability(props.dwells());
+        this.engine.setReliefOverrun(props.reliefOverrun());
         this.last = engine.snapshot();
         this.meters = meters;
         this.tickTimer = Timer.builder("metromind.sim.tick")
@@ -207,6 +208,13 @@ public class SimulationService {
     public DwellVariability dwellVariability() {
         synchronized (engine) {
             return engine.dwellVariability();
+        }
+    }
+
+    /** Late reliefs of the live engine, which analyses and benchmarks start from. */
+    public ReliefOverrun reliefOverrun() {
+        synchronized (engine) {
+            return engine.reliefOverrun();
         }
     }
 
