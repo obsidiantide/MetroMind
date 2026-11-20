@@ -338,6 +338,8 @@
     "depotAccessSeconds": 300,
     "runTimeVariability": 0.08,
     "dwellVariability": 0.12,
+    "crewChangeStationIds": ["icherisheher", "aslanov", "bakmil"],
+    "crewChangeSeconds": 60,
     "fleetPlan": [
      {"from": "06:00", "trains": 6},
      {"from": "07:00", "trains": 10},
@@ -391,6 +393,8 @@
     "depotAccessSeconds": 120,
     "runTimeVariability": 0.06,
     "dwellVariability": 0.08,
+    "crewChangeStationIds": ["darnagul", "khatai"],
+    "crewChangeSeconds": 45,
     "fleetPlan": [
      {"from": "06:00", "trains": 4},
      {"from": "07:00", "trains": 7},
