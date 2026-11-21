@@ -874,7 +874,8 @@ than `metromind.sim.tick-millis` means the simulation is falling behind its conf
 ```
 backend/   Spring Boot service (sim engine, analysis, adapters)
 frontend/  Next.js dashboard
-docs/      Roadmap and design notes
+docs/      Roadmap and dashboard screenshot
+docker-compose.yml  local stack: PostGIS, Redis, Kafka, backend, frontend
 ```
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for what is planned next.
