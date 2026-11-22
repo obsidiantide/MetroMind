@@ -69,7 +69,7 @@ Mark items `[x]` when merged.
       what-if copies share it (today a swap always takes exactly `crewChangeSeconds`)
 - [x] Per-line late reliefs: a line's own share and mean overrun of late relief drivers, overriding the engine-wide
       setting like run-time and dwell spreads
-- [ ] Late reliefs in the benchmark API: `reliefOverrunShare` and `reliefOverrunSeconds` query parameters, like the
+- [x] Late reliefs in the benchmark API: `reliefOverrunShare` and `reliefOverrunSeconds` query parameters, like the
       run-time and dwell spreads, reported in the benchmark result
 
 ### Incidents
