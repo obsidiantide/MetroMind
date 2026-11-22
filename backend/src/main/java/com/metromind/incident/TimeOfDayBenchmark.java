@@ -64,6 +64,21 @@ public final class TimeOfDayBenchmark {
                                Set<BenchmarkReport.IncidentKind> kinds, BenchmarkReport.RankingMetric metric,
                                double runTimeVariability, double dwellVariability,
                                StrategyBenchmark.ProgressListener progress) {
+        return run(network, startClocks, scenarioCount, seed, horizonSeconds, strategies, kinds, metric,
+                runTimeVariability, dwellVariability, reliefs, progress);
+    }
+
+    /**
+     * As {@link #run(MetroNetwork, List, int, long, double, List, Set, BenchmarkReport.RankingMetric, double,
+     * double, StrategyBenchmark.ProgressListener)}, with late reliefs as often and as long as {@code reliefOverrun}
+     * says instead of this benchmark's own setting (its seed is ignored: draws come from the benchmark seed).
+     */
+    public TimeOfDayReport run(MetroNetwork network, List<String> startClocks, int scenarioCount, long seed,
+                               double horizonSeconds, List<HeadwayStrategy> strategies,
+                               Set<BenchmarkReport.IncidentKind> kinds, BenchmarkReport.RankingMetric metric,
+                               double runTimeVariability, double dwellVariability, ReliefOverrun reliefOverrun,
+                               StrategyBenchmark.ProgressListener progress) {
+        ReliefOverrun seededReliefs = reliefOverrun.withSeed(seed);
         checkStartClocks(startClocks); // reject a bad start time before running any period
         int perPeriod = StrategyBenchmark.totalRuns(scenarioCount, strategies.size());
         int total = startClocks.size() * perPeriod;
@@ -74,10 +89,10 @@ public final class TimeOfDayBenchmark {
                     HeadwayStrategy.NO_CONTROL);
             engine.setRunTimeVariability(new RunTimeVariability(runTimeVariability, seed));
             engine.setDwellVariability(new DwellVariability(dwellVariability, seed));
-            engine.setReliefOverrun(reliefs.withSeed(seed));
+            engine.setReliefOverrun(seededReliefs);
             engine.run(WARM_UP_SECONDS, 1);
             periods.add(new TimeOfDayReport.Period(clock, benchmark.run(engine, scenarioCount, seed, horizonSeconds,
-                    strategies, kinds, metric, runTimeVariability, dwellVariability,
+                    strategies, kinds, metric, runTimeVariability, dwellVariability, seededReliefs,
                     (done, runs) -> progress.onProgress(before + done, total))));
         }
         return new TimeOfDayReport(seed, horizonSeconds, metric, periods, rank(strategies, periods, metric));

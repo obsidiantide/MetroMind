@@ -68,6 +68,20 @@ class TimeOfDayBenchmarkTest {
     }
 
     @Test
+    void requestedLateReliefsOverrideTheBenchmarksOwnSetting() {
+        MetroNetwork relieved = TestNetworks.withCrewChanges(planned(), List.of("A", "F"), 60);
+        TimeOfDayReport configured = new TimeOfDayBenchmark(new ReliefOverrun(0.5, 120, 1)).run(relieved,
+                List.of("08:00"), 2, 3, 1200, TWO, DELAYS, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0);
+        TimeOfDayReport requested = new TimeOfDayBenchmark().run(relieved, List.of("08:00"), 2, 3, 1200, TWO,
+                DELAYS, BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, new ReliefOverrun(0.5, 120, 7),
+                StrategyBenchmark.ProgressListener.NONE);
+
+        assertThat(requested).isEqualTo(configured);
+        assertThat(requested.periods().get(0).report().reliefOverrunShare()).isEqualTo(0.5);
+        assertThat(requested.periods().get(0).report().reliefOverrunSeconds()).isEqualTo(120);
+    }
+
+    @Test
     void reportsProgressOverAllPeriods() {
         List<int[]> seen = new ArrayList<>();
         new TimeOfDayBenchmark().run(planned(), List.of("08:00", "13:00"), 2, 3, 600, TWO, DELAYS,

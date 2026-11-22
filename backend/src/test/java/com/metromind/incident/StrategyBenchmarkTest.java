@@ -195,6 +195,38 @@ class StrategyBenchmarkTest {
     }
 
     @Test
+    void aBenchmarkMayRequestItsOwnLateReliefsAndReportsThem() {
+        List<HeadwayStrategy> two = List.of(HeadwayStrategy.NO_CONTROL, HeadwayStrategy.BALANCED);
+        Set<BenchmarkReport.IncidentKind> delays = EnumSet.of(BenchmarkReport.IncidentKind.DELAY);
+        StrategyBenchmark benchmark = new StrategyBenchmark();
+        java.util.function.Supplier<SimulationEngine> onTimeLive = () -> {
+            SimulationEngine live = new SimulationEngine(
+                    TestNetworks.withCrewChanges(TestNetworks.singleLine(), List.of("A", "C", "F"), 60),
+                    8 * 3600, HeadwayStrategy.NO_CONTROL);
+            live.run(300, 1);
+            return live;
+        };
+
+        BenchmarkReport inherited = benchmark.run(onTimeLive.get(), 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, StrategyBenchmark.ProgressListener.NONE);
+        BenchmarkReport requested = benchmark.run(onTimeLive.get(), 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, new ReliefOverrun(0.5, 120, 42),
+                StrategyBenchmark.ProgressListener.NONE);
+
+        assertThat(inherited.reliefOverrunShare()).isZero();
+        assertThat(requested.reliefOverrunShare()).isEqualTo(0.5);
+        assertThat(requested.reliefOverrunSeconds()).isEqualTo(120);
+        assertThat(requested.scenarios()).as("same incidents").isEqualTo(inherited.scenarios());
+        assertThat(requested.rankings()).extracting(BenchmarkReport.StrategyRanking::meanWaitSeconds)
+                .isNotEqualTo(inherited.rankings().stream().map(BenchmarkReport.StrategyRanking::meanWaitSeconds)
+                        .toList());
+        // The requested setting's own seed is ignored: the benchmark seed draws the late reliefs.
+        assertThat(benchmark.run(onTimeLive.get(), 3, 7, 1800, two, delays,
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0, 0, new ReliefOverrun(0.5, 120, 1),
+                StrategyBenchmark.ProgressListener.NONE)).isEqualTo(requested);
+    }
+
+    @Test
     void benchmarksInheritTheLiveEnginesDwellSpread() {
         SimulationEngine live = live();
         live.setDwellVariability(new DwellVariability(0.1, 3));
