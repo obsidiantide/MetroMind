@@ -67,7 +67,8 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
      * One incident injected at the start of the horizon. Only the fields its kind needs are set (the others are
      * null and left out of the JSON): {@code trainId} for a delay, breakdown or door fault; {@code lineId},
      * {@code fromStationId}, {@code toStationId} and {@code response} for a track-section closure; {@code stationId}
-     * for a station closure; {@code lineId} for a traction power failure. {@code seconds} is how long it lasts.
+     * for a station closure; {@code lineId} for a traction power failure, with {@code fromStationId} and
+     * {@code toStationId} when only that feeder section loses power. {@code seconds} is how long it lasts.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Scenario(IncidentKind kind, String trainId, String lineId, String fromStationId,
@@ -91,6 +92,13 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
             return new Scenario(IncidentKind.POWER_FAILURE, null, lineId, null, null, null, null, seconds);
         }
 
+        /** Power lost only on the feeder section of line {@code lineId} between two of its stations. */
+        public static Scenario sectionalPowerFailure(String lineId, String fromStationId, String toStationId,
+                                                     double seconds) {
+            return new Scenario(IncidentKind.POWER_FAILURE, null, lineId, fromStationId, toStationId, null, null,
+                    seconds);
+        }
+
         /** Injects this incident into {@code engine} at its current time. */
         public void applyTo(SimulationEngine engine) {
             switch (kind) {
@@ -99,7 +107,13 @@ public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric me
                 case SECTION_CLOSURE -> engine.closeSection(lineId, fromStationId, toStationId, seconds, response);
                 case STATION_CLOSURE -> engine.closeStation(stationId, seconds);
                 case DOOR_FAULT -> engine.injectDoorFault(trainId, seconds);
-                case POWER_FAILURE -> engine.cutPower(lineId, seconds);
+                case POWER_FAILURE -> {
+                    if (fromStationId != null) {
+                        engine.cutPower(lineId, fromStationId, toStationId, seconds);
+                    } else {
+                        engine.cutPower(lineId, seconds);
+                    }
+                }
             }
         }
     }

@@ -272,6 +272,24 @@ class IncidentApiTest {
     }
 
     @Test
+    void analysesASectionalPowerFailureWithoutCuttingLivePower() throws Exception {
+        mvc.perform(post("/api/analysis/power-failure-impact").param("horizonSeconds", "300")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "BLUE", "fromStationId": "B4", "toStationId": "B6", "seconds": 240}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incident.kind").value("POWER_FAILURE"))
+                .andExpect(jsonPath("$.incident.lineId").value("BLUE"))
+                .andExpect(jsonPath("$.incident.fromStationId").value("B4"))
+                .andExpect(jsonPath("$.incident.toStationId").value("B6"))
+                .andExpect(jsonPath("$.outcomes.length()").value(HeadwayStrategy.all().size()));
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.kind == 'POWER_FAILURE' && @.subjectId == 'BLUE')]")
+                        .isEmpty());
+    }
+
+    @Test
     void analysesAPowerFailureWithoutCuttingLivePower() throws Exception {
         mvc.perform(post("/api/analysis/power-failure-impact").param("horizonSeconds", "300")
                         .contentType(MediaType.APPLICATION_JSON)

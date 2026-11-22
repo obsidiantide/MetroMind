@@ -188,6 +188,12 @@ public class SimulationController {
             }
             return fromStationId != null;
         }
+
+        BenchmarkReport.Scenario scenario() {
+            return sectional()
+                    ? BenchmarkReport.Scenario.sectionalPowerFailure(lineId, fromStationId, toStationId, seconds)
+                    : BenchmarkReport.Scenario.powerFailure(lineId, seconds);
+        }
     }
 
     /**
@@ -255,8 +261,8 @@ public class SimulationController {
     }
 
     /**
-     * What-if: impact of a traction power failure on a line, compared across all headway strategies. Does not touch
-     * live state.
+     * What-if: impact of a traction power failure on a line, or on one feeder section of it, compared across all
+     * headway strategies. Does not touch live state.
      */
     @Tag(name = "Analysis")
     @Operation(summary = "What-if: impact of a traction power failure under every strategy")
@@ -264,8 +270,7 @@ public class SimulationController {
     public IncidentImpactReport powerFailureImpact(@Valid @RequestBody PowerFailureRequest req,
                                                    @RequestParam(defaultValue = "1800") @Min(60) @Max(7200)
                                                    double horizonSeconds) {
-        return simulation.analyzeIncident(BenchmarkReport.Scenario.powerFailure(req.lineId(), req.seconds()),
-                horizonSeconds);
+        return simulation.analyzeIncident(req.scenario(), horizonSeconds);
     }
 
     /**
