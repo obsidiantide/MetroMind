@@ -1,5 +1,6 @@
 import type {
-  BenchmarkJob, BenchmarkRequest, ClosureResponse, DayBenchmarkJob, DelayImpactReport, Departure, IncidentImpactReport,
+  BenchmarkJob, BenchmarkRequest, ClosureResponse, DayBenchmarkJob, DelayImpactReport, Departure, FeederSection,
+  IncidentImpactReport,
   MetroNetwork,
   MinuteKpi,
 } from "./types";
@@ -54,9 +55,14 @@ export const api = {
     }),
   closeStation: (stationId: string, seconds: number) =>
     call<void>("/api/incidents/station-closure", { method: "POST", body: JSON.stringify({ stationId, seconds }) }),
-  /** Cuts traction power to a line: all its trains stop where they are for `seconds`. */
-  cutPower: (lineId: string, seconds: number) =>
-    call<void>("/api/incidents/power-failure", { method: "POST", body: JSON.stringify({ lineId, seconds }) }),
+  /**
+   * Cuts traction power to a line for `seconds`: all its trains stop where they are, or with a `stretch` only those
+   * on the feeder section between its two stations.
+   */
+  cutPower: (lineId: string, seconds: number, stretch?: FeederSection) =>
+    call<void>("/api/incidents/power-failure", {
+      method: "POST", body: JSON.stringify({ lineId, seconds, ...stretch }),
+    }),
   analyze: (trainId: string, seconds: number) =>
     call<DelayImpactReport>("/api/analysis/delay-impact", { method: "POST", body: JSON.stringify({ trainId, seconds }) }),
   analyzeSectionClosure: (lineId: string, fromStationId: string, toStationId: string, seconds: number,
@@ -70,10 +76,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ trainId, seconds }),
     }),
-  analyzePowerFailure: (lineId: string, seconds: number) =>
+  analyzePowerFailure: (lineId: string, seconds: number, stretch?: FeederSection) =>
     call<IncidentImpactReport>("/api/analysis/power-failure-impact", {
       method: "POST",
-      body: JSON.stringify({ lineId, seconds }),
+      body: JSON.stringify({ lineId, seconds, ...stretch }),
     }),
   analyzeStationClosure: (stationId: string, seconds: number) =>
     call<IncidentImpactReport>("/api/analysis/station-closure-impact", {

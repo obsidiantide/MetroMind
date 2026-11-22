@@ -38,7 +38,10 @@ function describe(s: IncidentScenario, name: Names): string {
         + (s.response === "TURN_BACK" ? "trains turn back" : "trains wait");
     case "STATION_CLOSURE": return `${name(s.stationId)} closed ${length}`;
     case "DOOR_FAULT": return `${s.trainId} held by a door fault ${length}`;
-    case "POWER_FAILURE": return `${name(s.lineId)} without traction power ${length}`;
+    case "POWER_FAILURE":
+      return s.fromStationId
+        ? `${name(s.lineId)} ${name(s.fromStationId)} – ${name(s.toStationId)} without traction power ${length}`
+        : `${name(s.lineId)} without traction power ${length}`;
   }
 }
 

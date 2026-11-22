@@ -122,6 +122,8 @@ export interface IncidentScenario {
   kind: ScenarioKind; seconds: number; trainId?: string; lineId?: string; fromStationId?: string;
   toStationId?: string; response?: ClosureResponse; stationId?: string;
 }
+/** A feeder section of a line: the stretch between two of its stations that loses power in a sectional failure. */
+export interface FeederSection { fromStationId: string; toStationId: string; }
 export interface IncidentImpactReport {
   incident: IncidentScenario; horizonSeconds: number; outcomes: StrategyOutcome[]; bestStrategy: string;
 }

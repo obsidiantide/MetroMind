@@ -55,3 +55,19 @@ describe("day benchmark jobs", () => {
     await expect(api.cancelDayBenchmarkJob("gone")).rejects.toThrow(/404/);
   });
 });
+
+describe("power failures", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("cuts a whole line, or only a feeder section when a stretch is given", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(null, { status: 202 }));
+
+    await api.cutPower("RED", 300);
+    await api.cutPower("RED", 300, { fromStationId: "R5", toStationId: "R7" });
+
+    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/incidents/power-failure`);
+    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string)).toEqual({ lineId: "RED", seconds: 300 });
+    expect(JSON.parse(fetch.mock.calls[1][1]?.body as string))
+      .toEqual({ lineId: "RED", seconds: 300, fromStationId: "R5", toStationId: "R7" });
+  });
+});
