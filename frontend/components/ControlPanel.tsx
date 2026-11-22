@@ -4,7 +4,7 @@ import type { WaitHeat } from "@/components/MetroMap";
 import { api } from "@/lib/api";
 import { trunkCv } from "@/lib/format";
 import { lineSections } from "@/lib/lines";
-import type { ClosureResponse, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
+import type { ClosureResponse, FeederSection, MetroNetwork, Snapshot, StrategyOutcome } from "@/lib/types";
 
 /** A what-if result ready to show: what was simulated and how each strategy coped. */
 interface WhatIf {
@@ -74,6 +74,9 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
   const [closureResponse, setClosureResponse] = useState<ClosureResponse>("TURN_BACK");
   const [closedStation, setClosedStation] = useState("");
   const [darkLine, setDarkLine] = useState("");
+  // Ends of a dead feeder section on the power line; empty for a whole-line failure.
+  const [deadFrom, setDeadFrom] = useState("");
+  const [deadTo, setDeadTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -132,10 +135,24 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
   };
 
   const powerLine = () => darkLine || network!.lines[0].id;
+  const powerStations = () => network!.lines.find((l) => l.id === powerLine())?.stationIds ?? [];
+  /** The dead feeder section chosen, or undefined for the whole line. */
+  const stretch = (): FeederSection | undefined =>
+    deadFrom && deadTo && deadFrom !== deadTo ? { fromStationId: deadFrom, toStationId: deadTo } : undefined;
+  const chooseDarkLine = (lineId: string) => {
+    setDarkLine(lineId);
+    setDeadFrom("");
+    setDeadTo("");
+  };
   const analyzePowerFailure = async () => {
     const lineId = powerLine();
-    const r = await api.analyzePowerFailure(lineId, closureMinutes * 60);
-    setReport({ title: `Impact of a ${closureMinutes} min power failure on ${lineName.get(lineId) ?? lineId}`, ...r });
+    const dead = stretch();
+    const r = await api.analyzePowerFailure(lineId, closureMinutes * 60, dead);
+    const where = dead
+      ? `${stationName.get(dead.fromStationId) ?? dead.fromStationId} – `
+        + `${stationName.get(dead.toStationId) ?? dead.toStationId} on ${lineName.get(lineId) ?? lineId}`
+      : lineName.get(lineId) ?? lineId;
+    setReport({ title: `Impact of a ${closureMinutes} min power failure on ${where}`, ...r });
   };
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -225,17 +242,32 @@ export function ControlPanel({ snapshot, network, onHeat = () => {}, whatIf = nu
             <button disabled={busy} onClick={() => run(analyzeStationClosure)}>What-if</button>
           </div>
           <div className="row" style={{ marginTop: 8 }}>
-            <select value={powerLine()} onChange={(e) => setDarkLine(e.target.value)} aria-label="Line">
+            <select value={powerLine()} onChange={(e) => chooseDarkLine(e.target.value)} aria-label="Line">
               {network!.lines.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
-            <button disabled={busy} onClick={() => run(() => api.cutPower(powerLine(), closureMinutes * 60))}>
+            <select value={deadFrom} onChange={(e) => { setDeadFrom(e.target.value); setDeadTo(""); }}
+                    aria-label="Dead from">
+              <option value="">Whole line</option>
+              {powerStations().map((id) => <option key={id} value={id}>{stationName.get(id) ?? id}</option>)}
+            </select>
+            {deadFrom && (
+              <select value={deadTo} onChange={(e) => setDeadTo(e.target.value)} aria-label="Dead to">
+                <option value="">to…</option>
+                {powerStations().filter((id) => id !== deadFrom)
+                  .map((id) => <option key={id} value={id}>{stationName.get(id) ?? id}</option>)}
+              </select>
+            )}
+            <button disabled={busy || (deadFrom !== "" && !stretch())}
+                    onClick={() => run(() => api.cutPower(powerLine(), closureMinutes * 60, stretch()))}>
               Cut power
             </button>
-            <button disabled={busy} onClick={() => run(analyzePowerFailure)}>What-if</button>
+            <button disabled={busy || (deadFrom !== "" && !stretch())}
+                    onClick={() => run(analyzePowerFailure)}>What-if</button>
           </div>
           <p className="muted">
             Track: trains wait at the signal or turn back at the last open station. Station: trains run through and
-            passengers use the neighbouring stations. Power: every train of the line stops where it is.
+            passengers use the neighbouring stations. Power: every train of the line stops where it is, or with a feeder
+            section only the trains between its two stations; the rest run up to the dead stretch.
           </p>
         </section>
       )}
