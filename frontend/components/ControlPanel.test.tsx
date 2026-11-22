@@ -111,7 +111,33 @@ describe("ControlPanel power failures", () => {
     fireEvent.change(screen.getByLabelText("Minutes"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Cut power" }));
 
-    await waitFor(() => expect(cutPower).toHaveBeenCalledWith("BLUE", 300));
+    await waitFor(() => expect(cutPower).toHaveBeenCalledWith("BLUE", 300, undefined));
+  });
+
+  it("cuts power to a feeder section between two stations of the line", async () => {
+    const cutPower = vi.spyOn(api, "cutPower").mockResolvedValue(undefined);
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.change(screen.getByLabelText("Dead from"), { target: { value: "C" } });
+    // Only one end chosen: neither a whole-line nor a sectional failure yet.
+    expect(screen.getByRole("button", { name: "Cut power" })).toHaveProperty("disabled", true);
+    fireEvent.change(screen.getByLabelText("Dead to"), { target: { value: "B" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cut power" }));
+
+    await waitFor(() => expect(cutPower).toHaveBeenCalledWith("RED", 600, { fromStationId: "C", toStationId: "B" }));
+  });
+
+  it("forgets the feeder section when another line is chosen", async () => {
+    const cutPower = vi.spyOn(api, "cutPower").mockResolvedValue(undefined);
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.change(screen.getByLabelText("Dead from"), { target: { value: "C" } });
+    fireEvent.change(screen.getByLabelText("Dead to"), { target: { value: "B" } });
+    fireEvent.change(screen.getByLabelText("Line"), { target: { value: "BLUE" } });
+    expect(screen.queryByLabelText("Dead to")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cut power" }));
+
+    await waitFor(() => expect(cutPower).toHaveBeenCalledWith("BLUE", 600, undefined));
   });
 
   it("compares strategies on a power failure without cutting power", async () => {
@@ -128,7 +154,24 @@ describe("ControlPanel power failures", () => {
     fireEvent.click(whatIfs[whatIfs.length - 1]);
 
     expect(await screen.findByText("Impact of a 10 min power failure on Red Line")).toBeTruthy();
-    expect(analyze).toHaveBeenCalledWith("RED", 600);
+    expect(analyze).toHaveBeenCalledWith("RED", 600, undefined);
     expect(cutPower).not.toHaveBeenCalled();
+  });
+
+  it("names the feeder section in a sectional power failure's what-if", async () => {
+    const report: IncidentImpactReport = {
+      incident: { kind: "POWER_FAILURE", lineId: "RED", fromStationId: "A", toStationId: "C", seconds: 600 },
+      horizonSeconds: 1800, outcomes: [outcome("BALANCED"), outcome("NO_CONTROL")], bestStrategy: "BALANCED",
+    };
+    const analyze = vi.spyOn(api, "analyzePowerFailure").mockResolvedValue(report);
+    render(<ControlPanel snapshot={live} network={network} />);
+
+    fireEvent.change(screen.getByLabelText("Dead from"), { target: { value: "A" } });
+    fireEvent.change(screen.getByLabelText("Dead to"), { target: { value: "C" } });
+    const whatIfs = screen.getAllByRole("button", { name: "What-if" });
+    fireEvent.click(whatIfs[whatIfs.length - 1]);
+
+    expect(await screen.findByText("Impact of a 10 min power failure on Alpha – Central on Red Line")).toBeTruthy();
+    expect(analyze).toHaveBeenCalledWith("RED", 600, { fromStationId: "A", toStationId: "C" });
   });
 });
