@@ -11,6 +11,7 @@ import com.metromind.network.MetroNetwork;
 import com.metromind.sim.ClosureResponse;
 import com.metromind.sim.Departure;
 import com.metromind.sim.HeadwayStrategy;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.SimulationService;
 import com.metromind.sim.SimulationSnapshot;
 import jakarta.validation.Valid;
@@ -253,7 +254,9 @@ public class SimulationController {
      * track-section closures, station closures and traction power failures are all used. {@code metric} picks the ranking: {@code WAIT_PER_BOARDING}
      * (default) or {@code TRAVEL_TIME}. {@code runTimeVariability} (0 to 0.25) sets how much run times between
      * stations vary around nominal in every run, drawn from {@code seed}; by default as much as on the live engine.
-     * {@code dwellVariability} (0 to 0.25) does the same for dwells at platforms. Does not touch live state.
+     * {@code dwellVariability} (0 to 0.25) does the same for dwells at platforms. {@code reliefOverrunShare} (0 to 1)
+     * and {@code reliefOverrunSeconds} (0 to 600) set how often crew changes overrun and by how long on average,
+     * each defaulting to the live engine's; lines with their own late reliefs keep them. Does not touch live state.
      */
     @Tag(name = "Analysis")
     @Operation(summary = "Rank strategies over random incident scenarios")
@@ -267,16 +270,22 @@ public class SimulationController {
                                      @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
                                      Double runTimeVariability,
                                      @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25")
-                                     Double dwellVariability) {
+                                     Double dwellVariability,
+                                     @RequestParam(required = false) @DecimalMin("0") @DecimalMax("1")
+                                     Double reliefOverrunShare,
+                                     @RequestParam(required = false) @DecimalMin("0") @DecimalMax("600")
+                                     Double reliefOverrunSeconds) {
         return simulation.benchmarkStrategies(scenarios, seed, horizonSeconds, drawn(kinds), metric,
-                spread(runTimeVariability), dwellSpread(dwellVariability));
+                spread(runTimeVariability), dwellSpread(dwellVariability),
+                reliefs(reliefOverrunShare, reliefOverrunSeconds));
     }
 
     /**
      * Strategy benchmark across times of day: the benchmark of {@code POST /analysis/benchmark} run from each of
      * {@code startTimes} ({@code HH:mm}, comma-separated, 00:30 or later), every one from a fresh copy of the
-     * network warmed up for 30 simulated minutes to that time, then ranked over the whole day. Scenarios, run times
-     * and dwells all come from {@code seed}; the spreads default to the live engine's. Does not touch live state.
+     * network warmed up for 30 simulated minutes to that time, then ranked over the whole day. Scenarios, run times,
+     * dwells and late reliefs all come from {@code seed}; the spreads and late reliefs default to the live engine's.
+     * Does not touch live state.
      */
     @Tag(name = "Analysis")
     @Operation(summary = "Rank strategies over random incidents at several times of day")
@@ -289,9 +298,12 @@ public class SimulationController {
             @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
             @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
             @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
-            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("1") Double reliefOverrunShare,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("600") Double reliefOverrunSeconds) {
         return simulation.benchmarkTimesOfDay(startTimes, scenarios, seed, horizonSeconds, drawn(kinds), metric,
-                spread(runTimeVariability), dwellSpread(dwellVariability));
+                spread(runTimeVariability), dwellSpread(dwellVariability),
+                reliefs(reliefOverrunShare, reliefOverrunSeconds));
     }
 
     /**
@@ -312,9 +324,12 @@ public class SimulationController {
             @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
             @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
             @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
-            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("1") Double reliefOverrunShare,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("600") Double reliefOverrunSeconds) {
         BenchmarkJobs.Job<BenchmarkReport> job = simulation.submitBenchmark(scenarios, seed, horizonSeconds, drawn(kinds), metric,
-                spread(runTimeVariability), dwellSpread(dwellVariability));
+                spread(runTimeVariability), dwellSpread(dwellVariability),
+                reliefs(reliefOverrunShare, reliefOverrunSeconds));
         return ResponseEntity.accepted()
                 .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
                         .toUri())
@@ -373,9 +388,12 @@ public class SimulationController {
             @RequestParam(required = false) Set<BenchmarkReport.IncidentKind> kinds,
             @RequestParam(defaultValue = "WAIT_PER_BOARDING") BenchmarkReport.RankingMetric metric,
             @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double runTimeVariability,
-            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability) {
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("0.25") Double dwellVariability,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("1") Double reliefOverrunShare,
+            @RequestParam(required = false) @DecimalMin("0") @DecimalMax("600") Double reliefOverrunSeconds) {
         BenchmarkJobs.Job<TimeOfDayReport> job = simulation.submitDayBenchmark(startTimes, scenarios, seed,
-                horizonSeconds, drawn(kinds), metric, spread(runTimeVariability), dwellSpread(dwellVariability));
+                horizonSeconds, drawn(kinds), metric, spread(runTimeVariability), dwellSpread(dwellVariability),
+                reliefs(reliefOverrunShare, reliefOverrunSeconds));
         return ResponseEntity.accepted()
                 .location(ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(job.id())
                         .toUri())
@@ -427,6 +445,13 @@ public class SimulationController {
     /** The dwell spread a benchmark uses: the one requested, otherwise the live engine's. */
     private double dwellSpread(Double requested) {
         return requested != null ? requested : simulation.dwellVariability().sigma();
+    }
+
+    /**
+     * The late reliefs a benchmark draws: the live engine's share and mean, each replaced by the one requested.
+     */
+    private ReliefOverrun reliefs(Double share, Double meanSeconds) {
+        return simulation.reliefOverrun().overriddenBy(share, meanSeconds);
     }
 
     @ExceptionHandler(BenchmarkJobs.QueueFullException.class)

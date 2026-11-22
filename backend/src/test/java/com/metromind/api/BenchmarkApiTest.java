@@ -85,6 +85,30 @@ class BenchmarkApiTest {
     }
 
     @Test
+    void drawsLateReliefsWhenAskedAndReportsThem() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reliefOverrunShare").value(0.0));
+        mvc.perform(post("/api/analysis/benchmark").param("scenarios", "1").param("seed", "3")
+                        .param("horizonSeconds", "300").param("reliefOverrunShare", "0.4")
+                        .param("reliefOverrunSeconds", "120"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reliefOverrunShare").value(0.4))
+                .andExpect(jsonPath("$.reliefOverrunSeconds").value(120.0));
+    }
+
+    @Test
+    void lateReliefsOutsideTheSupportedRangeAreABadRequest() throws Exception {
+        mvc.perform(post("/api/analysis/benchmark").param("reliefOverrunShare", "1.5"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/analysis/benchmark/jobs").param("reliefOverrunSeconds", "-1"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/analysis/benchmark/day").param("reliefOverrunSeconds", "900"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void tooMuchDwellVariabilityIsABadRequest() throws Exception {
         mvc.perform(post("/api/analysis/benchmark").param("dwellVariability", "0.3"))
                 .andExpect(status().isBadRequest());
