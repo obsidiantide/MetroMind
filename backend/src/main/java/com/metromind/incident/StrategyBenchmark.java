@@ -48,6 +48,8 @@ public final class StrategyBenchmark {
     static final double MAX_CLOSURE_SECONDS = 1200;
     static final double MIN_POWER_FAILURE_SECONDS = 120;
     static final double MAX_POWER_FAILURE_SECONDS = 900;
+    /** Longest dead feeder section drawn, in sections between stations. */
+    static final int MAX_FEEDER_SECTIONS = 3;
     private static final double DT = 1.0;
     static final double RECOVERY_SAMPLE_SECONDS = 30;
 
@@ -238,7 +240,9 @@ public final class StrategyBenchmark {
     /**
      * Draws the scenarios: for each one a kind among {@code kinds} (in declaration order, so a seed always maps to
      * the same incidents), then its subject (a train of the live fleet, a pair of adjacent stations of a line, a
-     * station, or a line) and a duration in the kind's range. A closed section gets a random response.
+     * station, or a line) and a duration in the kind's range. A closed section gets a random response; half the
+     * power failures cut a whole line and half only a feeder section of one to {@value #MAX_FEEDER_SECTIONS}
+     * sections along it.
      */
     static List<BenchmarkReport.Scenario> drawScenarios(SimulationEngine live, int count, long seed,
                                                         Set<BenchmarkReport.IncidentKind> kinds) {
@@ -273,9 +277,20 @@ public final class StrategyBenchmark {
                 case DOOR_FAULT -> BenchmarkReport.Scenario.train(kind,
                         trainIds.get(random.nextInt(trainIds.size())),
                         between(random, MIN_DOOR_FAULT_SECONDS, MAX_DOOR_FAULT_SECONDS));
-                case POWER_FAILURE -> BenchmarkReport.Scenario.powerFailure(
-                        lines.get(random.nextInt(lines.size())).id(),
-                        between(random, MIN_POWER_FAILURE_SECONDS, MAX_POWER_FAILURE_SECONDS));
+                case POWER_FAILURE -> {
+                    Line line = lines.get(random.nextInt(lines.size()));
+                    if (!random.nextBoolean()) {
+                        yield BenchmarkReport.Scenario.powerFailure(line.id(),
+                                between(random, MIN_POWER_FAILURE_SECONDS, MAX_POWER_FAILURE_SECONDS));
+                    }
+                    // A feeder section of one to MAX_FEEDER_SECTIONS sections along the main route (round a ring).
+                    List<String> ids = line.stationIds();
+                    int from = random.nextInt(line.sectionCount());
+                    int length = 1 + random.nextInt(MAX_FEEDER_SECTIONS);
+                    int to = line.ring() ? (from + length) % ids.size() : Math.min(from + length, ids.size() - 1);
+                    yield BenchmarkReport.Scenario.sectionalPowerFailure(line.id(), ids.get(from), ids.get(to),
+                            between(random, MIN_POWER_FAILURE_SECONDS, MAX_POWER_FAILURE_SECONDS));
+                }
             });
         }
         return scenarios;

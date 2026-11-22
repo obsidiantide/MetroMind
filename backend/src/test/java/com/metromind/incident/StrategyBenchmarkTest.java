@@ -235,6 +235,26 @@ class StrategyBenchmarkTest {
     }
 
     @Test
+    void powerFailuresCutWholeLinesOrFeederSectionsAlongThem() {
+        SimulationEngine live = live();
+        List<BenchmarkReport.Scenario> drawn = StrategyBenchmark.drawScenarios(live, 40, 5,
+                EnumSet.of(BenchmarkReport.IncidentKind.POWER_FAILURE));
+        List<String> stations = live.network().line("L1").stationIds();
+
+        assertThat(drawn).anySatisfy(s -> assertThat(s.fromStationId()).isNull());
+        assertThat(drawn).anySatisfy(s -> assertThat(s.fromStationId()).isNotNull());
+        assertThat(drawn).filteredOn(s -> s.fromStationId() != null).allSatisfy(s -> {
+            int from = stations.indexOf(s.fromStationId());
+            int to = stations.indexOf(s.toStationId());
+            assertThat(to - from).isBetween(1, StrategyBenchmark.MAX_FEEDER_SECTIONS);
+            assertThat(s.seconds()).isBetween(StrategyBenchmark.MIN_POWER_FAILURE_SECONDS,
+                    StrategyBenchmark.MAX_POWER_FAILURE_SECONDS);
+        });
+        // Every drawn stretch can be injected.
+        drawn.forEach(s -> s.applyTo(live.copy()));
+    }
+
+    @Test
     void scenariosDependOnTheSeedAndStayInRange() {
         SimulationEngine live = live();
         List<BenchmarkReport.Scenario> a = StrategyBenchmark.drawScenarios(live, 20, 1);
