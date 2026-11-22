@@ -53,6 +53,8 @@ export default function BenchmarkPage() {
   const [spread, setSpread] = useState("");
   // Dwell spread in percent; empty uses the live engine's.
   const [dwellSpread, setDwellSpread] = useState("");
+  // Share of late relief drivers in percent; empty uses the live engine's.
+  const [lateReliefs, setLateReliefs] = useState("");
   const [job, setJob] = useState<BenchmarkJob | null>(null);
   const [history, setHistory] = useState<BenchmarkJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export default function BenchmarkPage() {
   const request = (): BenchmarkRequest => ({
     scenarios, seed, horizonSeconds: horizonMinutes * 60, kinds, metric,
     runTimeVariability: percent(spread), dwellVariability: percent(dwellSpread),
+    reliefOverrunShare: percent(lateReliefs),
   });
 
   const submit = async () => {
@@ -117,7 +120,7 @@ export default function BenchmarkPage() {
         <p className="muted">
           Every headway strategy is run against the same random incidents, all started from the live network&apos;s
           current state, and ranked. The same seed and starting state always give the same scenarios, and the same
-          everyday variation of run times and dwells when a spread is set.
+          everyday variation of run times, dwells and late relief drivers when they are set.
         </p>
         <div className="row">
           <label>Scenarios <input type="number" min={1} max={200} value={scenarios}
@@ -132,6 +135,9 @@ export default function BenchmarkPage() {
           <label title="How much each stop's dwell varies around the one its passengers need, drawn from the seed">
             Dwell spread <input type="number" min={0} max={25} step={1} value={dwellSpread} placeholder="live"
                                 onChange={(e) => setDwellSpread(e.target.value)} style={{ width: 60 }} /> %</label>
+          <label title="Share of crew changes whose relief driver is late, drawn from the seed">
+            Late reliefs <input type="number" min={0} max={100} step={5} value={lateReliefs} placeholder="live"
+                                onChange={(e) => setLateReliefs(e.target.value)} style={{ width: 60 }} /> %</label>
           <label>Rank by{" "}
             <select value={metric} onChange={(e) => setMetric(e.target.value as RankingMetric)}>
               <option value="WAIT_PER_BOARDING">Platform wait per boarding</option>
@@ -209,6 +215,8 @@ function Results({ report, name }: { report: BenchmarkReport; name: Names }) {
           {byWait ? "platform wait per boarding" : "total travel time"}
           {(report.runTimeVariability ?? 0) > 0 && ` · run times ±${Math.round((report.runTimeVariability ?? 0) * 100)} %`}
           {(report.dwellVariability ?? 0) > 0 && ` · dwells ±${Math.round((report.dwellVariability ?? 0) * 100)} %`}
+          {(report.reliefOverrunShare ?? 0) > 0 && ` · late reliefs ${Math.round((report.reliefOverrunShare ?? 0) * 100)} %`
+            + ` (~${Math.round(report.reliefOverrunSeconds ?? 0)} s)`}
         </h2>
         <button onClick={() => downloadCsv(benchmarkCsv(report), benchmarkCsvName(report))}>Export CSV</button>
       </div>
