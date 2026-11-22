@@ -79,7 +79,7 @@ Mark items `[x]` when merged.
 - [x] Automatic incident clearing timeline in the UI
 - [x] Traction power failure: every train on a line stops where it is for the duration, in the incident API, what-if
       and benchmark scenarios
-- [ ] Sectional power failure: only trains between two stations of a line lose power (a feeder section), the rest of
+- [x] Sectional power failure: only trains between two stations of a line lose power (a feeder section), the rest of
       the line keeps running up to the dead stretch
 - [ ] Passengers detrain from a train stuck between stations for longer than a threshold and walk to the nearest
       platform, so a long power failure empties trains instead of keeping passengers on board
