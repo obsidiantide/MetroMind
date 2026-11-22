@@ -4,7 +4,7 @@ import type {
   MinuteKpi,
 } from "./types";
 
-/** Query parameters of a benchmark request; spreads left out use the live engine's. */
+/** Query parameters of a benchmark request; spreads and late reliefs left out use the live engine's. */
 function benchmarkQuery(r: BenchmarkRequest) {
   const q = new URLSearchParams({
     scenarios: String(r.scenarios), seed: String(r.seed), horizonSeconds: String(r.horizonSeconds), metric: r.metric,
@@ -12,6 +12,8 @@ function benchmarkQuery(r: BenchmarkRequest) {
   if (r.kinds.length > 0) q.set("kinds", r.kinds.join(","));
   if (r.runTimeVariability !== undefined) q.set("runTimeVariability", String(r.runTimeVariability));
   if (r.dwellVariability !== undefined) q.set("dwellVariability", String(r.dwellVariability));
+  if (r.reliefOverrunShare !== undefined) q.set("reliefOverrunShare", String(r.reliefOverrunShare));
+  if (r.reliefOverrunSeconds !== undefined) q.set("reliefOverrunSeconds", String(r.reliefOverrunSeconds));
   return q;
 }
 

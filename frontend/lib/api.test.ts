@@ -4,7 +4,7 @@ import type { BenchmarkRequest, DayBenchmarkJob } from "@/lib/types";
 
 const request: BenchmarkRequest = {
   scenarios: 3, seed: 9, horizonSeconds: 1200, kinds: ["DELAY", "DOOR_FAULT"], metric: "TRAVEL_TIME",
-  dwellVariability: 0.1,
+  dwellVariability: 0.1, reliefOverrunShare: 0.2,
 };
 
 const queued: DayBenchmarkJob = {
@@ -30,7 +30,7 @@ describe("day benchmark jobs", () => {
     expect(fetch.mock.calls[0][1]?.method).toBe("POST");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       scenarios: "3", seed: "9", horizonSeconds: "1200", metric: "TRAVEL_TIME", kinds: "DELAY,DOOR_FAULT",
-      dwellVariability: "0.1", startTimes: "08:00,22:30",
+      dwellVariability: "0.1", reliefOverrunShare: "0.2", startTimes: "08:00,22:30",
     });
   });
 

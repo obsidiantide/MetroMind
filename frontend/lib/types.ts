@@ -165,6 +165,10 @@ export interface BenchmarkReport {
   runTimeVariability?: number;
   /** Spread of dwells around the passenger-driven one every run was drawn with; 0 or absent for none. */
   dwellVariability?: number;
+  /** Share of crew changes whose relief driver was late in every run (0–1); 0 or absent when swaps ran to plan. */
+  reliefOverrunShare?: number;
+  /** Mean overrun of a late relief, seconds. */
+  reliefOverrunSeconds?: number;
 }
 /** A strategy's standing over every benchmarked time of day: means of its per-period means. */
 export interface DayRanking {
@@ -196,4 +200,8 @@ export interface BenchmarkRequest {
   runTimeVariability?: number;
   /** Spread of dwells (0–0.25); left out, the benchmark uses the live engine's. */
   dwellVariability?: number;
+  /** Share of late relief drivers (0–1); left out, the benchmark uses the live engine's. */
+  reliefOverrunShare?: number;
+  /** Mean overrun of a late relief in seconds (0–600); left out, the benchmark uses the live engine's. */
+  reliefOverrunSeconds?: number;
 }
