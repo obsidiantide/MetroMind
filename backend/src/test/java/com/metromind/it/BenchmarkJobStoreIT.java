@@ -5,6 +5,7 @@ import com.metromind.incident.BenchmarkJobs;
 import com.metromind.incident.BenchmarkReport;
 import com.metromind.incident.TimeOfDayReport;
 import com.metromind.infra.JdbcBenchmarkJobStore;
+import com.metromind.sim.ReliefOverrun;
 import com.metromind.sim.SimulationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +41,7 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
 
         String id = simulation.submitDayBenchmark(List.of("08:00", "21:00"), 1, 5, 300,
                 EnumSet.of(BenchmarkReport.IncidentKind.DELAY), BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0,
-                0).id();
+                0, ReliefOverrun.NONE).id();
         await().atMost(Duration.ofSeconds(60)).until(() -> dayStore.find(id).isPresent());
 
         BenchmarkJobs.Job<TimeOfDayReport> stored = dayStore.find(id).orElseThrow();
@@ -56,7 +57,7 @@ class BenchmarkJobStoreIT extends InfrastructureIT {
         assertThat(store).isInstanceOf(JdbcBenchmarkJobStore.class);
 
         String id = simulation.submitBenchmark(1, 5, 300, EnumSet.allOf(BenchmarkReport.IncidentKind.class),
-                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05, 0.1).id();
+                BenchmarkReport.RankingMetric.WAIT_PER_BOARDING, 0.05, 0.1, ReliefOverrun.NONE).id();
         await().atMost(Duration.ofSeconds(60)).until(() -> store.find(id).isPresent());
 
         BenchmarkJobs.Job<BenchmarkReport> stored = store.find(id).orElseThrow();

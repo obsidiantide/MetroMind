@@ -258,33 +258,34 @@ public class SimulationService {
     /**
      * Ranks every headway strategy over {@code scenarios} random incidents drawn from {@code seed}, starting from a
      * copy of the live state, with run times varying by {@code runTimeVariability} around nominal and dwells by
-     * {@code dwellVariability} around the passenger-driven one. Like the delay
-     * analysis it never touches the live engine.
+     * {@code dwellVariability} around the passenger-driven one, and crew changes overrunning as often and as long as
+     * {@code reliefOverrun} says (drawn from {@code seed}). Like the delay analysis it never touches the live engine.
      */
     public BenchmarkReport benchmarkStrategies(int scenarios, long seed, double horizonSeconds,
                                                Set<BenchmarkReport.IncidentKind> kinds,
                                                BenchmarkReport.RankingMetric metric, double runTimeVariability,
-                                               double dwellVariability) {
+                                               double dwellVariability, ReliefOverrun reliefOverrun) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
         }
         return analysisTimer("benchmark").record(
                 () -> benchmark.run(fork, scenarios, seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric,
-                        runTimeVariability, dwellVariability, StrategyBenchmark.ProgressListener.NONE));
+                        runTimeVariability, dwellVariability, reliefOverrun, StrategyBenchmark.ProgressListener.NONE));
     }
 
     /**
      * Ranks every headway strategy over the same kind of benchmark run from several times of day, each from a fresh
-     * copy of the network warmed up to that time (see {@link TimeOfDayBenchmark}). The live engine is only read for
-     * its network.
+     * copy of the network warmed up to that time (see {@link TimeOfDayBenchmark}), with late reliefs as
+     * {@code reliefOverrun} says. The live engine is only read for its network.
      */
     public TimeOfDayReport benchmarkTimesOfDay(List<String> startClocks, int scenarios, long seed,
                                                double horizonSeconds, Set<BenchmarkReport.IncidentKind> kinds,
                                                BenchmarkReport.RankingMetric metric, double runTimeVariability,
-                                               double dwellVariability) {
+                                               double dwellVariability, ReliefOverrun reliefOverrun) {
         return analysisTimer("benchmark_day").record(() -> dayBenchmark.run(engine.network(), startClocks, scenarios,
-                seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric, runTimeVariability, dwellVariability));
+                seed, horizonSeconds, HeadwayStrategy.all(), kinds, metric, runTimeVariability, dwellVariability,
+                reliefOverrun, StrategyBenchmark.ProgressListener.NONE));
     }
 
     /**
@@ -296,7 +297,7 @@ public class SimulationService {
     public BenchmarkJobs.Job<BenchmarkReport> submitBenchmark(int scenarios, long seed, double horizonSeconds,
                                              Set<BenchmarkReport.IncidentKind> kinds,
                                              BenchmarkReport.RankingMetric metric, double runTimeVariability,
-                                             double dwellVariability) {
+                                             double dwellVariability, ReliefOverrun reliefOverrun) {
         SimulationEngine fork;
         synchronized (engine) {
             fork = engine.copy();
@@ -305,7 +306,7 @@ public class SimulationService {
         return benchmarkJobs.submit(StrategyBenchmark.totalRuns(scenarios, strategies.size()),
                 progress -> analysisTimer("benchmark").record(() -> benchmark.run(fork, scenarios, seed,
                         horizonSeconds, strategies, kinds, metric, runTimeVariability,
-                        dwellVariability, progress)));
+                        dwellVariability, reliefOverrun, progress)));
     }
 
     public Optional<BenchmarkJobs.Job<BenchmarkReport>> benchmarkJob(String id) {
@@ -333,14 +334,15 @@ public class SimulationService {
                                                                 double horizonSeconds,
                                                                 Set<BenchmarkReport.IncidentKind> kinds,
                                                                 BenchmarkReport.RankingMetric metric,
-                                                                double runTimeVariability, double dwellVariability) {
+                                                                double runTimeVariability, double dwellVariability,
+                                                                ReliefOverrun reliefOverrun) {
         TimeOfDayBenchmark.checkStartClocks(startClocks);
         List<String> clocks = List.copyOf(startClocks);
         List<HeadwayStrategy> strategies = HeadwayStrategy.all();
         return dayBenchmarkJobs.submit(TimeOfDayBenchmark.totalRuns(clocks.size(), scenarios, strategies.size()),
                 progress -> analysisTimer("benchmark_day").record(() -> dayBenchmark.run(engine.network(), clocks,
                         scenarios, seed, horizonSeconds, strategies, kinds, metric, runTimeVariability,
-                        dwellVariability, progress)));
+                        dwellVariability, reliefOverrun, progress)));
     }
 
     public Optional<BenchmarkJobs.Job<TimeOfDayReport>> dayBenchmarkJob(String id) {
