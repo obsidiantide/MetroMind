@@ -2140,6 +2140,12 @@ public final class SimulationEngine {
                 SimulationSnapshot.IncidentKind.POWER_FAILURE, lineId,
                 "No traction power on line " + network.line(lineId).name(),
                 powerOffSince.getOrDefault(lineId, simTime), remaining)));
+        for (SectionalPowerCut c : sectionalPowerCuts) {
+            views.add(incidentView(SimulationSnapshot.IncidentKind.POWER_FAILURE, c.lineId,
+                    "No traction power between %s and %s on line %s".formatted(stationName(c.fromStationId),
+                            stationName(c.toStationId), network.line(c.lineId).name()),
+                    c.startedAt, c.remainingSeconds));
+        }
         views.sort(Comparator.comparingDouble(SimulationSnapshot.ActiveIncidentView::remainingSeconds));
         return views;
     }

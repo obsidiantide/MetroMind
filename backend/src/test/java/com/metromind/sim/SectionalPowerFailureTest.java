@@ -112,4 +112,19 @@ class SectionalPowerFailureTest {
         assertThatThrownBy(() -> engine.cutPower("L1", "B", "B", 60)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> engine.cutPower("L1", "A", "B", 0)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aDeadFeederSectionIsListedAmongActiveIncidents() {
+        SimulationEngine engine = engine(TestNetworks.singleLine());
+        engine.run(60, 1);
+        engine.cutPower("L1", "B", "D", 300);
+        engine.run(100, 1);
+
+        assertThat(engine.snapshot().activeIncidents()).singleElement().satisfies(i -> {
+            assertThat(i.kind()).isEqualTo(SimulationSnapshot.IncidentKind.POWER_FAILURE);
+            assertThat(i.subjectId()).isEqualTo("L1");
+            assertThat(i.description()).contains("between");
+            assertThat(i.remainingSeconds()).isCloseTo(200, org.assertj.core.api.Assertions.within(1.0));
+        });
+    }
 }
