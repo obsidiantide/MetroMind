@@ -189,6 +189,16 @@ public class SimulationService {
         }
     }
 
+    /** Cuts power to one feeder section of a line; recorded as a power failure whose detail names the stretch. */
+    public void cutPower(String lineId, String fromStationId, String toStationId, double seconds) {
+        synchronized (engine) {
+            engine.cutPower(lineId, fromStationId, toStationId, seconds);
+            history.record(engine.simTime(), IncidentRecord.Kind.POWER_FAILURE, lineId, seconds,
+                    "%s-%s".formatted(fromStationId, toStationId));
+            countIncident(IncidentRecord.Kind.POWER_FAILURE);
+        }
+    }
+
     /** Incidents injected so far, most recent first. */
     public List<IncidentRecord> incidentHistory(int limit) {
         return history.recent(limit);

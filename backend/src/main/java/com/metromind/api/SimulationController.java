@@ -174,16 +174,37 @@ public class SimulationController {
         return ResponseEntity.accepted().build();
     }
 
-    public record PowerFailureRequest(@NotBlank String lineId, @Min(1) @Max(7200) double seconds) {
+    /**
+     * A traction power failure: the whole line, or with {@code fromStationId} and {@code toStationId} only the
+     * feeder section between those two stations of the line.
+     */
+    public record PowerFailureRequest(@NotBlank String lineId, @Min(1) @Max(7200) double seconds,
+                                      String fromStationId, String toStationId) {
+
+        /** Whether only a feeder section loses power; giving just one end of it is a bad request. */
+        boolean sectional() {
+            if ((fromStationId == null) != (toStationId == null)) {
+                throw new IllegalArgumentException("A sectional power failure needs both fromStationId and toStationId");
+            }
+            return fromStationId != null;
+        }
     }
 
-    /** Traction power failure: every train of the line stops where it is until power is restored. */
+    /**
+     * Traction power failure: every train of the line, or with {@code fromStationId} and {@code toStationId} every
+     * train on the feeder section between them, stops where it is until power is restored; the rest of the line runs
+     * up to the dead stretch.
+     */
     @Tag(name = "Incidents")
-    @Operation(summary = "Cut traction power to a line; its trains stop where they are")
+    @Operation(summary = "Cut traction power to a line or one feeder section; its trains stop where they are")
     @ApiResponse(responseCode = "202", description = "Power cut")
     @PostMapping("/incidents/power-failure")
     public ResponseEntity<Void> cutPower(@Valid @RequestBody PowerFailureRequest req) {
-        simulation.cutPower(req.lineId(), req.seconds());
+        if (req.sectional()) {
+            simulation.cutPower(req.lineId(), req.fromStationId(), req.toStationId(), req.seconds());
+        } else {
+            simulation.cutPower(req.lineId(), req.seconds());
+        }
         return ResponseEntity.accepted().build();
     }
 

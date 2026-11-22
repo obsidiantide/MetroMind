@@ -123,6 +123,38 @@ class IncidentApiTest {
     }
 
     @Test
+    void cutsPowerToOneFeederSectionAndRecordsTheStretch() throws Exception {
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "RED", "fromStationId": "R5", "toStationId": "R7", "seconds": 180}"""))
+                .andExpect(status().isAccepted());
+        simulation.tick();
+        mvc.perform(get("/api/state"))
+                .andExpect(jsonPath("$.activeIncidents[?(@.subjectId == 'RED')].description",
+                        hasItem(containsString("between"))))
+                .andExpect(jsonPath("$.recentEvents[*].message",
+                        hasItem(containsString("power lost between"))));
+        mvc.perform(get("/api/incidents").param("limit", "1"))
+                .andExpect(jsonPath("$[0].kind").value("POWER_FAILURE"))
+                .andExpect(jsonPath("$[0].subjectId").value("RED"))
+                .andExpect(jsonPath("$[0].detail").value("R5-R7"));
+    }
+
+    @Test
+    void aSectionalPowerFailureNeedsBothEndsOnTheLine() throws Exception {
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "RED", "fromStationId": "R5", "seconds": 60}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("both")));
+        mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lineId": "RED", "fromStationId": "R5", "toStationId": "B1", "seconds": 60}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("not both on line RED")));
+    }
+
+    @Test
     void aPowerFailureOnAnUnknownLineOrWithoutSecondsIsABadRequest() throws Exception {
         mvc.perform(post("/api/incidents/power-failure").contentType(MediaType.APPLICATION_JSON)
                         .content("""
