@@ -100,6 +100,17 @@ describe("BenchmarkPage", () => {
     expect(await screen.findByText("Red Line without traction power 5m 00s")).toBeTruthy();
   });
 
+  it("names the stretch of a sectional power failure scenario", async () => {
+    const withOutage = job({ report: { ...job().report!, scenarios: [
+      { kind: "POWER_FAILURE", seconds: 300, lineId: "RED", fromStationId: "C", toStationId: "B" }] } });
+    vi.spyOn(api, "benchmarkJobs").mockResolvedValue([withOutage]);
+    render(<BenchmarkPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show" }));
+
+    expect(await screen.findByText("Red Line Central – Bravo without traction power 5m 00s")).toBeTruthy();
+  });
+
   it("shows each branched line's trunk regularity when the network has one", async () => {
     const report = job().report!;
     const withTrunk = {
