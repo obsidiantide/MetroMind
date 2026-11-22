@@ -107,6 +107,44 @@ class LineTest {
                 .hasMessageContaining("crewChangeSeconds");
     }
 
+    @Test
+    void lateReliefsAreOptionalInJson() throws Exception {
+        Line plain = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "crewChangeStationIds": ["B"], "crewChangeSeconds": 60}
+                """, Line.class);
+        assertThat(plain.reliefOverrunShare()).isNull();
+        assertThat(plain.reliefOverrunSeconds()).isNull();
+        assertThat(plain.hasOwnReliefOverrun()).isFalse();
+
+        Line unreliable = mapper.readValue("""
+                {"id": "L", "name": "L", "color": "#000", "stationIds": ["A", "B"], "runSeconds": [90],
+                 "trainCount": 2, "trainCapacity": 800, "crewChangeStationIds": ["B"], "crewChangeSeconds": 60,
+                 "reliefOverrunShare": 0.3}
+                """, Line.class);
+        assertThat(unreliable.reliefOverrunShare()).isEqualTo(0.3);
+        assertThat(unreliable.reliefOverrunSeconds()).isNull();
+        assertThat(unreliable.hasOwnReliefOverrun()).isTrue();
+    }
+
+    @Test
+    void rejectsLateReliefsOutsideTheSupportedRange() {
+        assertThatThrownBy(() -> lateReliefs(1.5, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reliefOverrunShare");
+        assertThatThrownBy(() -> lateReliefs(null, -1.0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reliefOverrunSeconds");
+        assertThatThrownBy(() -> lateReliefs(null, Line.MAX_RELIEF_OVERRUN_SECONDS + 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reliefOverrunSeconds");
+    }
+
+    private static Line lateReliefs(Double share, Double seconds) {
+        return new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(), false, List.of(),
+                List.of(), List.of(), null, 0, null, List.of("B"), 60, share, seconds);
+    }
+
     private static Line crewChanges(List<String> stationIds, int seconds) {
         return new Line("L", "L", "#000", List.of("A", "B"), List.of(90), 2, 800, 0, List.of(), false, List.of(),
                 List.of(), List.of(), null, 0, null, stationIds, seconds);

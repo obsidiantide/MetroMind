@@ -41,13 +41,33 @@ import java.util.List;
  * @param crewChangeStationIds stations where drivers swap, on the main route or a branch; every call there dwells
  *                       {@code crewChangeSeconds} longer, and the timetable allows for it; empty for none
  * @param crewChangeSeconds extra dwell of a crew change (0 when the line has no crew-change stations)
+ * @param reliefOverrunShare the line's own share of crew changes whose relief driver is late, 0 to 1, overriding the
+ *                       engine-wide share for its trains; {@code null} to use the engine-wide share
+ * @param reliefOverrunSeconds the line's own mean overrun of a late relief, seconds (0 to
+ *                       {@value #MAX_RELIEF_OVERRUN_SECONDS}), overriding the engine-wide mean; {@code null} to use
+ *                       the engine-wide mean
  */
 public record Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
                    int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
                    List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
                    Double runTimeVariability, int depotAccessSeconds, Double dwellVariability,
-                   List<String> crewChangeStationIds, int crewChangeSeconds)
+                   List<String> crewChangeStationIds, int crewChangeSeconds, Double reliefOverrunShare,
+                   Double reliefOverrunSeconds)
         implements LoopTopology {
+
+    /** Longest mean relief overrun a line may declare, as for the engine-wide one. */
+    public static final double MAX_RELIEF_OVERRUN_SECONDS = 600;
+
+    /** Line whose late reliefs follow the engine-wide setting. */
+    public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
+                int trainCount, int trainCapacity, int spareTrains, List<List<Double>> path, boolean ring,
+                List<String> timingStationIds, List<Branch> branches, List<FleetPlanPeriod> fleetPlan,
+                Double runTimeVariability, int depotAccessSeconds, Double dwellVariability,
+                List<String> crewChangeStationIds, int crewChangeSeconds) {
+        this(id, name, color, stationIds, runSeconds, trainCount, trainCapacity, spareTrains, path, ring,
+                timingStationIds, branches, fleetPlan, runTimeVariability, depotAccessSeconds, dwellVariability,
+                crewChangeStationIds, crewChangeSeconds, null, null);
+    }
 
     /** Line where drivers do not swap in service. */
     public Line(String id, String name, String color, List<String> stationIds, List<Integer> runSeconds,
@@ -210,6 +230,19 @@ public record Line(String id, String name, String color, List<String> stationIds
         if (!crewChangeStationIds.isEmpty() && crewChangeSeconds == 0) {
             throw new IllegalArgumentException("Line " + id + ": crew-change stations need crewChangeSeconds");
         }
+        if (reliefOverrunShare != null && !(reliefOverrunShare >= 0 && reliefOverrunShare <= 1)) {
+            throw new IllegalArgumentException("Line " + id + ": reliefOverrunShare must be between 0 and 1");
+        }
+        if (reliefOverrunSeconds != null
+                && !(reliefOverrunSeconds >= 0 && reliefOverrunSeconds <= MAX_RELIEF_OVERRUN_SECONDS)) {
+            throw new IllegalArgumentException("Line " + id + ": reliefOverrunSeconds must be between 0 and "
+                    + MAX_RELIEF_OVERRUN_SECONDS);
+        }
+    }
+
+    /** Whether the line overrides the engine-wide share or mean of late relief drivers. */
+    public boolean hasOwnReliefOverrun() {
+        return reliefOverrunShare != null || reliefOverrunSeconds != null;
     }
 
     /**
