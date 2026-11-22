@@ -234,7 +234,7 @@ are started once and shared by every integration test.
 | POST | `/api/incidents/door-fault` | `{ "trainId": "RED-1", "seconds": 120 }`: extra dwell at its platform |
 | POST | `/api/incidents/section-closure` | `{ "lineId": "RED", "fromStationId": "R4", "toStationId": "R5", "seconds": 900, "response": "TURN_BACK" }` |
 | POST | `/api/incidents/station-closure` | `{ "stationId": "R3", "seconds": 1200 }` |
-| POST | `/api/incidents/power-failure` | `{ "lineId": "GREEN", "seconds": 600 }`: every train of the line stops |
+| POST | `/api/incidents/power-failure` | `{ "lineId": "GREEN", "seconds": 600 }`: every train of the line stops; with `fromStationId` and `toStationId` only those on that feeder section |
 | POST | `/api/analysis/delay-impact` | What-if analysis across strategies |
 | POST | `/api/analysis/section-closure-impact` | What-if for a track-section closure (same body as `/api/incidents/section-closure`) |
 | POST | `/api/analysis/station-closure-impact` | What-if for a station closure (same body as `/api/incidents/station-closure`) |
@@ -456,6 +456,22 @@ events mark both ends, and the history records it as `POWER_FAILURE`. `POST /api
 runs the same outage as a what-if; the dashboard's *Closures* panel has Cut power and What-if buttons for a chosen
 line, using the panel's minutes, and benchmarks draw power failures of 2 to 15 minutes on a random line.
 
+**Sectional failures.** Real lines are fed in sections, and a tripped feeder only darkens one stretch. Adding
+`"fromStationId"` and `"toStationId"` (two stations of the line, in either order; on a ring the stretch runs from
+the first round to the second in the ring's direction) cuts only that feeder section:
+
+```json
+{ "lineId": "RED", "fromStationId": "R5", "toStationId": "R7", "seconds": 600 }
+```
+
+Trains running between those stations, and trains at the platforms strictly inside the stretch, stop where they
+are; the two end stations stay live. The rest of the line keeps running up to the dead stretch: a train due to run
+onto it waits at the platform before it, doors open, until power is back, so the queue of trains grows from both
+ends. The same stretch cut again (from either end) extends the outage. It is listed among `activeIncidents` as a
+`POWER_FAILURE` of the line described as the stretch, and the history keeps the stretch in its `detail` (`R5-R7`).
+The what-if endpoint takes the same body; the *Closures* panel's "Whole line" select picks the two ends of a feeder
+section instead, and half the power failures benchmarks draw are sectional, over one to three sections.
+
 ### What-if for closures
 
 Closures can be analysed before they are applied, like delays. `POST /api/analysis/section-closure-impact` and
@@ -638,7 +654,7 @@ Each scenario lists only what its kind needs:
 
 `kinds` narrows the draw, e.g. `?kinds=SECTION_CLOSURE,STATION_CLOSURE` to compare strategies on closures only;
 by default all six kinds are drawn (`DOOR_FAULT` holds a train at its platform for 30 s to 3 min, `POWER_FAILURE`
-stops a whole line for 2 to 15 min; adding each changed which incidents a seed draws when no `kinds` are given). The same seed, kinds and starting state always give the same report, and
+stops a whole line, or one to three sections of it, for 2 to 15 min; adding each changed which incidents a seed draws when no `kinds` are given). The same seed, kinds and starting state always give the same report, and
 the live simulation is never touched. Limits: 1–50 scenarios, a horizon of 5–60 minutes.
 
 `runTimeVariability` (0–0.25) makes every run of the benchmark, baselines included, vary its run times as
