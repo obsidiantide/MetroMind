@@ -110,20 +110,30 @@ public final class StrategyBenchmark {
                 live.dwellVariability().sigma(), progress);
     }
 
-    /**
-     * The full benchmark. Every run, baselines included, draws its run times with spread
-     * {@code runTimeVariability}, its dwells with spread {@code dwellVariability} and its late reliefs as often and
-     * as long as on the live engine from the benchmark {@code seed}: a seed gives the same everyday irregularity in
-     * every run (common random numbers), so strategies are compared on the same "day" and differences come from
-     * the strategies and incidents, and the report stays reproducible whatever the live engine's own seed.
-     */
+    /** The full benchmark with late reliefs as often and as long as on the live engine. */
     public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
                                List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
                                BenchmarkReport.RankingMetric metric, double runTimeVariability,
                                double dwellVariability, ProgressListener progress) {
+        return run(live, scenarioCount, seed, horizonSeconds, strategies, kinds, metric, runTimeVariability,
+                dwellVariability, live.reliefOverrun(), progress);
+    }
+
+    /**
+     * The full benchmark. Every run, baselines included, draws its run times with spread
+     * {@code runTimeVariability}, its dwells with spread {@code dwellVariability} and its late reliefs with the share
+     * and mean of {@code reliefOverrun} (its seed is ignored) from the benchmark {@code seed}: a seed gives the same
+     * everyday irregularity in every run (common random numbers), so strategies are compared on the same "day" and
+     * differences come from the strategies and incidents, and the report stays reproducible whatever the live
+     * engine's own seed. Lines with their own late reliefs keep them.
+     */
+    public BenchmarkReport run(SimulationEngine live, int scenarioCount, long seed, double horizonSeconds,
+                               List<HeadwayStrategy> strategies, Set<BenchmarkReport.IncidentKind> kinds,
+                               BenchmarkReport.RankingMetric metric, double runTimeVariability,
+                               double dwellVariability, ReliefOverrun reliefOverrun, ProgressListener progress) {
         RunTimeVariability variability = new RunTimeVariability(runTimeVariability, seed);
         DwellVariability dwells = new DwellVariability(dwellVariability, seed);
-        ReliefOverrun reliefs = live.reliefOverrun().withSeed(seed);
+        ReliefOverrun reliefs = reliefOverrun.withSeed(seed);
         if (scenarioCount < 1) {
             throw new IllegalArgumentException("A benchmark needs at least one scenario");
         }
@@ -200,7 +210,7 @@ public final class StrategyBenchmark {
             rankings.add(unranked.get(i).withRank(i + 1));
         }
         return new BenchmarkReport(seed, horizonSeconds, metric, scenarios, rankings, runTimeVariability,
-                dwellVariability);
+                dwellVariability, reliefs.share(), reliefs.meanSeconds());
     }
 
     /** Each line's sum divided by {@code count}, in line order. */

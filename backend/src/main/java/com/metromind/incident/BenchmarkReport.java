@@ -26,9 +26,20 @@ import java.util.Map;
  *                   {@link com.metromind.sim.RunTimeVariability}), seeded by {@code seed}; 0 for nominal run times
  * @param dwellVariability spread of dwells every run was drawn with (see
  *                   {@link com.metromind.sim.DwellVariability}), seeded by {@code seed}; 0 for passenger-driven dwells
+ * @param reliefOverrunShare share of crew changes whose relief driver was late in every run (see
+ *                   {@link com.metromind.sim.ReliefOverrun}), seeded by {@code seed}; 0 when swaps ran to plan (and in
+ *                   reports stored before late reliefs were reported); lines with their own share keep it
+ * @param reliefOverrunSeconds mean overrun of a late relief, seconds
  */
 public record BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
-                              List<StrategyRanking> rankings, double runTimeVariability, double dwellVariability) {
+                              List<StrategyRanking> rankings, double runTimeVariability, double dwellVariability,
+                              double reliefOverrunShare, double reliefOverrunSeconds) {
+
+    /** Report of a benchmark run whose crew changes ran to plan. */
+    public BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,
+                           List<StrategyRanking> rankings, double runTimeVariability, double dwellVariability) {
+        this(seed, horizonSeconds, metric, scenarios, rankings, runTimeVariability, dwellVariability, 0, 0);
+    }
 
     /** Report of a benchmark run with passenger-driven dwells. */
     public BenchmarkReport(long seed, double horizonSeconds, RankingMetric metric, List<Scenario> scenarios,

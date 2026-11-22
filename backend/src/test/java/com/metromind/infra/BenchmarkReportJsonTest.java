@@ -59,5 +59,8 @@ class BenchmarkReportJsonTest {
         BenchmarkReport report = mapper.readValue(json, BenchmarkReport.class);
 
         assertThat(report.rankings().get(0).meanTrunkHeadwayCv()).isEmpty();
+        // Reports stored before late reliefs were reported read back as run with swaps to plan.
+        assertThat(report.reliefOverrunShare()).isZero();
+        assertThat(report.reliefOverrunSeconds()).isZero();
     }
 }
