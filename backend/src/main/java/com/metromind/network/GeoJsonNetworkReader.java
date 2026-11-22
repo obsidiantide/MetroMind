@@ -26,6 +26,8 @@ import java.util.Map;
  *       {@code depotAccessSeconds} (see {@link Line#depotAccessSeconds()}),
  *       {@code dwellVariability} (the line's own spread of dwells, see {@link Line#dwellVariability()}),
  *       {@code crewChangeStationIds} and {@code crewChangeSeconds} (see {@link Line#crewChangeStationIds()}),
+ *       {@code reliefOverrunShare} and {@code reliefOverrunSeconds} (the line's own late relief drivers, see
+ *       {@link Line#reliefOverrunShare()}),
  *       and optionally either {@code runSeconds} or {@code averageSpeedKmh}. A ring line sets {@code ring: true}; its track is a closed
  *       LineString that starts and ends at the first station, and its trains run the way it is drawn.</li>
  *   <li>A {@code LineString} feature with a {@code branchOf} property is a branch of that line, its geometry drawn
@@ -220,7 +222,8 @@ public class GeoJsonNetworkReader {
         return new Line(id, p.path("name").asText(id), p.path("color").asText("#888888"), stationIds, runSeconds,
                 p.get("trainCount").asInt(), p.get("trainCapacity").asInt(), p.path("spareTrains").asInt(0), path, ring,
                 timingStationIds, branches, fleetPlan, runTimeVariability, p.path("depotAccessSeconds").asInt(0),
-                dwellVariability, crewChangeStationIds, p.path("crewChangeSeconds").asInt(0));
+                dwellVariability, crewChangeStationIds, p.path("crewChangeSeconds").asInt(0),
+                optionalNumber(p, id, "reliefOverrunShare"), optionalNumber(p, id, "reliefOverrunSeconds"));
     }
 
     /** A line's optional numeric property, {@code null} when it is left out or set to {@code null}. */
