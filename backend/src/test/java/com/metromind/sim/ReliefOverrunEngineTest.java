@@ -92,4 +92,36 @@ class ReliefOverrunEngineTest {
         double worstLate = late.trains().stream().mapToDouble(TrainState::delaySeconds).max().orElseThrow();
         assertThat(worstLate).isGreaterThan(worstOnTime + 30);
     }
+
+    @Test
+    void aLineWithItsOwnLateReliefsOverridesTheEngineWideSetting() {
+        MetroNetwork base = withCrewChanges(TestNetworks.singleLine(), List.of("A", "C", "F"));
+        MetroNetwork reliable = TestNetworks.withOwnReliefOverrun(base, 0.0, null);
+        SimulationEngine engineWide = engine(base, new ReliefOverrun(0.5, 90, 5));
+        SimulationEngine own = engine(reliable, new ReliefOverrun(0.5, 90, 5));
+        engineWide.run(3600, 1);
+        own.run(3600, 1);
+        assertThat(engineWide.reliefOverruns()).isPositive();
+        assertThat(own.reliefOverruns()).isZero();
+
+        // A line's own share applies even when the engine-wide setting has none; its mean falls back to the engine's.
+        MetroNetwork unreliable = TestNetworks.withOwnReliefOverrun(base, 1.0, null);
+        SimulationEngine late = engine(unreliable, new ReliefOverrun(0, 60, 5));
+        late.run(1800, 1);
+        assertThat(late.reliefOverruns()).isPositive();
+    }
+
+    @Test
+    void aLinesOwnMeanLengthensItsOverruns() {
+        MetroNetwork base = withCrewChanges(TestNetworks.singleTrain(), List.of("C"));
+        SimulationEngine shortOverruns = engine(TestNetworks.withOwnReliefOverrun(base, null, 30.0),
+                new ReliefOverrun(1, 60, 3));
+        SimulationEngine longOverruns = engine(TestNetworks.withOwnReliefOverrun(base, null, 300.0),
+                new ReliefOverrun(1, 60, 3));
+        shortOverruns.run(900, 1);
+        longOverruns.run(900, 1);
+        // Same draw scaled by the mean: the arrival after the crew change is later with the longer mean.
+        assertThat(longOverruns.trains().get(0).arrivals().get(3))
+                .isGreaterThan(shortOverruns.trains().get(0).arrivals().get(3));
+    }
 }

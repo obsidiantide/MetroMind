@@ -678,7 +678,7 @@ public final class SimulationEngine {
      * (between {@link #MIN_DWELL} and {@link #MAX_DWELL}), then drawn around that by the dwell variability, never
      * below the minimum. Each call draws the next number of the train's dwell stream. Where drivers swap the crew
      * change adds its planned time on top, plus the overrun drawn for this call when the relief is late (see
-     * {@link ReliefOverrun}).
+     * {@link ReliefOverrun}), with the line's own share and mean of late reliefs where it declares them.
      */
     private double dwell(TrainState t, double passengersMoved) {
         double byPassengers = Math.max(MIN_DWELL, Math.min(MAX_DWELL, MIN_DWELL + SECONDS_PER_PASSENGER * passengersMoved));
@@ -690,7 +690,7 @@ public final class SimulationEngine {
         if (crewChange == 0) {
             return drawn;
         }
-        double overrun = reliefOverrun.extraSeconds(t.id, call);
+        double overrun = reliefOverrun(t).extraSeconds(t.id, call);
         if (overrun > 0) {
             reliefOverruns++;
             emit(SimEvent.Type.RELIEF_OVERRUN, t.id, "Relief driver late for train %s at %s, crew change %.0f s over"
@@ -706,6 +706,17 @@ public final class SimulationEngine {
     private DwellVariability dwellVariability(TrainState t) {
         Double own = network.line(t.lineId).dwellVariability();
         return own == null ? dwellVariability : dwellVariability.withSigma(own);
+    }
+
+    /**
+     * Late reliefs a train's crew changes are drawn with: its line's own share and mean where the line declares
+     * them, with the engine's seed, otherwise the engine-wide setting.
+     */
+    private ReliefOverrun reliefOverrun(TrainState t) {
+        Line line = network.line(t.lineId);
+        return line.hasOwnReliefOverrun()
+                ? reliefOverrun.overriddenBy(line.reliefOverrunShare(), line.reliefOverrunSeconds())
+                : reliefOverrun;
     }
 
     /**
