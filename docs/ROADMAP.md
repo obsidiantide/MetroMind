@@ -67,7 +67,7 @@ Mark items `[x]` when merged.
 - [x] Bundled Baku network: crew changes at the Red and Green line terminals
 - [x] Late relief drivers: a seeded share of crew changes overrun their planned time, drawn like dwell noise so
       what-if copies share it (today a swap always takes exactly `crewChangeSeconds`)
-- [ ] Per-line late reliefs: a line's own share and mean overrun of late relief drivers, overriding the engine-wide
+- [x] Per-line late reliefs: a line's own share and mean overrun of late relief drivers, overriding the engine-wide
       setting like run-time and dwell spreads
 - [ ] Late reliefs in the benchmark API: `reliefOverrunShare` and `reliefOverrunSeconds` query parameters, like the
       run-time and dwell spreads, reported in the benchmark result
