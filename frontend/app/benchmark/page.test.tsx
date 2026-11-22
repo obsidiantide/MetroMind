@@ -62,6 +62,19 @@ describe("BenchmarkPage", () => {
     expect(submit.mock.calls[0][0].runTimeVariability).toBeUndefined();
   });
 
+  it("sends a share of late reliefs when one is set and shows it on the ranking", async () => {
+    const submit = vi.spyOn(api, "submitBenchmark").mockResolvedValue(
+      job({ report: { ...job().report!, reliefOverrunShare: 0.2, reliefOverrunSeconds: 90 } }));
+    render(<BenchmarkPage />);
+
+    fireEvent.change(screen.getByLabelText(/Late reliefs/), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run benchmark" }));
+
+    expect(await screen.findByText(/late reliefs 20 % \(~90 s\)/)).toBeTruthy();
+    expect(submit.mock.calls[0][0].reliefOverrunShare).toBeCloseTo(0.2);
+    expect(submit.mock.calls[0][0].dwellVariability).toBeUndefined();
+  });
+
   it("ranks strategies with recovery, short turns and skipped stops, and names scenario places", async () => {
     vi.spyOn(api, "benchmarkJobs").mockResolvedValue([job()]);
     render(<BenchmarkPage />);
