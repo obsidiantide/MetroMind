@@ -186,6 +186,23 @@ class GeoJsonNetworkReaderTest {
     }
 
     @Test
+    void readsALinesOwnLateReliefsAndDefaultsToTheEngineWideOnes() throws Exception {
+        Line late = read(network(", \"crewChangeStationIds\": [\"B\"], \"crewChangeSeconds\": 45,"
+                + " \"reliefOverrunShare\": 0.25, \"reliefOverrunSeconds\": 120", "49.84")).line("L1");
+        assertThat(late.reliefOverrunShare()).isEqualTo(0.25);
+        assertThat(late.reliefOverrunSeconds()).isEqualTo(120);
+        Line plain = read(network("", "49.84")).line("L1");
+        assertThat(plain.reliefOverrunShare()).isNull();
+        assertThat(plain.reliefOverrunSeconds()).isNull();
+        assertThatThrownBy(() -> read(network(", \"reliefOverrunShare\": \"often\"", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reliefOverrunShare");
+        assertThatThrownBy(() -> read(network(", \"reliefOverrunSeconds\": 900", "49.84")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reliefOverrunSeconds");
+    }
+
+    @Test
     void readsALinesDwellVariabilityAndDefaultsToTheEngineWideOne() throws Exception {
         assertThat(read(network(", \"dwellVariability\": 0.15", "49.84")).line("L1").dwellVariability())
                 .isEqualTo(0.15);
