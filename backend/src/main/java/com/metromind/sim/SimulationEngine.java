@@ -111,6 +111,8 @@ public final class SimulationEngine {
     private final Map<String, Double> powerOff = new LinkedHashMap<>();
     /** Simulated time at which each line now without power lost it. */
     private final Map<String, Double> powerOffSince = new LinkedHashMap<>();
+    /** Feeder sections without traction power, in the order they failed. */
+    private final List<SectionalPowerCut> sectionalPowerCuts = new ArrayList<>();
     /** Spare trains waiting in each line's depot. */
     private final Map<String, Integer> depot = new LinkedHashMap<>();
     /** Trains each line has brought out of its depot so far; numbers new trains so ids are never reused. */
@@ -252,6 +254,7 @@ public final class SimulationEngine {
         this.stationClosedSince.putAll(other.stationClosedSince);
         this.powerOff.putAll(other.powerOff);
         this.powerOffSince.putAll(other.powerOffSince);
+        other.sectionalPowerCuts.forEach(c -> this.sectionalPowerCuts.add(c.copy()));
         this.depot.putAll(other.depot);
         this.dispatchedCount.putAll(other.dispatchedCount);
         other.depotRuns.forEach(r -> this.depotRuns.add(r.copy()));
@@ -439,7 +442,7 @@ public final class SimulationEngine {
             }
             return;
         }
-        if (powerOff.containsKey(t.lineId)) {
+        if (powerOff.containsKey(t.lineId) || onDeadSection(t)) {
             return; // no traction current: the train stands where it is, doors and all
         }
         switch (t.phase) {
@@ -601,6 +604,10 @@ public final class SimulationEngine {
         }
         int next = (t.stop + 1) % p.loopLength();
         String to = p.stationAtStop(next);
+        if (deadSectionBetween(t.lineId, p.stationAtStop(t.stop), to) != null) {
+            t.phase = TrainPhase.WAITING_SIGNAL; // no current ahead: wait at the platform for it to come back
+            return;
+        }
         if (sectionTaken(t, t.lineId, p.stationAtStop(t.stop), to)
                 || platformTaken(t, t.lineId, to, p.directionAtStop(next))) {
             t.phase = TrainPhase.WAITING_SIGNAL;
@@ -1256,6 +1263,100 @@ public final class SimulationEngine {
                 emit(SimEvent.Type.INCIDENT_CLEARED, e.getKey(), "Traction power restored on line " + e.getKey());
             }
         }
+        for (var it = sectionalPowerCuts.iterator(); it.hasNext(); ) {
+            SectionalPowerCut c = it.next();
+            c.remainingSeconds -= dt;
+            if (c.remainingSeconds <= 1e-9) {
+                it.remove();
+                emit(SimEvent.Type.INCIDENT_CLEARED, c.lineId, "Traction power restored between %s and %s on line %s"
+                        .formatted(stationName(c.fromStationId), stationName(c.toStationId), c.lineId));
+            }
+        }
+    }
+
+    /**
+     * Sectional traction power failure: the feeder section of line {@code lineId} from {@code fromStationId} to
+     * {@code toStationId} (two stations of one of its service patterns, in either order) loses current for
+     * {@code seconds}. Trains running between them and trains at the stations strictly inside the stretch stop
+     * where they are, as in {@link #cutPower(String, double)}; the rest of the line keeps running, and a train due
+     * to enter the dead stretch waits at the platform before it until power comes back. The end stations stay
+     * live. A second failure of the same stretch extends the outage.
+     */
+    public void cutPower(String lineId, String fromStationId, String toStationId, double seconds) {
+        if (!lines.containsKey(lineId)) {
+            throw new IllegalArgumentException("Unknown line " + lineId);
+        }
+        if (seconds <= 0) {
+            throw new IllegalArgumentException("Power failure duration must be positive");
+        }
+        List<String> stretch = stretch(lineId, fromStationId, toStationId);
+        SectionalPowerCut existing = sectionalPowerCuts.stream()
+                .filter(c -> c.sameStretch(lineId, stretch)).findFirst().orElse(null);
+        if (existing != null) {
+            existing.remainingSeconds = Math.max(existing.remainingSeconds, seconds);
+        } else {
+            sectionalPowerCuts.add(new SectionalPowerCut(lineId, stretch, seconds, simTime));
+        }
+        emit(SimEvent.Type.INCIDENT, lineId, "Traction power lost between %s and %s on line %s for %.0f s"
+                .formatted(stationName(fromStationId), stationName(toStationId), lineId, seconds));
+    }
+
+    /**
+     * Stations of line {@code lineId} from {@code from} to {@code to}, ends included, along the first service
+     * pattern that has both: between them on an ordinary line or branch, round the ring in its direction on a ring.
+     */
+    private List<String> stretch(String lineId, String from, String to) {
+        if (from.equals(to)) {
+            throw new IllegalArgumentException("A dead feeder section needs two different stations");
+        }
+        for (ServicePattern p : patternsByLine.get(lineId)) {
+            List<String> ids = p.stationIds();
+            int a = ids.indexOf(from);
+            int b = ids.indexOf(to);
+            if (a < 0 || b < 0) {
+                continue;
+            }
+            if (!p.ring()) {
+                return List.copyOf(ids.subList(Math.min(a, b), Math.max(a, b) + 1));
+            }
+            List<String> walk = new ArrayList<>();
+            for (int i = a; ; i = (i + 1) % ids.size()) {
+                walk.add(ids.get(i));
+                if (i == b) {
+                    return walk;
+                }
+            }
+        }
+        throw new IllegalArgumentException(
+                "Stations %s and %s are not both on line %s".formatted(from, to, lineId));
+    }
+
+    /** Whether a train is on a dead feeder section: running over it, or standing at a platform inside it. */
+    private boolean onDeadSection(TrainState t) {
+        if (sectionalPowerCuts.isEmpty()) {
+            return false;
+        }
+        ServicePattern p = pattern(t);
+        String at = p.stationAtStop(t.stop);
+        if (t.phase == TrainPhase.RUNNING) {
+            return deadSectionBetween(t.lineId, at, p.stationAtStop((t.stop + 1) % p.loopLength())) != null;
+        }
+        return sectionalPowerCuts.stream().anyMatch(c -> c.deadAt(t.lineId, at));
+    }
+
+    /** The cut that leaves the track between neighbouring stations {@code a} and {@code b} dead, or null. */
+    private SectionalPowerCut deadSectionBetween(String lineId, String a, String b) {
+        for (SectionalPowerCut c : sectionalPowerCuts) {
+            if (c.deadBetween(lineId, a, b)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
+    /** Feeder sections without traction power, as {@code [lineId, fromStationId, toStationId]}, oldest first. */
+    public List<List<String>> sectionalPowerFailures() {
+        return sectionalPowerCuts.stream().map(c -> List.of(c.lineId, c.fromStationId, c.toStationId)).toList();
     }
 
     /**
