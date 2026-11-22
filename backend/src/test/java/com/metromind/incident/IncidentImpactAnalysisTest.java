@@ -58,6 +58,21 @@ class IncidentImpactAnalysisTest {
     }
 
     @Test
+    void aSectionalPowerFailureHurtsLessThanLosingTheWholeLine() {
+        BenchmarkReport.Scenario section = BenchmarkReport.Scenario.sectionalPowerFailure("L1", "D", "F", 600);
+        BenchmarkReport.Scenario line = BenchmarkReport.Scenario.powerFailure("L1", 600);
+        DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
+        DelayImpactReport.StrategyOutcome sectional = analyzer
+                .analyze(live(), section, HORIZON, List.of(HeadwayStrategy.NO_CONTROL)).outcomes().get(0);
+        DelayImpactReport.StrategyOutcome whole = analyzer
+                .analyze(live(), line, HORIZON, List.of(HeadwayStrategy.NO_CONTROL)).outcomes().get(0);
+
+        assertThat(sectional.totalExtraTravelMinutes()).isPositive()
+                .isLessThan(whole.totalExtraTravelMinutes());
+        assertThat(sectional.trainsAffected()).isPositive();
+    }
+
+    @Test
     void aDelayScenarioMatchesTheDelayAnalysis() {
         DelayPropagationAnalyzer analyzer = new DelayPropagationAnalyzer();
         DelayImpactReport delay = analyzer.analyze(live(), "L1-2", 240, HORIZON, HeadwayStrategy.all());
