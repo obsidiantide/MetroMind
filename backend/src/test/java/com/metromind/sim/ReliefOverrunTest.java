@@ -60,4 +60,12 @@ class ReliefOverrunTest {
         assertThatThrownBy(() -> new ReliefOverrun(0.1, 601, 1)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new ReliefOverrun(Double.NaN, 60, 1)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aLineOverridesOnlyWhatItDeclaresAndKeepsTheSeed() {
+        ReliefOverrun engineWide = new ReliefOverrun(0.2, 90, 7);
+        assertThat(engineWide.overriddenBy(null, null)).isSameAs(engineWide);
+        assertThat(engineWide.overriddenBy(0.5, null)).isEqualTo(new ReliefOverrun(0.5, 90, 7));
+        assertThat(engineWide.overriddenBy(null, 30.0)).isEqualTo(new ReliefOverrun(0.2, 30, 7));
+    }
 }

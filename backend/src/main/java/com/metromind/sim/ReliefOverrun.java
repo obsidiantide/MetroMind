@@ -44,6 +44,16 @@ public record ReliefOverrun(double share, double meanSeconds, long seed) {
         return seed == this.seed ? this : new ReliefOverrun(share, meanSeconds, seed);
     }
 
+    /**
+     * The overrun a line with its own late reliefs draws with: its own share and mean where it declares them, this
+     * one's otherwise, from this seed so the line's draws stay reproducible.
+     */
+    public ReliefOverrun overriddenBy(Double ownShare, Double ownMeanSeconds) {
+        double s = ownShare != null ? ownShare : share;
+        double m = ownMeanSeconds != null ? ownMeanSeconds : meanSeconds;
+        return s == share && m == meanSeconds ? this : new ReliefOverrun(s, m, seed);
+    }
+
     public boolean enabled() {
         return share > 0 && meanSeconds > 0;
     }

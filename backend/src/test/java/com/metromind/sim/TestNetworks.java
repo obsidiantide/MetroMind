@@ -120,4 +120,14 @@ public final class TestNetworks {
                 l.fleetPlan(), l.runTimeVariability(), l.depotAccessSeconds(), l.dwellVariability(), stationIds, seconds);
         return new MetroNetwork(base.city(), base.stations(), List.of(relieved), base.odWeights());
     }
+
+    /** {@code base} whose first line overrides the engine-wide share and mean of late relief drivers. */
+    public static MetroNetwork withOwnReliefOverrun(MetroNetwork base, Double share, Double seconds) {
+        Line l = base.lines().get(0);
+        Line own = new Line(l.id(), l.name(), l.color(), l.stationIds(), l.runSeconds(), l.trainCount(),
+                l.trainCapacity(), l.spareTrains(), l.path(), l.ring(), l.timingStationIds(), l.branches(),
+                l.fleetPlan(), l.runTimeVariability(), l.depotAccessSeconds(), l.dwellVariability(),
+                l.crewChangeStationIds(), l.crewChangeSeconds(), share, seconds);
+        return new MetroNetwork(base.city(), base.stations(), List.of(own), base.odWeights());
+    }
 }
