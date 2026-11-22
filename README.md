@@ -113,7 +113,7 @@ data usually comes in (OpenStreetMap exports, open-data portals, QGIS):
 | Feature | Geometry | Properties |
 |---|---|---|
 | Station | `Point` | `id` (or the feature's `id`), `name`, `baseArrivalsPerMinute`, optional `platformCapacity` |
-| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `dwellVariability`, optional `depotAccessSeconds`, optional `crewChangeStationIds` and `crewChangeSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
+| Line | `LineString`: the track, first station to last (a ring's track is closed, back to its first station) | `id`, `name`, `color`, `stationIds` (in track order), `trainCount`, `trainCapacity`, optional `spareTrains`, optional `ring`, optional `timingStationIds`, optional `fleetPlan`, optional `runTimeVariability`, optional `dwellVariability`, optional `depotAccessSeconds`, optional `crewChangeStationIds` and `crewChangeSeconds`, optional `reliefOverrunShare` and `reliefOverrunSeconds`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Branch | `LineString`: the branch track, from the junction to the branch terminal | `id`, `branchOf` (the line), `junctionStationId`, `stationIds` (branch stations after the junction, in track order), `share`, and optionally `runSeconds` or `averageSpeedKmh` |
 | Collection | (its own `properties`) | `city`, optional `odWeights` and `crossPlatform` as in the JSON format |
 
@@ -331,6 +331,17 @@ the same late reliefs and a run replays exactly. The timetable keeps the planned
 as lateness. Each one emits a `RELIEF_OVERRUN` event and is counted in the snapshot's `metrics.reliefOverruns`;
 strategy and times-of-day benchmarks draw late reliefs as often and as long as on the live engine,
 from the benchmark seed.
+
+Some lines have a harder time with their reliefs than others, e.g. one whose mess room is a long walk from the
+platform. A line may set its own `reliefOverrunShare` (0 to 1) and `reliefOverrunSeconds` (at most 600), in the native
+JSON and as GeoJSON line properties; each overrides the engine-wide value for that line's crew changes and the other
+falls back to it, drawn from the same seed. A line's own share applies even when the engine-wide share is 0, and
+`"reliefOverrunShare": 0` keeps a line's swaps to plan whatever the engine-wide setting:
+
+```json
+{ "id": "RED", "crewChangeStationIds": ["R1", "R5"], "crewChangeSeconds": 60,
+  "reliefOverrunShare": 0.2, "reliefOverrunSeconds": 90, ... }
+```
 
 `GET /api/stations/R3/departures` lists the trains leaving a station within the horizon, soonest first:
 
